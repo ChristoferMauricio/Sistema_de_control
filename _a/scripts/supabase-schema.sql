@@ -25,6 +25,25 @@ CREATE INDEX IF NOT EXISTS idx_jira_tickets_status ON jira_tickets (status);
 CREATE INDEX IF NOT EXISTS idx_jira_tickets_assignee ON jira_tickets (assignee_email);
 CREATE INDEX IF NOT EXISTS idx_jira_tickets_updated ON jira_tickets (updated_at DESC);
 
+-- ─── Tabla: jira_ticket_status_history ────────────────────
+-- Registra cada cambio de estado de un ticket para gráficos
+-- de seguimiento (burndown, cumulative flow, tiempo en estado)
+
+CREATE TABLE IF NOT EXISTS jira_ticket_status_history (
+  id              SERIAL PRIMARY KEY,
+  jira_key        TEXT NOT NULL,                 -- Ej: PF3-3157
+  old_status      TEXT,                          -- Estado anterior (NULL = ticket nuevo)
+  new_status      TEXT NOT NULL,                 -- Estado nuevo
+  changed_at      TIMESTAMPTZ DEFAULT NOW(),     -- Cuándo se detectó el cambio
+  CONSTRAINT fk_history_ticket FOREIGN KEY (jira_key)
+    REFERENCES jira_tickets(jira_key) ON DELETE CASCADE
+);
+
+-- Índices para consultas de historial
+CREATE INDEX IF NOT EXISTS idx_status_history_key ON jira_ticket_status_history (jira_key);
+CREATE INDEX IF NOT EXISTS idx_status_history_date ON jira_ticket_status_history (changed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_status_history_new ON jira_ticket_status_history (new_status);
+
 -- ─── Tabla: team_roles ─────────────────────────────────────
 -- Define el rol de cada usuario dentro del dashboard
 
@@ -61,6 +80,17 @@ CREATE POLICY "Authenticated users can read tickets"
 
 -- Política de inserción/actualización: solo service_role (para el sync script)
 -- Nota: service_role bypassa RLS por defecto en Supabase
+
+-- ─── RLS para jira_ticket_status_history ──────────────────
+-- Usuarios autenticados pueden leer el historial, escritura solo via service_role
+
+ALTER TABLE jira_ticket_status_history ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Authenticated users can read status history"
+  ON jira_ticket_status_history
+  FOR SELECT
+  TO authenticated
+  USING (true);
 
 -- ─── RLS para team_roles ───────────────────────────────────
 -- Cada usuario solo puede ver su propio rol

@@ -175,6 +175,87 @@ async function upsertToSupabase(records) {
   }
 }
 
+/**
+ * Obtiene los estados actuales de los tickets desde Supabase
+ * @param {Array<string>} jiraKeys - Array de jira_key a consultar
+ * @returns {Promise<Object>} - Mapa { jira_key: status }
+ */
+async function fetchCurrentStatuses(jiraKeys) {
+  const statusMap = {};
+  const batchSize = 50;
+
+  for (let i = 0; i < jiraKeys.length; i += batchSize) {
+    const batch = jiraKeys.slice(i, i + batchSize);
+    const filter = batch.map((k) => `"${k}"`).join(",");
+
+    const response = await fetch(
+      `${SUPABASE_URL}/rest/v1/jira_tickets?jira_key=in.(${filter})&select=jira_key,status`,
+      {
+        method: "GET",
+        headers: {
+          apikey: SUPABASE_SERVICE_KEY,
+          Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.warn(`⚠️  Error obteniendo estados actuales: ${errText}`);
+      continue;
+    }
+
+    const data = await response.json();
+    for (const row of data) {
+      statusMap[row.jira_key] = row.status;
+    }
+  }
+
+  return statusMap;
+}
+
+/**
+ * Registra cambios de estado en la tabla de historial
+ * @param {Array} changes - Array de { jira_key, old_status, new_status }
+ */
+async function recordStatusChanges(changes) {
+  if (changes.length === 0) {
+    console.log("ℹ️  No hay cambios de estado para registrar.");
+    return;
+  }
+
+  const batchSize = 100;
+  let inserted = 0;
+
+  for (let i = 0; i < changes.length; i += batchSize) {
+    const batch = changes.slice(i, i + batchSize);
+
+    const response = await fetch(
+      `${SUPABASE_URL}/rest/v1/jira_ticket_status_history`,
+      {
+        method: "POST",
+        headers: {
+          apikey: SUPABASE_SERVICE_KEY,
+          Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(batch),
+      }
+    );
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.warn(`⚠️  Error registrando historial: ${errText}`);
+      continue;
+    }
+
+    inserted += batch.length;
+  }
+
+  console.log(`   📊 ${inserted} cambio(s) de estado registrados en historial`);
+}
+
 // ─── Main ──────────────────────────────────────────────────
 
 async function main() {
@@ -203,13 +284,51 @@ async function main() {
 
     // 2. Transformar datos
     const records = issues.map(transformIssue);
-    console.log("🔄 Datos transformados, iniciando upsert...\n");
+    console.log("🔄 Datos transformados\n");
 
-    // 3. Upsert en Supabase
+    // 3. Detectar cambios de estado
+    const jiraKeys = records.map((r) => r.jira_key);
+    const currentStatuses = await fetchCurrentStatuses(jiraKeys);
+
+    const statusChanges = [];
+    const now = new Date().toISOString();
+
+    for (const record of records) {
+      const oldStatus = currentStatuses[record.jira_key];
+      const newStatus = record.status;
+
+      if (oldStatus === undefined) {
+        // Ticket nuevo — registrar estado inicial
+        statusChanges.push({
+          jira_key: record.jira_key,
+          old_status: null,
+          new_status: newStatus,
+          changed_at: now,
+        });
+      } else if (oldStatus !== newStatus) {
+        // Estado cambió — registrar transición
+        statusChanges.push({
+          jira_key: record.jira_key,
+          old_status: oldStatus,
+          new_status: newStatus,
+          changed_at: now,
+        });
+      }
+    }
+
+    console.log(`   🔀 ${statusChanges.length} cambio(s) de estado detectados`);
+
+    // 4. Upsert tickets en Supabase
     await upsertToSupabase(records);
+
+    // 5. Registrar cambios de estado en historial
+    if (statusChanges.length > 0) {
+      await recordStatusChanges(statusChanges);
+    }
 
     console.log(`\n🎉 Sincronización completada exitosamente!`);
     console.log(`   ${records.length} tickets sincronizados.`);
+    console.log(`   ${statusChanges.length} cambios de estado registrados.`);
   } catch (error) {
     console.error("\n❌ Error durante la sincronización:");
     console.error(`   ${error.message}`);
