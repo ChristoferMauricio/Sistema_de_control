@@ -31,7 +31,7 @@ const jiraHeaders = {
 async function searchJira(jql) {
   const allIssues = [];
   let startAt = 0;
-  const maxResults = 50;
+  const maxResults = 100;
   let total = Infinity;
 
   while (startAt < total) {
@@ -82,6 +82,9 @@ function transformIssue(issue) {
   };
 }
 
+// Vercel: máximo tiempo de ejecución (60s en plan Hobby)
+export const maxDuration = 60;
+
 export async function POST() {
   try {
     // Validar configuración
@@ -111,16 +114,21 @@ export async function POST() {
       });
     }
 
-    // 2. Obtener estados actuales de Supabase
+    // 2. Obtener estados actuales de Supabase (en lotes de 200)
     const jiraKeys = records.map((r) => r.jira_key);
-    const { data: currentTickets } = await supabaseAdmin
-      .from("jira_tickets")
-      .select("jira_key, status")
-      .in("jira_key", jiraKeys);
-
     const statusMap = {};
-    for (const t of currentTickets || []) {
-      statusMap[t.jira_key] = t.status;
+    const queryBatchSize = 200;
+
+    for (let i = 0; i < jiraKeys.length; i += queryBatchSize) {
+      const batch = jiraKeys.slice(i, i + queryBatchSize);
+      const { data: currentTickets } = await supabaseAdmin
+        .from("jira_tickets")
+        .select("jira_key, status")
+        .in("jira_key", batch);
+
+      for (const t of currentTickets || []) {
+        statusMap[t.jira_key] = t.status;
+      }
     }
 
     // 3. Detectar cambios de estado
@@ -148,23 +156,30 @@ export async function POST() {
       }
     }
 
-    // 4. Upsert tickets
-    const { error: upsertError } = await supabaseAdmin
-      .from("jira_tickets")
-      .upsert(records, { onConflict: "jira_key" });
+    // 4. Upsert tickets en lotes de 500
+    const upsertBatchSize = 500;
+    for (let i = 0; i < records.length; i += upsertBatchSize) {
+      const batch = records.slice(i, i + upsertBatchSize);
+      const { error: upsertError } = await supabaseAdmin
+        .from("jira_tickets")
+        .upsert(batch, { onConflict: "jira_key" });
 
-    if (upsertError) {
-      throw new Error(`Supabase upsert: ${upsertError.message}`);
+      if (upsertError) {
+        throw new Error(`Supabase upsert (lote ${i}): ${upsertError.message}`);
+      }
     }
 
-    // 5. Registrar cambios de estado
+    // 5. Registrar cambios de estado en lotes
     if (statusChanges.length > 0) {
-      const { error: historyError } = await supabaseAdmin
-        .from("jira_ticket_status_history")
-        .insert(statusChanges);
+      for (let i = 0; i < statusChanges.length; i += upsertBatchSize) {
+        const batch = statusChanges.slice(i, i + upsertBatchSize);
+        const { error: historyError } = await supabaseAdmin
+          .from("jira_ticket_status_history")
+          .insert(batch);
 
-      if (historyError) {
-        console.warn("Error registrando historial:", historyError.message);
+        if (historyError) {
+          console.warn("Error registrando historial:", historyError.message);
+        }
       }
     }
 

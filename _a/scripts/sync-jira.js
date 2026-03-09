@@ -75,7 +75,7 @@ const jiraHeaders = {
 async function searchJira(jql) {
   const allIssues = [];
   let startAt = 0;
-  const maxResults = 50;
+  const maxResults = 100;
   let total = Infinity;
 
   console.log(`🔍 JQL: ${jql}`);
@@ -265,11 +265,21 @@ async function main() {
   console.log("════════════════════════════════════════\n");
 
   try {
-    // Construir JQL: tickets actualizados en la última hora
-    // Si hay un project key, filtrar por proyecto
-    let jql = "updated >= -1h ORDER BY updated DESC";
+    // Modo: --recent solo trae la última hora, por defecto trae TODO
+    const isRecent = process.argv.includes("--recent");
+
+    let jql = "ORDER BY updated DESC";
     if (JIRA_PROJECT_KEY) {
-      jql = `project = ${JIRA_PROJECT_KEY} AND updated >= -1h ORDER BY updated DESC`;
+      jql = `project = ${JIRA_PROJECT_KEY} ORDER BY updated DESC`;
+    }
+
+    if (isRecent) {
+      jql = JIRA_PROJECT_KEY
+        ? `project = ${JIRA_PROJECT_KEY} AND updated >= -1h ORDER BY updated DESC`
+        : "updated >= -1h ORDER BY updated DESC";
+      console.log("📌 Modo incremental: solo tickets de la última hora\n");
+    } else {
+      console.log("📌 Modo completo: sincronizando TODOS los tickets\n");
     }
 
     // 1. Buscar en Jira
@@ -277,7 +287,7 @@ async function main() {
     console.log(`\n✅ Total issues encontrados: ${issues.length}\n`);
 
     if (issues.length === 0) {
-      console.log("ℹ️  No hay tickets actualizados en la última hora.");
+      console.log("ℹ️  No se encontraron tickets.");
       console.log("════════════════════════════════════════");
       return;
     }
