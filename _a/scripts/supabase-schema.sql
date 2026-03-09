@@ -7,23 +7,32 @@
 -- Almacena los tickets sincronizados desde Jira
 
 CREATE TABLE IF NOT EXISTS jira_tickets (
-  id            SERIAL PRIMARY KEY,
-  jira_key      TEXT UNIQUE NOT NULL,        -- Ej: PROJ-123
-  summary       TEXT,                         -- Resumen del ticket
-  status        TEXT,                         -- Estado (To Do, In Progress, Certificación, Producción, Done)
-  assignee_email TEXT,                        -- Email del asignado en Jira
-  assignee_name TEXT,                         -- Nombre visible del asignado
-  priority      TEXT,                         -- Prioridad (Highest, High, Medium, Low, Lowest)
-  issue_type    TEXT,                         -- Tipo (Bug, Story, Task, Epic, etc.)
-  created_at    TIMESTAMPTZ,                 -- Fecha de creación en Jira
-  updated_at    TIMESTAMPTZ,                 -- Última actualización en Jira
-  synced_at     TIMESTAMPTZ DEFAULT NOW()    -- Última sincronización
+  id              SERIAL PRIMARY KEY,
+  jira_key        TEXT UNIQUE NOT NULL,        -- Ej: PGIM-F3-123
+  summary         TEXT,                         -- Resumen del ticket
+  status          TEXT,                         -- Estado (To Do, In Progress, Certificación, Producción, Done)
+  assignee_email  TEXT,                         -- Email del asignado en Jira
+  assignee_name   TEXT,                         -- Nombre visible del asignado
+  priority        TEXT,                         -- Prioridad (Highest, High, Medium, Low, Lowest)
+  issue_type      TEXT,                         -- Tipo (Bug, Story, Task, Sub-task, Epic)
+  sprint          TEXT,                         -- Sprint activo (ej: "Sprint 5")
+  story_points    NUMERIC,                     -- Story points (solo aplica para Historias)
+  reporter_name   TEXT,                         -- Nombre del informador
+  reporter_email  TEXT,                         -- Email del informador
+  parent_key      TEXT,                         -- Clave del issue padre (ej: PGIM-F3-100)
+  subtask_keys    TEXT[],                       -- Array de claves de subtareas
+  created_at      TIMESTAMPTZ,                 -- Fecha de creación en Jira
+  updated_at      TIMESTAMPTZ,                 -- Última actualización en Jira
+  synced_at       TIMESTAMPTZ DEFAULT NOW()    -- Última sincronización
 );
 
 -- Índices para consultas frecuentes
 CREATE INDEX IF NOT EXISTS idx_jira_tickets_status ON jira_tickets (status);
 CREATE INDEX IF NOT EXISTS idx_jira_tickets_assignee ON jira_tickets (assignee_email);
 CREATE INDEX IF NOT EXISTS idx_jira_tickets_updated ON jira_tickets (updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_jira_tickets_issue_type ON jira_tickets (issue_type);
+CREATE INDEX IF NOT EXISTS idx_jira_tickets_sprint ON jira_tickets (sprint);
+CREATE INDEX IF NOT EXISTS idx_jira_tickets_parent ON jira_tickets (parent_key);
 
 -- ─── Tabla: jira_ticket_status_history ────────────────────
 -- Registra cada cambio de estado de un ticket para gráficos
@@ -120,17 +129,3 @@ CREATE POLICY "Admins can read all roles"
       AND tr.role = 'admin'
     )
   );
-
-
--- ═══════════════════════════════════════════════════════════
--- DATOS DE EJEMPLO (Opcional — para testing)
--- ═══════════════════════════════════════════════════════════
-
--- Descomenta las líneas siguientes para insertar datos de prueba
-
--- INSERT INTO jira_tickets (jira_key, summary, status, assignee_email, assignee_name, priority, issue_type, created_at, updated_at) VALUES
--- ('PROJ-001', 'Implementar autenticación OAuth', 'In Progress', 'dev@ejemplo.com', 'Juan Pérez', 'High', 'Story', NOW() - INTERVAL '5 days', NOW() - INTERVAL '1 hour'),
--- ('PROJ-002', 'Fix: Error en cálculo de totales', 'Certificación', 'qa@ejemplo.com', 'María García', 'Highest', 'Bug', NOW() - INTERVAL '3 days', NOW() - INTERVAL '2 hours'),
--- ('PROJ-003', 'Bug crítico en producción - Login falla', 'Producción', 'dev@ejemplo.com', 'Juan Pérez', 'Highest', 'Bug', NOW() - INTERVAL '1 day', NOW() - INTERVAL '30 minutes'),
--- ('PROJ-004', 'Agregar validación de formularios', 'To Do', 'dev2@ejemplo.com', 'Carlos López', 'Medium', 'Task', NOW() - INTERVAL '7 days', NOW() - INTERVAL '4 hours'),
--- ('PROJ-005', 'Optimizar queries de base de datos', 'Done', 'dev@ejemplo.com', 'Juan Pérez', 'Low', 'Task', NOW() - INTERVAL '10 days', NOW() - INTERVAL '1 day');

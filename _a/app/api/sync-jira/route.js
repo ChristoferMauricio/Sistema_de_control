@@ -34,7 +34,7 @@ async function searchJira(jql) {
   let nextPageToken = null;
 
   while (true) {
-    const fields = "key,summary,status,assignee,priority,issuetype,created,updated";
+    const fields = "key,summary,status,assignee,priority,issuetype,created,updated,reporter,parent,subtasks,customfield_10036,customfield_10020";
     const params = new URLSearchParams({
       jql,
       maxResults: String(maxResults),
@@ -72,6 +72,17 @@ async function searchJira(jql) {
 }
 
 /**
+ * Extrae el nombre del sprint activo
+ */
+function extractSprintName(sprintField) {
+  if (!sprintField || !Array.isArray(sprintField) || sprintField.length === 0) {
+    return null;
+  }
+  const activeSprint = sprintField.find(s => s.state === "active") || sprintField[sprintField.length - 1];
+  return activeSprint?.name || null;
+}
+
+/**
  * Transforma issue de Jira al formato de nuestra tabla
  */
 function transformIssue(issue) {
@@ -84,6 +95,14 @@ function transformIssue(issue) {
     assignee_name: fields.assignee?.displayName || "",
     priority: fields.priority?.name || "",
     issue_type: fields.issuetype?.name || "",
+    sprint: extractSprintName(fields.customfield_10020),
+    story_points: fields.customfield_10036 || null,
+    reporter_name: fields.reporter?.displayName || "",
+    reporter_email: fields.reporter?.emailAddress || "",
+    parent_key: fields.parent?.key || null,
+    subtask_keys: fields.subtasks && fields.subtasks.length > 0
+      ? fields.subtasks.map(s => s.key)
+      : null,
     created_at: fields.created || null,
     updated_at: fields.updated || null,
     synced_at: new Date().toISOString(),
@@ -103,7 +122,7 @@ export async function POST() {
       );
     }
 
-    // Construir JQL — traer todos los tickets del proyecto (no solo última hora)
+    // Construir JQL — traer todos los tickets del proyecto
     let jql = "ORDER BY updated DESC";
     if (JIRA_PROJECT_KEY) {
       jql = `project = ${JIRA_PROJECT_KEY} ORDER BY updated DESC`;

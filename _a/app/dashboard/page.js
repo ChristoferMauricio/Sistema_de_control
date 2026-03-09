@@ -7,6 +7,7 @@ import Card from "@/components/ui/Card";
 
 export default function DashboardPage() {
   const [tickets, setTickets] = useState([]);
+  const [statusHistory, setStatusHistory] = useState({});
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState(null);
@@ -56,6 +57,23 @@ export default function DashboardPage() {
           (t.status || "").toLowerCase().includes("producci")
         ).length,
       });
+    }
+
+    // Fetch status history for all tickets
+    const { data: historyData } = await supabase
+      .from("jira_ticket_status_history")
+      .select("*")
+      .order("changed_at", { ascending: true });
+
+    if (historyData) {
+      const historyMap = {};
+      for (const entry of historyData) {
+        if (!historyMap[entry.jira_key]) {
+          historyMap[entry.jira_key] = [];
+        }
+        historyMap[entry.jira_key].push(entry);
+      }
+      setStatusHistory(historyMap);
     }
 
     setLoading(false);
@@ -250,7 +268,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Tickets Table */}
-      <TicketTable tickets={tickets} title="Todos los Tickets" />
+      <TicketTable tickets={tickets} title="Todos los Tickets" statusHistory={statusHistory} />
     </div>
   );
 }

@@ -83,6 +83,26 @@ export function getStatusColor(status) {
 }
 
 /**
+ * Devuelve clases de color según el tipo de incidencia (light theme)
+ * @param {string} issueType - Tipo de incidencia
+ * @returns {object} Clases CSS
+ */
+export function getIssueTypeStyle(issueType) {
+  const normalized = (issueType || '').toLowerCase();
+  if (normalized.includes('histori') || normalized === 'story')
+    return { bg: 'bg-green-50', text: 'text-green-700', dot: 'bg-green-500' };
+  if (normalized.includes('bug'))
+    return { bg: 'bg-red-50', text: 'text-red-700', dot: 'bg-red-500' };
+  if (normalized.includes('sub-task') || normalized.includes('subtare') || normalized === 'subtask')
+    return { bg: 'bg-teal-50', text: 'text-teal-700', dot: 'bg-teal-500' };
+  if (normalized.includes('task') || normalized.includes('tarea'))
+    return { bg: 'bg-blue-50', text: 'text-blue-700', dot: 'bg-blue-500' };
+  if (normalized.includes('epic') || normalized.includes('épica'))
+    return { bg: 'bg-purple-50', text: 'text-purple-700', dot: 'bg-purple-500' };
+  return { bg: 'bg-gray-100', text: 'text-gray-600', dot: 'bg-gray-400' };
+}
+
+/**
  * Genera iniciales a partir de un nombre
  * @param {string} name - Nombre completo
  * @returns {string} Iniciales (máx 2 caracteres)

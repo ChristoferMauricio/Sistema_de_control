@@ -81,7 +81,10 @@ async function searchJira(jql) {
   console.log(`🔍 JQL: ${jql}`);
 
   while (true) {
-    const fields = "key,summary,status,assignee,priority,issuetype,created,updated";
+    // Campos: key, summary, status, assignee, priority, issuetype, created, updated
+    //         + sprint (customfield_10020), story_points (customfield_10016),
+    //         + reporter, parent, subtasks
+    const fields = "key,summary,status,assignee,priority,issuetype,created,updated,reporter,parent,subtasks,customfield_10036,customfield_10020";
     const params = new URLSearchParams({
       jql,
       maxResults: String(maxResults),
@@ -124,6 +127,19 @@ async function searchJira(jql) {
 }
 
 /**
+ * Extrae el nombre del sprint activo de los datos de Jira
+ * customfield_10020 es un array de sprints, tomamos el último (activo)
+ */
+function extractSprintName(sprintField) {
+  if (!sprintField || !Array.isArray(sprintField) || sprintField.length === 0) {
+    return null;
+  }
+  // El último sprint en el array suele ser el activo
+  const activeSprint = sprintField.find(s => s.state === "active") || sprintField[sprintField.length - 1];
+  return activeSprint?.name || null;
+}
+
+/**
  * Transforma un issue de Jira al formato de nuestra tabla
  * @param {object} issue - Issue de Jira
  * @returns {object} - Registro para Supabase
@@ -138,6 +154,14 @@ function transformIssue(issue) {
     assignee_name: fields.assignee?.displayName || "",
     priority: fields.priority?.name || "",
     issue_type: fields.issuetype?.name || "",
+    sprint: extractSprintName(fields.customfield_10020),
+    story_points: fields.customfield_10036 || null,
+    reporter_name: fields.reporter?.displayName || "",
+    reporter_email: fields.reporter?.emailAddress || "",
+    parent_key: fields.parent?.key || null,
+    subtask_keys: fields.subtasks && fields.subtasks.length > 0
+      ? fields.subtasks.map(s => s.key)
+      : null,
     created_at: fields.created || null,
     updated_at: fields.updated || null,
     synced_at: new Date().toISOString(),
