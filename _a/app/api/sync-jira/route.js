@@ -30,18 +30,21 @@ const jiraHeaders = {
  */
 async function searchJira(jql) {
   const allIssues = [];
-  let startAt = 0;
   const maxResults = 100;
-  let total = Infinity;
+  let nextPageToken = null;
 
-  while (startAt < total) {
+  while (true) {
     const fields = "key,summary,status,assignee,priority,issuetype,created,updated";
     const params = new URLSearchParams({
       jql,
-      startAt: String(startAt),
       maxResults: String(maxResults),
       fields,
     });
+
+    if (nextPageToken) {
+      params.set("nextPageToken", nextPageToken);
+    }
+
     const url = `${JIRA_BASE_URL}/rest/api/3/search/jql?${params.toString()}`;
 
     const response = await fetch(url, {
@@ -55,9 +58,14 @@ async function searchJira(jql) {
     }
 
     const data = await response.json();
-    total = data.total;
-    allIssues.push(...(data.issues || []));
-    startAt += maxResults;
+    const issues = data.issues || [];
+    allIssues.push(...issues);
+
+    if (!data.nextPageToken || issues.length === 0) {
+      break;
+    }
+
+    nextPageToken = data.nextPageToken;
   }
 
   return allIssues;

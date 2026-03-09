@@ -74,20 +74,25 @@ const jiraHeaders = {
  */
 async function searchJira(jql) {
   const allIssues = [];
-  let startAt = 0;
   const maxResults = 100;
-  let total = Infinity;
+  let nextPageToken = null;
+  let pageNum = 0;
 
   console.log(`🔍 JQL: ${jql}`);
 
-  while (startAt < total) {
+  while (true) {
     const fields = "key,summary,status,assignee,priority,issuetype,created,updated";
     const params = new URLSearchParams({
       jql,
-      startAt: String(startAt),
       maxResults: String(maxResults),
       fields,
     });
+
+    // Agregar token de paginación si existe (segunda página en adelante)
+    if (nextPageToken) {
+      params.set("nextPageToken", nextPageToken);
+    }
+
     const url = `${JIRA_BASE_URL}/rest/api/3/search/jql?${params.toString()}`;
 
     const response = await fetch(url, {
@@ -101,11 +106,18 @@ async function searchJira(jql) {
     }
 
     const data = await response.json();
-    total = data.total;
-    allIssues.push(...(data.issues || []));
-    startAt += maxResults;
+    const issues = data.issues || [];
+    allIssues.push(...issues);
+    pageNum++;
 
-    console.log(`   📄 Obtenidos ${allIssues.length}/${total} issues`);
+    console.log(`   📄 Página ${pageNum}: +${issues.length} issues (total acumulado: ${allIssues.length})`);
+
+    // Si no hay nextPageToken, ya no hay más páginas
+    if (!data.nextPageToken || issues.length === 0) {
+      break;
+    }
+
+    nextPageToken = data.nextPageToken;
   }
 
   return allIssues;
