@@ -18,23 +18,41 @@ export default function DashboardPage() {
   });
 
   const fetchData = useCallback(async () => {
-    const { data, error } = await supabase
-      .from("jira_tickets")
-      .select("*")
-      .order("updated_at", { ascending: false });
+    // Supabase limita a 1000 filas por query — paginar para traer todo
+    let allData = [];
+    const pageSize = 1000;
+    let from = 0;
+    let hasMore = true;
 
-    if (!error && data) {
-      setTickets(data);
+    while (hasMore) {
+      const { data, error } = await supabase
+        .from("jira_tickets")
+        .select("*")
+        .order("updated_at", { ascending: false })
+        .range(from, from + pageSize - 1);
+
+      if (error || !data) {
+        hasMore = false;
+        break;
+      }
+
+      allData = [...allData, ...data];
+      from += pageSize;
+      hasMore = data.length === pageSize;
+    }
+
+    if (allData.length > 0) {
+      setTickets(allData);
 
       setStats({
-        total: data.length,
-        pendientes: data.filter(
+        total: allData.length,
+        pendientes: allData.filter(
           (t) => !["Done", "Cerrado"].some((s) => (t.status || "").includes(s))
         ).length,
-        certificacion: data.filter((t) =>
+        certificacion: allData.filter((t) =>
           (t.status || "").toLowerCase().includes("certificaci")
         ).length,
-        produccion: data.filter((t) =>
+        produccion: allData.filter((t) =>
           (t.status || "").toLowerCase().includes("producci")
         ).length,
       });
