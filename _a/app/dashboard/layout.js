@@ -49,17 +49,17 @@ export default function DashboardLayout({ children }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-mesh">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="flex flex-col items-center gap-4 animate-fade-in">
-          <div className="w-10 h-10 border-3 border-primary border-t-transparent rounded-full animate-spin" />
-          <p className="text-secondary-text text-sm">Cargando dashboard...</p>
+          <div className="w-10 h-10 border-3 border-orange-500 border-t-transparent rounded-full animate-spin" />
+          <p className="text-gray-500 text-sm">Cargando dashboard...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex bg-gradient-mesh">
+    <div className="min-h-screen flex bg-gray-50">
       {/* Sidebar Navigation */}
       <DashboardNav user={user} role={role} />
 

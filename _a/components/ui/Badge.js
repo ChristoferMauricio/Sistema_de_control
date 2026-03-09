@@ -1,12 +1,12 @@
 export default function Badge({ children, color = "default", className = "" }) {
   const colors = {
-    default: "bg-slate-500/20 text-slate-400",
-    primary: "bg-primary/20 text-primary-light",
-    success: "bg-emerald-500/20 text-emerald-400",
-    warning: "bg-amber-500/20 text-amber-400",
-    danger: "bg-red-500/20 text-red-400",
-    info: "bg-blue-500/20 text-blue-400",
-    purple: "bg-purple-500/20 text-purple-400",
+    default: "bg-gray-100 text-gray-600",
+    primary: "bg-orange-50 text-orange-700",
+    success: "bg-emerald-50 text-emerald-700",
+    warning: "bg-amber-50 text-amber-700",
+    danger: "bg-red-50 text-red-700",
+    info: "bg-blue-50 text-blue-700",
+    purple: "bg-purple-50 text-purple-700",
   };
 
   return (

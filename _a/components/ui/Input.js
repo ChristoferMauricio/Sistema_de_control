@@ -10,7 +10,7 @@ export default function Input({
       {label && (
         <label
           htmlFor={id}
-          className="block text-sm font-medium text-secondary-text"
+          className="block text-sm font-medium text-gray-700"
         >
           {label}
         </label>
@@ -19,17 +19,17 @@ export default function Input({
         id={id}
         className={`
           w-full px-4 py-3 rounded-xl
-          bg-elevated border border-border
-          text-foreground placeholder-muted
-          focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50
+          bg-white border border-gray-200
+          text-gray-900 placeholder-gray-400
+          focus:outline-none focus:ring-2 focus:ring-orange-500/40 focus:border-orange-500/40
           transition-all duration-200
-          ${error ? "border-red-500/50 focus:ring-red-500/50" : ""}
+          ${error ? "border-red-400 focus:ring-red-500/40" : ""}
           ${className}
         `}
         {...props}
       />
       {error && (
-        <p className="text-xs text-red-400 mt-1">{error}</p>
+        <p className="text-xs text-red-600 mt-1">{error}</p>
       )}
     </div>
   );

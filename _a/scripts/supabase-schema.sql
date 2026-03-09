@@ -72,6 +72,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_team_roles_unique ON team_roles (user_id);
 ALTER TABLE jira_tickets ENABLE ROW LEVEL SECURITY;
 
 -- Política de lectura: cualquier usuario autenticado
+DROP POLICY IF EXISTS "Authenticated users can read tickets" ON jira_tickets;
 CREATE POLICY "Authenticated users can read tickets"
   ON jira_tickets
   FOR SELECT
@@ -86,6 +87,7 @@ CREATE POLICY "Authenticated users can read tickets"
 
 ALTER TABLE jira_ticket_status_history ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Authenticated users can read status history" ON jira_ticket_status_history;
 CREATE POLICY "Authenticated users can read status history"
   ON jira_ticket_status_history
   FOR SELECT
@@ -98,6 +100,7 @@ CREATE POLICY "Authenticated users can read status history"
 ALTER TABLE team_roles ENABLE ROW LEVEL SECURITY;
 
 -- Política de lectura: solo tu propio registro
+DROP POLICY IF EXISTS "Users can read own role" ON team_roles;
 CREATE POLICY "Users can read own role"
   ON team_roles
   FOR SELECT
@@ -105,6 +108,7 @@ CREATE POLICY "Users can read own role"
   USING (user_id = auth.uid());
 
 -- Política de lectura para admins: un admin puede ver todos los roles
+DROP POLICY IF EXISTS "Admins can read all roles" ON team_roles;
 CREATE POLICY "Admins can read all roles"
   ON team_roles
   FOR SELECT

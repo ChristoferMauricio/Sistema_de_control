@@ -49,37 +49,37 @@ export function truncate(str, maxLength = 60) {
 }
 
 /**
- * Devuelve clases de color según la prioridad de Jira
+ * Devuelve clases de color según la prioridad de Jira (light theme)
  * @param {string} priority - Prioridad del ticket
  * @returns {object} Clases CSS de bg y text
  */
 export function getPriorityColor(priority) {
   const colors = {
-    Highest: { bg: 'bg-red-500/20', text: 'text-red-400', dot: 'bg-red-500' },
-    High: { bg: 'bg-orange-500/20', text: 'text-orange-400', dot: 'bg-orange-500' },
-    Medium: { bg: 'bg-yellow-500/20', text: 'text-yellow-400', dot: 'bg-yellow-500' },
-    Low: { bg: 'bg-blue-500/20', text: 'text-blue-400', dot: 'bg-blue-500' },
-    Lowest: { bg: 'bg-slate-500/20', text: 'text-slate-400', dot: 'bg-slate-500' },
+    Highest: { bg: 'bg-red-50', text: 'text-red-700', dot: 'bg-red-500' },
+    High: { bg: 'bg-orange-50', text: 'text-orange-700', dot: 'bg-orange-500' },
+    Medium: { bg: 'bg-amber-50', text: 'text-amber-700', dot: 'bg-amber-500' },
+    Low: { bg: 'bg-blue-50', text: 'text-blue-700', dot: 'bg-blue-500' },
+    Lowest: { bg: 'bg-gray-100', text: 'text-gray-600', dot: 'bg-gray-400' },
   };
   return colors[priority] || colors.Medium;
 }
 
 /**
- * Devuelve clases de color según el estado del ticket
+ * Devuelve clases de color según el estado del ticket (light theme)
  * @param {string} status - Estado del ticket
  * @returns {object} Clases CSS
  */
 export function getStatusColor(status) {
   const normalized = (status || '').toLowerCase();
   if (normalized.includes('done') || normalized.includes('cerrado'))
-    return { bg: 'bg-emerald-500/20', text: 'text-emerald-400' };
+    return { bg: 'bg-emerald-50', text: 'text-emerald-700' };
   if (normalized.includes('progress') || normalized.includes('desarrollo'))
-    return { bg: 'bg-blue-500/20', text: 'text-blue-400' };
+    return { bg: 'bg-blue-50', text: 'text-blue-700' };
   if (normalized.includes('review') || normalized.includes('certificación') || normalized.includes('certificacion'))
-    return { bg: 'bg-purple-500/20', text: 'text-purple-400' };
+    return { bg: 'bg-purple-50', text: 'text-purple-700' };
   if (normalized.includes('producción') || normalized.includes('produccion'))
-    return { bg: 'bg-red-500/20', text: 'text-red-400' };
-  return { bg: 'bg-slate-500/20', text: 'text-slate-400' };
+    return { bg: 'bg-red-50', text: 'text-red-700' };
+  return { bg: 'bg-gray-100', text: 'text-gray-600' };
 }
 
 /**

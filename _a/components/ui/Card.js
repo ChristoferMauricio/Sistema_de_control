@@ -8,9 +8,10 @@ export default function Card({
   return (
     <div
       className={`
-        glass rounded-2xl p-6
-        ${hover ? "glass-hover cursor-pointer" : ""}
-        ${glow ? "hover:shadow-lg hover:shadow-primary/10" : ""}
+        bg-white rounded-2xl p-6 border border-gray-200
+        shadow-sm
+        ${hover ? "hover:shadow-md hover:border-gray-300 cursor-pointer" : ""}
+        ${glow ? "hover:shadow-lg hover:shadow-orange-500/5" : ""}
         transition-all duration-300
         ${className}
       `}

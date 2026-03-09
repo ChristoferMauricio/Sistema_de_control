@@ -20,10 +20,10 @@ export default function HomePage() {
   }, [router]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-mesh">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="flex flex-col items-center gap-4 animate-fade-in">
-        <div className="w-12 h-12 border-3 border-primary border-t-transparent rounded-full animate-spin" />
-        <p className="text-secondary-text font-medium">Cargando...</p>
+        <div className="w-12 h-12 border-3 border-orange-500 border-t-transparent rounded-full animate-spin" />
+        <p className="text-gray-500 font-medium">Cargando...</p>
       </div>
     </div>
   );

@@ -103,8 +103,8 @@ export default function DashboardPage() {
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
         </svg>
       ),
-      color: "text-blue-400",
-      bg: "bg-blue-500/15",
+      color: "text-blue-600",
+      bg: "bg-blue-50",
     },
     {
       label: "Pendientes",
@@ -114,8 +114,8 @@ export default function DashboardPage() {
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
       ),
-      color: "text-amber-400",
-      bg: "bg-amber-500/15",
+      color: "text-amber-600",
+      bg: "bg-amber-50",
     },
     {
       label: "En Certificación",
@@ -125,8 +125,8 @@ export default function DashboardPage() {
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
         </svg>
       ),
-      color: "text-purple-400",
-      bg: "bg-purple-500/15",
+      color: "text-purple-600",
+      bg: "bg-purple-50",
     },
     {
       label: "En Producción",
@@ -136,8 +136,8 @@ export default function DashboardPage() {
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
         </svg>
       ),
-      color: "text-red-400",
-      bg: "bg-red-500/15",
+      color: "text-red-600",
+      bg: "bg-red-50",
     },
   ];
 
@@ -146,13 +146,13 @@ export default function DashboardPage() {
       <div className="space-y-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="glass rounded-2xl p-6">
+            <div key={i} className="bg-white rounded-2xl border border-gray-200 p-6">
               <div className="skeleton h-5 w-24 mb-3" />
               <div className="skeleton h-8 w-16" />
             </div>
           ))}
         </div>
-        <div className="glass rounded-2xl p-6">
+        <div className="bg-white rounded-2xl border border-gray-200 p-6">
           <div className="skeleton h-6 w-32 mb-4" />
           <div className="space-y-3">
             {[1, 2, 3, 4, 5].map((i) => (
@@ -169,10 +169,10 @@ export default function DashboardPage() {
       {/* Header + Sync Button */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 animate-fade-in">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold font-[family-name:var(--font-heading)] text-foreground">
+          <h1 className="text-2xl md:text-3xl font-bold font-[family-name:var(--font-heading)] text-gray-900">
             Vista General
           </h1>
-          <p className="text-secondary-text mt-1">
+          <p className="text-gray-500 mt-1">
             Resumen de todos los tickets sincronizados desde Jira
           </p>
         </div>
@@ -185,8 +185,8 @@ export default function DashboardPage() {
             inline-flex items-center gap-2.5 px-5 py-2.5 rounded-xl
             font-medium text-sm transition-all duration-300
             ${syncing
-              ? "bg-white/5 text-muted cursor-wait"
-              : "bg-primary/90 hover:bg-primary text-white shadow-lg shadow-primary/25 hover:shadow-primary/40 hover:scale-[1.02] active:scale-[0.98]"
+              ? "bg-gray-100 text-gray-400 cursor-wait"
+              : "bg-orange-500 hover:bg-orange-600 text-white shadow-md shadow-orange-500/15 hover:shadow-lg hover:shadow-orange-500/25 hover:scale-[1.02] active:scale-[0.98]"
             }
           `}
         >
@@ -212,8 +212,8 @@ export default function DashboardPage() {
           className={`
             flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium animate-slide-up
             ${syncResult.type === "success"
-              ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20"
-              : "bg-red-500/15 text-red-400 border border-red-500/20"
+              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+              : "bg-red-50 text-red-700 border border-red-200"
             }
           `}
         >
@@ -236,8 +236,8 @@ export default function DashboardPage() {
           <Card key={kpi.label} hover className={`animate-slide-up stagger-${index + 1}`}>
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-muted text-sm font-medium">{kpi.label}</p>
-                <p className="text-3xl font-bold font-[family-name:var(--font-heading)] text-foreground mt-1">
+                <p className="text-gray-500 text-sm font-medium">{kpi.label}</p>
+                <p className="text-3xl font-bold font-[family-name:var(--font-heading)] text-gray-900 mt-1">
                   {kpi.value}
                 </p>
               </div>
