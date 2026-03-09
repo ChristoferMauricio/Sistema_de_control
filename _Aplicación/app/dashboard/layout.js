@@ -1,0 +1,74 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
+import DashboardNav from "@/components/DashboardNav";
+
+export default function DashboardLayout({ children }) {
+  const router = useRouter();
+  const [user, setUser] = useState(null);
+  const [role, setRole] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function checkSession() {
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) {
+        router.replace("/login");
+        return;
+      }
+
+      setUser(session.user);
+
+      // Obtener rol del usuario
+      const { data: roleData } = await supabase
+        .from("team_roles")
+        .select("role")
+        .eq("user_id", session.user.id)
+        .single();
+
+      setRole(roleData?.role || "viewer");
+      setLoading(false);
+    }
+
+    checkSession();
+
+    // Escuchar cambios de auth
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (event === "SIGNED_OUT" || !session) {
+          router.replace("/login");
+        }
+      }
+    );
+
+    return () => subscription?.unsubscribe();
+  }, [router]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-mesh">
+        <div className="flex flex-col items-center gap-4 animate-fade-in">
+          <div className="w-10 h-10 border-3 border-primary border-t-transparent rounded-full animate-spin" />
+          <p className="text-secondary-text text-sm">Cargando dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen flex bg-gradient-mesh">
+      {/* Sidebar Navigation */}
+      <DashboardNav user={user} role={role} />
+
+      {/* Main Content */}
+      <main className="flex-1 lg:ml-72 min-h-screen">
+        <div className="p-4 md:p-6 lg:p-8 max-w-7xl mx-auto">
+          {children}
+        </div>
+      </main>
+    </div>
+  );
+}
