@@ -30,7 +30,7 @@ if (fs.existsSync(envPath)) {
 
 // ─── Configuración ─────────────────────────────────────────
 
-const JIRA_BASE_URL = process.env.JIRA_BASE_URL;
+const JIRA_BASE_URL = (process.env.JIRA_BASE_URL || "").replace(/\/+$/, "");
 const JIRA_USER_EMAIL = process.env.JIRA_USER_EMAIL;
 const JIRA_API_TOKEN = process.env.JIRA_API_TOKEN;
 const JIRA_PROJECT_KEY = process.env.JIRA_PROJECT_KEY || "";
@@ -152,7 +152,7 @@ async function upsertToSupabase(records) {
     const batch = records.slice(i, i + batchSize);
 
     const response = await fetch(
-      `${SUPABASE_URL}/rest/v1/jira_tickets`,
+      `${SUPABASE_URL}/rest/v1/jira_tickets?on_conflict=jira_key`,
       {
         method: "POST",
         headers: {
