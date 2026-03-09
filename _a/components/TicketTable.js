@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { formatDate, timeAgo, getStatusColor, getIssueTypeStyle, truncate } from "@/lib/utils";
 
 const PAGE_SIZE = 15;
@@ -11,6 +11,58 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
   const [sortDir, setSortDir] = useState("desc");
   const [currentPage, setCurrentPage] = useState(1);
   const [expandedRow, setExpandedRow] = useState(null);
+
+  // Column filters
+  const [filterType, setFilterType] = useState("");
+  const [filterSprint, setFilterSprint] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
+  const [filterAssignee, setFilterAssignee] = useState("");
+  const [filterReporter, setFilterReporter] = useState("");
+
+  // Dual scrollbar refs
+  const topScrollRef = useRef(null);
+  const bottomScrollRef = useRef(null);
+  const [scrollWidth, setScrollWidth] = useState(0);
+  const isSyncing = useRef(false);
+
+  // Sync top ↔ bottom scroll
+  const handleTopScroll = useCallback(() => {
+    if (isSyncing.current) return;
+    isSyncing.current = true;
+    if (bottomScrollRef.current && topScrollRef.current) {
+      bottomScrollRef.current.scrollLeft = topScrollRef.current.scrollLeft;
+    }
+    isSyncing.current = false;
+  }, []);
+
+  const handleBottomScroll = useCallback(() => {
+    if (isSyncing.current) return;
+    isSyncing.current = true;
+    if (topScrollRef.current && bottomScrollRef.current) {
+      topScrollRef.current.scrollLeft = bottomScrollRef.current.scrollLeft;
+    }
+    isSyncing.current = false;
+  }, []);
+
+  // Measure table width for the top scrollbar
+  useEffect(() => {
+    const el = bottomScrollRef.current;
+    if (!el) return;
+    const updateWidth = () => setScrollWidth(el.scrollWidth);
+    updateWidth();
+    const observer = new ResizeObserver(updateWidth);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  // Get unique values for filter dropdowns
+  const uniqueTypes = useMemo(() => [...new Set(tickets.map(t => t.issue_type).filter(Boolean))].sort(), [tickets]);
+  const uniqueSprints = useMemo(() => [...new Set(tickets.map(t => t.sprint).filter(Boolean))].sort(), [tickets]);
+  const uniqueStatuses = useMemo(() => [...new Set(tickets.map(t => t.status).filter(Boolean))].sort(), [tickets]);
+  const uniqueAssignees = useMemo(() => [...new Set(tickets.map(t => t.assignee_name).filter(Boolean))].sort(), [tickets]);
+  const uniqueReporters = useMemo(() => [...new Set(tickets.map(t => t.reporter_name).filter(Boolean))].sort(), [tickets]);
+
+  const activeFilterCount = [filterType, filterSprint, filterStatus, filterAssignee, filterReporter].filter(Boolean).length;
 
   // Filter + Sort
   const filtered = useMemo(() => {
@@ -29,6 +81,13 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
       );
     }
 
+    // Apply column filters
+    if (filterType) result = result.filter(t => t.issue_type === filterType);
+    if (filterSprint) result = result.filter(t => t.sprint === filterSprint);
+    if (filterStatus) result = result.filter(t => t.status === filterStatus);
+    if (filterAssignee) result = result.filter(t => t.assignee_name === filterAssignee);
+    if (filterReporter) result = result.filter(t => t.reporter_name === filterReporter);
+
     result.sort((a, b) => {
       const aVal = a[sortField] || "";
       const bVal = b[sortField] || "";
@@ -37,7 +96,7 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
     });
 
     return result;
-  }, [tickets, search, sortField, sortDir]);
+  }, [tickets, search, sortField, sortDir, filterType, filterSprint, filterStatus, filterAssignee, filterReporter]);
 
   // Pagination
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -56,6 +115,16 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
     setCurrentPage(1);
   }
 
+  function clearAllFilters() {
+    setFilterType("");
+    setFilterSprint("");
+    setFilterStatus("");
+    setFilterAssignee("");
+    setFilterReporter("");
+    setSearch("");
+    setCurrentPage(1);
+  }
+
   function SortIcon({ field }) {
     if (sortField !== field) return null;
     return (
@@ -65,13 +134,32 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
     );
   }
 
-  // Helper: ¿Es Historia?
+  function FilterSelect({ value, onChange, options, placeholder }) {
+    return (
+      <select
+        value={value}
+        onChange={(e) => { onChange(e.target.value); setCurrentPage(1); }}
+        className={`
+          w-full mt-1 px-1.5 py-1 rounded-md text-[11px] border
+          focus:outline-none focus:ring-1 focus:ring-orange-400 transition-colors cursor-pointer
+          ${value
+            ? "bg-orange-50 border-orange-300 text-orange-700 font-medium"
+            : "bg-white border-gray-200 text-gray-500"
+          }
+        `}
+      >
+        <option value="">{placeholder}</option>
+        {options.map((opt) => (
+          <option key={opt} value={opt}>{opt}</option>
+        ))}
+      </select>
+    );
+  }
+
+  // Helpers
   const isStory = (type) => (type || "").toLowerCase().includes("histori") || (type || "").toLowerCase() === "story";
-  // Helper: ¿Es Subtarea?
   const isSubtask = (type) => (type || "").toLowerCase().includes("subtare") || (type || "").toLowerCase().includes("sub-task") || (type || "").toLowerCase() === "subtask";
-  // Helper: ¿Es Épica?
   const isEpic = (type) => (type || "").toLowerCase().includes("epic") || (type || "").toLowerCase().includes("épica");
-  // Helper: ¿Aplica historial de estados? (No para Subtarea ni Épica)
   const hasStatusHistory = (type) => !isSubtask(type) && !isEpic(type);
 
   return (
@@ -84,97 +172,133 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
           </h3>
           <p className="text-xs text-gray-400 mt-0.5">
             {filtered.length} ticket{filtered.length !== 1 ? "s" : ""} encontrado{filtered.length !== 1 ? "s" : ""}
+            {activeFilterCount > 0 && (
+              <span className="ml-1 text-orange-500">
+                ({activeFilterCount} filtro{activeFilterCount !== 1 ? "s" : ""} activo{activeFilterCount !== 1 ? "s" : ""})
+              </span>
+            )}
           </p>
         </div>
 
-        {/* Search */}
-        <div className="relative">
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setCurrentPage(1);
-            }}
-            placeholder="Buscar tickets..."
-            className="pl-9 pr-4 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500/40 focus:border-orange-500/40 transition-all w-full sm:w-64"
-          />
+        <div className="flex items-center gap-2">
+          {/* Clear filters button */}
+          {activeFilterCount > 0 && (
+            <button
+              onClick={clearAllFilters}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-orange-50 text-orange-600 border border-orange-200 hover:bg-orange-100 transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              Limpiar filtros
+            </button>
+          )}
+
+          {/* Search */}
+          <div className="relative">
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setCurrentPage(1);
+              }}
+              placeholder="Buscar tickets..."
+              className="pl-9 pr-4 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500/40 focus:border-orange-500/40 transition-all w-full sm:w-64"
+            />
+          </div>
         </div>
       </div>
 
-      {/* Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+      {/* Top scrollbar (mirrors the bottom one) */}
+      <div
+        ref={topScrollRef}
+        onScroll={handleTopScroll}
+        className="overflow-x-auto border-b border-gray-100"
+        style={{ height: "12px" }}
+      >
+        <div style={{ width: scrollWidth, height: "1px" }} />
+      </div>
+
+      {/* Table with bottom scrollbar */}
+      <div
+        ref={bottomScrollRef}
+        onScroll={handleBottomScroll}
+        className="overflow-x-auto"
+      >
+        <table className="w-full text-sm" style={{ minWidth: "1200px" }}>
           <thead>
+            {/* Sortable header row */}
             <tr className="border-b border-gray-100 text-gray-500 bg-gray-50/50">
-              <th
-                onClick={() => toggleSort("issue_type")}
-                className="text-left px-4 py-3 font-medium cursor-pointer hover:text-gray-900 transition-colors select-none whitespace-nowrap"
-              >
+              <th onClick={() => toggleSort("issue_type")} className="text-left px-4 py-3 font-medium cursor-pointer hover:text-gray-900 transition-colors select-none whitespace-nowrap" style={{ minWidth: "110px" }}>
                 Tipo <SortIcon field="issue_type" />
               </th>
-              <th
-                onClick={() => toggleSort("jira_key")}
-                className="text-left px-4 py-3 font-medium cursor-pointer hover:text-gray-900 transition-colors select-none"
-              >
+              <th onClick={() => toggleSort("jira_key")} className="text-left px-4 py-3 font-medium cursor-pointer hover:text-gray-900 transition-colors select-none" style={{ minWidth: "100px" }}>
                 Clave <SortIcon field="jira_key" />
               </th>
-              <th
-                onClick={() => toggleSort("summary")}
-                className="text-left px-4 py-3 font-medium cursor-pointer hover:text-gray-900 transition-colors select-none"
-              >
+              <th onClick={() => toggleSort("summary")} className="text-left px-4 py-3 font-medium cursor-pointer hover:text-gray-900 transition-colors select-none" style={{ minWidth: "200px" }}>
                 Resumen <SortIcon field="summary" />
               </th>
-              <th className="text-left px-4 py-3 font-medium whitespace-nowrap">
+              <th className="text-left px-4 py-3 font-medium whitespace-nowrap" style={{ minWidth: "100px" }}>
                 Subtareas
               </th>
-              <th className="text-left px-4 py-3 font-medium whitespace-nowrap">
+              <th className="text-left px-4 py-3 font-medium whitespace-nowrap" style={{ minWidth: "90px" }}>
                 Principal
               </th>
-              <th
-                onClick={() => toggleSort("sprint")}
-                className="text-left px-4 py-3 font-medium cursor-pointer hover:text-gray-900 transition-colors select-none whitespace-nowrap hidden md:table-cell"
-              >
+              <th onClick={() => toggleSort("sprint")} className="text-left px-4 py-3 font-medium cursor-pointer hover:text-gray-900 transition-colors select-none whitespace-nowrap" style={{ minWidth: "130px" }}>
                 Sprint <SortIcon field="sprint" />
               </th>
               {showAssignee && (
-                <th
-                  onClick={() => toggleSort("assignee_name")}
-                  className="text-left px-4 py-3 font-medium cursor-pointer hover:text-gray-900 transition-colors select-none hidden md:table-cell whitespace-nowrap"
-                >
+                <th onClick={() => toggleSort("assignee_name")} className="text-left px-4 py-3 font-medium cursor-pointer hover:text-gray-900 transition-colors select-none whitespace-nowrap" style={{ minWidth: "130px" }}>
                   Asignado <SortIcon field="assignee_name" />
                 </th>
               )}
-              <th
-                onClick={() => toggleSort("story_points")}
-                className="text-center px-4 py-3 font-medium cursor-pointer hover:text-gray-900 transition-colors select-none whitespace-nowrap hidden lg:table-cell"
-              >
+              <th onClick={() => toggleSort("story_points")} className="text-center px-4 py-3 font-medium cursor-pointer hover:text-gray-900 transition-colors select-none whitespace-nowrap" style={{ minWidth: "50px" }}>
                 SP <SortIcon field="story_points" />
               </th>
-              <th
-                onClick={() => toggleSort("status")}
-                className="text-left px-4 py-3 font-medium cursor-pointer hover:text-gray-900 transition-colors select-none whitespace-nowrap"
-              >
+              <th onClick={() => toggleSort("status")} className="text-left px-4 py-3 font-medium cursor-pointer hover:text-gray-900 transition-colors select-none whitespace-nowrap" style={{ minWidth: "110px" }}>
                 Estado <SortIcon field="status" />
               </th>
-              <th
-                onClick={() => toggleSort("reporter_name")}
-                className="text-left px-4 py-3 font-medium cursor-pointer hover:text-gray-900 transition-colors select-none hidden lg:table-cell whitespace-nowrap"
-              >
+              <th onClick={() => toggleSort("reporter_name")} className="text-left px-4 py-3 font-medium cursor-pointer hover:text-gray-900 transition-colors select-none whitespace-nowrap" style={{ minWidth: "130px" }}>
                 Informador <SortIcon field="reporter_name" />
               </th>
-              <th
-                onClick={() => toggleSort("created_at")}
-                className="text-left px-4 py-3 font-medium cursor-pointer hover:text-gray-900 transition-colors select-none hidden lg:table-cell whitespace-nowrap"
-              >
+              <th onClick={() => toggleSort("created_at")} className="text-left px-4 py-3 font-medium cursor-pointer hover:text-gray-900 transition-colors select-none whitespace-nowrap" style={{ minWidth: "90px" }}>
                 Creada <SortIcon field="created_at" />
               </th>
-              <th className="text-center px-4 py-3 font-medium whitespace-nowrap hidden md:table-cell">
+              <th className="text-center px-4 py-3 font-medium whitespace-nowrap" style={{ minWidth: "70px" }}>
                 Historial
               </th>
+            </tr>
+
+            {/* Filter row */}
+            <tr className="border-b border-gray-100 bg-gray-50/30">
+              <th className="px-4 py-2">
+                <FilterSelect value={filterType} onChange={setFilterType} options={uniqueTypes} placeholder="Todos" />
+              </th>
+              <th className="px-4 py-2" /> {/* Clave — no filter */}
+              <th className="px-4 py-2" /> {/* Resumen — use search */}
+              <th className="px-4 py-2" /> {/* Subtareas */}
+              <th className="px-4 py-2" /> {/* Principal */}
+              <th className="px-4 py-2">
+                <FilterSelect value={filterSprint} onChange={setFilterSprint} options={uniqueSprints} placeholder="Todos" />
+              </th>
+              {showAssignee && (
+                <th className="px-4 py-2">
+                  <FilterSelect value={filterAssignee} onChange={setFilterAssignee} options={uniqueAssignees} placeholder="Todos" />
+                </th>
+              )}
+              <th className="px-4 py-2" /> {/* SP */}
+              <th className="px-4 py-2">
+                <FilterSelect value={filterStatus} onChange={setFilterStatus} options={uniqueStatuses} placeholder="Todos" />
+              </th>
+              <th className="px-4 py-2">
+                <FilterSelect value={filterReporter} onChange={setFilterReporter} options={uniqueReporters} placeholder="Todos" />
+              </th>
+              <th className="px-4 py-2" /> {/* Creada */}
+              <th className="px-4 py-2" /> {/* Historial */}
             </tr>
           </thead>
           <tbody>
@@ -186,6 +310,11 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
                       <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                     </svg>
                     <p>No se encontraron tickets</p>
+                    {activeFilterCount > 0 && (
+                      <button onClick={clearAllFilters} className="text-orange-500 hover:text-orange-600 text-xs font-medium mt-1">
+                        Limpiar filtros
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -246,7 +375,7 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
                       </td>
 
                       {/* Sprint */}
-                      <td className="px-4 py-3 hidden md:table-cell">
+                      <td className="px-4 py-3">
                         {ticket.sprint ? (
                           <span className="text-xs text-gray-700 bg-gray-100 px-2 py-1 rounded-md whitespace-nowrap">
                             {ticket.sprint}
@@ -258,13 +387,13 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
 
                       {/* Asignado */}
                       {showAssignee && (
-                        <td className="px-4 py-3 hidden md:table-cell">
+                        <td className="px-4 py-3">
                           <span className="text-gray-600 text-xs">{ticket.assignee_name || "Sin asignar"}</span>
                         </td>
                       )}
 
                       {/* Story Points — solo para Historia */}
-                      <td className="px-4 py-3 text-center hidden lg:table-cell">
+                      <td className="px-4 py-3 text-center">
                         {isStory(ticket.issue_type) && ticket.story_points != null ? (
                           <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-amber-50 text-amber-700 text-xs font-bold">
                             {ticket.story_points}
@@ -286,19 +415,19 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
                       </td>
 
                       {/* Informador */}
-                      <td className="px-4 py-3 hidden lg:table-cell">
+                      <td className="px-4 py-3">
                         <span className="text-gray-600 text-xs">{ticket.reporter_name || "—"}</span>
                       </td>
 
                       {/* Creada */}
-                      <td className="px-4 py-3 hidden lg:table-cell">
-                        <span className="text-gray-400 text-xs" title={formatDate(ticket.created_at)}>
+                      <td className="px-4 py-3">
+                        <span className="text-gray-400 text-xs whitespace-nowrap" title={formatDate(ticket.created_at)}>
                           {timeAgo(ticket.created_at)}
                         </span>
                       </td>
 
                       {/* Historial de estados — No aplica para Subtarea ni Épica */}
-                      <td className="px-4 py-3 text-center hidden md:table-cell">
+                      <td className="px-4 py-3 text-center">
                         {hasStatusHistory(ticket.issue_type) && history.length > 0 ? (
                           <button
                             onClick={() => setExpandedRow(isExpanded ? null : ticket.jira_key)}
