@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { createPortal } from "react-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { supabase } from "@/lib/supabase";
@@ -109,8 +110,8 @@ function EditModal({ row, nombres, onSave, onClose, isNew }) {
     setSaving(false);
   }
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-6">
       <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={confirmClose} />
       <div
         className="relative bg-white rounded-2xl shadow-2xl max-w-5xl w-full h-[calc(100vh-3rem)] flex flex-col animate-fade-in"
@@ -287,7 +288,8 @@ function EditModal({ row, nombres, onSave, onClose, isNew }) {
           onClose={() => setMdPreview(null)}
         />
       )}
-    </div>
+    </div>,
+    document.body
   );
 }
 
