@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { supabase } from "@/lib/supabase";
+import { useRole } from "@/app/dashboard/RoleContext";
 
 // ─── Constants ──────────────────────────────────────────────
 const MODULO_OPTIONS = [
@@ -573,6 +574,7 @@ function EditModal({ row, sprints, nombres, onSave, onClose, isNew }) {
 
 // ─── Main Table ─────────────────────────────────────────────
 export default function ReunionesTable({ reuniones = [], sprints = [], nombres = [], onRefresh }) {
+    const role = useRole();
     const [search, setSearch] = useState("");
     const [editRow, setEditRow] = useState(null);
     const [deleteId, setDeleteId] = useState(null);
@@ -673,13 +675,15 @@ export default function ReunionesTable({ reuniones = [], sprints = [], nombres =
                         </div>
 
                         {/* New button */}
-                        <button onClick={openNew}
-                            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium bg-orange-500 text-white hover:bg-orange-600 shadow-md shadow-orange-500/15 transition-all">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                            </svg>
-                            Nueva Reunión
-                        </button>
+                        {role !== "viewer" && (
+                            <button onClick={openNew}
+                                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium bg-orange-500 text-white hover:bg-orange-600 shadow-md shadow-orange-500/15 transition-all">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                                </svg>
+                                Nueva Reunión
+                            </button>
+                        )}
                     </div>
                 </div>
 
@@ -697,7 +701,7 @@ export default function ReunionesTable({ reuniones = [], sprints = [], nombres =
                                 <th className="text-left px-4 py-3 font-medium whitespace-nowrap">Fecha</th>
                                 <th className="text-left px-4 py-3 font-medium whitespace-nowrap">Presentes</th>
                                 <th className="text-center px-4 py-3 font-medium whitespace-nowrap">Prioridad</th>
-                                <th className="text-center px-4 py-3 font-medium whitespace-nowrap w-20">Acciones</th>
+                                {role !== "viewer" && <th className="text-center px-4 py-3 font-medium whitespace-nowrap w-20">Acciones</th>}
                             </tr>
                         </thead>
                         <tbody>
@@ -747,22 +751,24 @@ export default function ReunionesTable({ reuniones = [], sprints = [], nombres =
                                                     {r.prioridad || "—"}
                                                 </span>
                                             </td>
-                                            <td className="px-4 py-3 text-center">
-                                                <div className="flex items-center justify-center gap-1">
-                                                    <button onClick={() => setEditRow(r)} title="Editar"
-                                                        className="p-1.5 rounded-lg text-gray-400 hover:bg-orange-50 hover:text-orange-600 transition-colors">
-                                                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                                        </svg>
-                                                    </button>
-                                                    <button onClick={() => setDeleteId(r.id)} title="Eliminar"
-                                                        className="p-1.5 rounded-lg text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors">
-                                                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                        </svg>
-                                                    </button>
-                                                </div>
-                                            </td>
+                                            {role !== "viewer" && (
+                                                <td className="px-4 py-3 text-center">
+                                                    <div className="flex items-center justify-center gap-1">
+                                                        <button onClick={() => setEditRow(r)} title="Editar"
+                                                            className="p-1.5 rounded-lg text-gray-400 hover:bg-orange-50 hover:text-orange-600 transition-colors">
+                                                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                                <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                            </svg>
+                                                        </button>
+                                                        <button onClick={() => setDeleteId(r.id)} title="Eliminar"
+                                                            className="p-1.5 rounded-lg text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors">
+                                                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                            </svg>
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            )}
                                         </tr>
                                     );
                                 })

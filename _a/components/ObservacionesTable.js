@@ -6,6 +6,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { supabase } from "@/lib/supabase";
 import MarkdownEditor from "@/components/MarkdownEditor";
+import { useRole } from "@/app/dashboard/RoleContext";
 
 const MODULO_OPTIONS = ["Mod. Maestros", "Mod. PAS", "Mod. Fiscalización"];
 const AMBIENTE_OPTIONS = ["Desarrollo", "Certificación", "Producción"];
@@ -387,15 +388,17 @@ export default function ObservacionesTable({ observaciones = [], nombres = [], o
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => { setEditRow({ ...EMPTY_ROW, fecha_registro: new Date().toISOString().split("T")[0] }); setIsNew(true); }}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium bg-orange-500 text-white hover:bg-orange-600 shadow-md shadow-orange-500/15 transition-all hover:scale-[1.02] active:scale-[0.98]"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-              </svg>
-              Nueva Observación
-            </button>
+            {role !== "viewer" && (
+              <button
+                onClick={() => { setEditRow({ ...EMPTY_ROW, fecha_registro: new Date().toISOString().split("T")[0] }); setIsNew(true); }}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium bg-orange-500 text-white hover:bg-orange-600 shadow-md shadow-orange-500/15 transition-all hover:scale-[1.02] active:scale-[0.98]"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                </svg>
+                Nueva Observación
+              </button>
+            )}
             <div className="relative">
               <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -426,7 +429,7 @@ export default function ObservacionesTable({ observaciones = [], nombres = [], o
                 <th className="text-center px-4 py-3 font-medium">Días</th>
                 <th className="text-left px-4 py-3 font-medium" style={{ minWidth: "140px" }}>Obs. Final</th>
                 <th className="text-left px-4 py-3 font-medium">Sol. WORD</th>
-                <th className="text-center px-4 py-3 font-medium w-20">Acciones</th>
+                {role !== "viewer" && <th className="text-center px-4 py-3 font-medium w-20">Acciones</th>}
               </tr>
             </thead>
             <tbody>
@@ -514,22 +517,24 @@ export default function ObservacionesTable({ observaciones = [], nombres = [], o
                       ) : <span className="text-gray-300 text-xs">—</span>}
                     </td>
                     {/* Actions */}
-                    <td className="px-4 py-3 text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        <button onClick={() => { setEditRow(obs); setIsNew(false); }}
-                          className="p-1.5 rounded-lg hover:bg-orange-50 text-gray-400 hover:text-orange-600 transition-colors" title="Editar">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                          </svg>
-                        </button>
-                        <button onClick={() => handleDelete(obs.id)} disabled={deleting === obs.id}
-                          className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors disabled:opacity-30" title="Eliminar">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
-                      </div>
-                    </td>
+                    {role !== "viewer" && (
+                      <td className="px-4 py-3 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <button onClick={() => { setEditRow(obs); setIsNew(false); }}
+                            className="p-1.5 rounded-lg hover:bg-orange-50 text-gray-400 hover:text-orange-600 transition-colors" title="Editar">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                          </button>
+                          <button onClick={() => handleDelete(obs.id)} disabled={deleting === obs.id}
+                            className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors disabled:opacity-30" title="Eliminar">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))
               )}
