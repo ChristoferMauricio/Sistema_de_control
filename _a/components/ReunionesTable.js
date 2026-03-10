@@ -232,7 +232,7 @@ function MeetingCalendar({ reuniones }) {
                                             className={`text-[10px] leading-tight px-1.5 py-0.5 rounded truncate cursor-default
                                                 ${isTent
                                                     ? "border border-dashed border-amber-300 bg-amber-50/60 text-amber-700 opacity-80"
-                                                    : isCliente ? "bg-blue-100 text-blue-800" : "bg-emerald-100 text-emerald-800"
+                                                    : isCliente ? "bg-blue-50 text-blue-700" : "bg-emerald-50 text-emerald-700"
                                                 }`}>
                                             {hora && <span className="font-semibold">{hora} </span>}
                                             {ev.modulo || ev.tema || ev.tipo}
