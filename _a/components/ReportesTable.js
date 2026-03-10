@@ -508,16 +508,16 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                         <thead>
-                            <tr className="border-b border-gray-100 bg-gray-50/50">
-                                <th className="text-left px-5 py-3 font-semibold text-gray-700" style={{ minWidth: "180px" }}>
+                            <tr className="border-b-2 border-gray-200 bg-gray-50/80">
+                                <th className="text-left px-4 py-2 font-semibold text-gray-700" style={{ minWidth: "160px" }}>
                                     Integrante
                                 </th>
                                 {STATUS_COLUMNS.map((col) => (
-                                    <th key={col.key} className="text-center px-3 py-3 font-medium text-gray-500" style={{ minWidth: "110px" }}>
+                                    <th key={col.key} className="text-center px-2 py-2 font-medium text-gray-500 border-l border-gray-200" style={{ minWidth: "100px" }}>
                                         {col.label}
                                     </th>
                                 ))}
-                                <th className="text-center px-4 py-3 font-semibold text-gray-700" style={{ minWidth: "120px" }}>
+                                <th className="text-center px-3 py-2 font-semibold text-gray-700 border-l border-gray-200" style={{ minWidth: "100px" }}>
                                     Total
                                 </th>
                             </tr>
@@ -532,12 +532,12 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                             ) : (
                                 <>
                                     {pivotData.map((row) => (
-                                        <tr key={row.assignee} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
-                                            <td className="px-5 py-3 font-medium text-gray-800 whitespace-nowrap">
+                                        <tr key={row.assignee} className="border-b border-gray-200 hover:bg-gray-50/50 transition-colors">
+                                            <td className="px-4 py-2 font-medium text-gray-800 whitespace-nowrap">
                                                 {row.assignee}
                                             </td>
                                             {STATUS_COLUMNS.map((col) => (
-                                                <td key={col.key} className="px-3 py-3 text-center">
+                                                <td key={col.key} className="px-2 py-2 text-center border-l border-gray-100">
                                                     {row[col.key] > 0 ? (
                                                         <span className={`inline-flex items-center justify-center min-w-[28px] px-2 py-0.5 rounded-lg text-xs font-bold ${STATUS_COLORS[col.key]}`}>
                                                             {row[col.key]}
@@ -547,7 +547,7 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                                                     )}
                                                 </td>
                                             ))}
-                                            <td className="px-4 py-3 text-center">
+                                            <td className="px-3 py-2 text-center border-l border-gray-100">
                                                 <div className="inline-flex items-center gap-1.5">
                                                     <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-xs font-bold bg-orange-100 text-orange-700">
                                                         {row.total}
@@ -567,10 +567,10 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                                     ))}
 
                                     {/* Totals row */}
-                                    <tr className="border-t-2 border-gray-200 bg-gray-50/80 font-semibold">
-                                        <td className="px-5 py-3 text-gray-700">TOTAL</td>
+                                    <tr className="border-t-2 border-gray-300 bg-gray-50/80 font-semibold">
+                                        <td className="px-4 py-2 text-gray-700">TOTAL</td>
                                         {STATUS_COLUMNS.map((col) => (
-                                            <td key={col.key} className="px-3 py-3 text-center">
+                                            <td key={col.key} className="px-2 py-2 text-center border-l border-gray-100">
                                                 <span className={`inline-flex items-center justify-center min-w-[28px] px-2 py-0.5 rounded-lg text-xs font-bold ${STATUS_COLORS[col.key]}`}>
                                                     {totals[col.key]}
                                                 </span>
@@ -606,16 +606,16 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                         <thead>
-                            <tr className="border-b border-gray-100 bg-gray-50/50">
-                                <th className="text-left px-5 py-3 font-semibold text-gray-700" style={{ minWidth: "180px" }}>
+                            <tr className="border-b-2 border-gray-200 bg-gray-50/80">
+                                <th className="text-left px-4 py-2 font-semibold text-gray-700" style={{ minWidth: "160px" }}>
                                     Integrante
                                 </th>
                                 {STATUS_COLUMNS.map((col) => (
-                                    <th key={col.key} className="text-center px-3 py-3 font-medium text-gray-500" style={{ minWidth: "110px" }}>
+                                    <th key={col.key} className="text-center px-2 py-2 font-medium text-gray-500 border-l border-gray-200" style={{ minWidth: "100px" }}>
                                         {col.label}
                                     </th>
                                 ))}
-                                <th className="text-center px-4 py-3 font-semibold text-gray-700" style={{ minWidth: "70px" }}>
+                                <th className="text-center px-3 py-2 font-semibold text-gray-700 border-l border-gray-200" style={{ minWidth: "70px" }}>
                                     Total SP
                                 </th>
                             </tr>
@@ -630,12 +630,12 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                             ) : (
                                 <>
                                     {pivotDataSP.map((row) => (
-                                        <tr key={row.assignee} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
-                                            <td className="px-5 py-3 font-medium text-gray-800 whitespace-nowrap">
+                                        <tr key={row.assignee} className="border-b border-gray-200 hover:bg-gray-50/50 transition-colors">
+                                            <td className="px-4 py-2 font-medium text-gray-800 whitespace-nowrap">
                                                 {row.assignee}
                                             </td>
                                             {STATUS_COLUMNS.map((col) => (
-                                                <td key={col.key} className="px-3 py-3 text-center">
+                                                <td key={col.key} className="px-2 py-2 text-center border-l border-gray-100">
                                                     {row[col.key] > 0 ? (
                                                         <span className={`inline-flex items-center justify-center min-w-[28px] px-2 py-0.5 rounded-lg text-xs font-bold ${STATUS_COLORS[col.key]}`}>
                                                             {row[col.key]}
@@ -645,7 +645,7 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                                                     )}
                                                 </td>
                                             ))}
-                                            <td className="px-4 py-3 text-center">
+                                            <td className="px-3 py-2 text-center border-l border-gray-100">
                                                 <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-xs font-bold bg-purple-100 text-purple-700">
                                                     {row.total}
                                                 </span>
@@ -654,10 +654,10 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                                     ))}
 
                                     {/* Totals row */}
-                                    <tr className="border-t-2 border-gray-200 bg-gray-50/80 font-semibold">
-                                        <td className="px-5 py-3 text-gray-700">TOTAL</td>
+                                    <tr className="border-t-2 border-gray-300 bg-gray-50/80 font-semibold">
+                                        <td className="px-4 py-2 text-gray-700">TOTAL</td>
                                         {STATUS_COLUMNS.map((col) => (
-                                            <td key={col.key} className="px-3 py-3 text-center">
+                                            <td key={col.key} className="px-2 py-2 text-center border-l border-gray-100">
                                                 <span className={`inline-flex items-center justify-center min-w-[28px] px-2 py-0.5 rounded-lg text-xs font-bold ${STATUS_COLORS[col.key]}`}>
                                                     {totalsSP[col.key]}
                                                 </span>
