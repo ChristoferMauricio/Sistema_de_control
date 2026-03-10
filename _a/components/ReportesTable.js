@@ -430,6 +430,41 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
         return t;
     }, [pivotData]);
 
+    // ─── Story Points pivot ─────────────────────────────
+    const pivotDataSP = useMemo(() => {
+        const map = {};
+
+        filtered.forEach((t) => {
+            const realName = resolveName(t.assignee_name);
+            const sp = parseFloat(t.story_points) || 0;
+            if (!map[realName]) {
+                map[realName] = { assignee: realName, total: 0 };
+                STATUS_COLUMNS.forEach((col) => { map[realName][col.key] = 0; });
+            }
+
+            map[realName].total += sp;
+
+            const matched = STATUS_COLUMNS.find((col) =>
+                col.jiraStatuses.some((s) => s.toLowerCase() === (t.status || "").toLowerCase())
+            );
+            if (matched) {
+                map[realName][matched.key] += sp;
+            }
+        });
+
+        return Object.values(map).sort((a, b) => b.total - a.total);
+    }, [filtered, nameMap]);
+
+    const totalsSP = useMemo(() => {
+        const t = { total: 0 };
+        STATUS_COLUMNS.forEach((col) => { t[col.key] = 0; });
+        pivotDataSP.forEach((row) => {
+            t.total += row.total;
+            STATUS_COLUMNS.forEach((col) => { t[col.key] += row[col.key]; });
+        });
+        return t;
+    }, [pivotDataSP]);
+
     // Open traceability modal for a given assignee
     function openTrace(assigneeName) {
         // Find all stories for this assignee
@@ -553,6 +588,93 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                                         <td className="px-4 py-3 text-center">
                                             <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-sm font-bold bg-orange-500 text-white">
                                                 {totals.total}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                </>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            {/* ─── Tabla 02: Story Points por integrante ─── */}
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden animate-fade-in">
+                {/* Header */}
+                <div className="px-6 py-4 border-b border-gray-100">
+                    <h3 className="text-lg font-semibold font-[family-name:var(--font-heading)] text-gray-900">
+                        Story Points por integrante
+                    </h3>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                        {totalsSP.total} SP totales · {pivotDataSP.length} integrante{pivotDataSP.length !== 1 ? "s" : ""}
+                        {selectedSprint ? ` · ${selectedSprint}` : ""}
+                    </p>
+                </div>
+
+                {/* Table */}
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                        <thead>
+                            <tr className="border-b border-gray-100 bg-gray-50/50">
+                                <th className="text-left px-5 py-3 font-semibold text-gray-700" style={{ minWidth: "180px" }}>
+                                    Integrante
+                                </th>
+                                {STATUS_COLUMNS.map((col) => (
+                                    <th key={col.key} className="text-center px-3 py-3 font-medium text-gray-500" style={{ minWidth: "110px" }}>
+                                        {col.label}
+                                    </th>
+                                ))}
+                                <th className="text-center px-4 py-3 font-semibold text-gray-700" style={{ minWidth: "70px" }}>
+                                    Total SP
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {pivotDataSP.length === 0 ? (
+                                <tr>
+                                    <td colSpan={STATUS_COLUMNS.length + 2} className="px-6 py-12 text-center text-gray-400">
+                                        No hay historias {selectedSprint ? `en ${selectedSprint}` : ""}
+                                    </td>
+                                </tr>
+                            ) : (
+                                <>
+                                    {pivotDataSP.map((row) => (
+                                        <tr key={row.assignee} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+                                            <td className="px-5 py-3 font-medium text-gray-800 whitespace-nowrap">
+                                                {row.assignee}
+                                            </td>
+                                            {STATUS_COLUMNS.map((col) => (
+                                                <td key={col.key} className="px-3 py-3 text-center">
+                                                    {row[col.key] > 0 ? (
+                                                        <span className={`inline-flex items-center justify-center min-w-[28px] px-2 py-0.5 rounded-lg text-xs font-bold ${STATUS_COLORS[col.key]}`}>
+                                                            {row[col.key]}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-gray-200 text-xs">0</span>
+                                                    )}
+                                                </td>
+                                            ))}
+                                            <td className="px-4 py-3 text-center">
+                                                <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-xs font-bold bg-purple-100 text-purple-700">
+                                                    {row.total}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    ))}
+
+                                    {/* Totals row */}
+                                    <tr className="border-t-2 border-gray-200 bg-gray-50/80 font-semibold">
+                                        <td className="px-5 py-3 text-gray-700">TOTAL</td>
+                                        {STATUS_COLUMNS.map((col) => (
+                                            <td key={col.key} className="px-3 py-3 text-center">
+                                                <span className={`inline-flex items-center justify-center min-w-[28px] px-2 py-0.5 rounded-lg text-xs font-bold ${STATUS_COLORS[col.key]}`}>
+                                                    {totalsSP[col.key]}
+                                                </span>
+                                            </td>
+                                        ))}
+                                        <td className="px-4 py-3 text-center">
+                                            <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-sm font-bold bg-purple-600 text-white">
+                                                {totalsSP.total}
                                             </span>
                                         </td>
                                     </tr>
