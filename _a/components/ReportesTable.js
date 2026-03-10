@@ -236,12 +236,29 @@ function TraceModal({ assigneeName, stories, onClose }) {
                                         >
                                             {/* Label */}
                                             <div
-                                                className="shrink-0 pr-3 text-right"
+                                                className="shrink-0 pr-2 flex items-center justify-end gap-1"
                                                 style={{ width: `${LABEL_WIDTH}px` }}
                                             >
-                                                <span className="text-xs font-mono font-semibold text-gray-700 truncate block" title={`${row.key}: ${row.summary}`}>
+                                                <a
+                                                    href={`https://supervisorservicio2020.atlassian.net/browse/${row.key}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-xs font-mono font-semibold text-blue-600 hover:text-blue-800 hover:underline truncate"
+                                                >
                                                     {row.key}
-                                                </span>
+                                                </a>
+                                                <div className="relative group shrink-0">
+                                                    <div className="w-4 h-4 rounded-full bg-gray-100 text-gray-400 hover:bg-orange-50 hover:text-orange-500 flex items-center justify-center text-[10px] font-bold cursor-default transition-colors">
+                                                        i
+                                                    </div>
+                                                    <div className="absolute right-0 bottom-full mb-1 hidden group-hover:block z-30 pointer-events-none">
+                                                        <div className="bg-gray-900 text-white rounded-lg px-3 py-2 text-[11px] shadow-xl max-w-[260px]">
+                                                            <div className="font-semibold text-orange-300 mb-0.5">{row.key}</div>
+                                                            <div className="text-gray-200 leading-relaxed">{row.summary}</div>
+                                                        </div>
+                                                        <div className="w-2 h-2 bg-gray-900 rotate-45 ml-auto mr-2 -mt-1" />
+                                                    </div>
+                                                </div>
                                             </div>
 
                                             {/* Chart area */}
