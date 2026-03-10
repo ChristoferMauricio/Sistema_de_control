@@ -83,13 +83,18 @@ function EditModal({ row, nombres, onSave, onClose, isNew }) {
   const [useCustomModulo, setUseCustomModulo] = useState(
     row.modulo && !MODULO_OPTIONS.includes(row.modulo)
   );
-  const [mdPreview, setMdPreview] = useState(null); // "descripcion" | "observacion_final"
+  const [mdPreview, setMdPreview] = useState(null);
   const [saving, setSaving] = useState(false);
+
+  function confirmClose() {
+    if (window.confirm("¿Estás seguro de que deseas salir? Los cambios no guardados se perderán.")) {
+      onClose();
+    }
+  }
 
   function updateField(field, value) {
     setForm((f) => {
       const updated = { ...f, [field]: value };
-      // Auto-set fecha_modificacion when estado changes
       if (field === "estado" && value !== f.estado) {
         updated.fecha_modificacion = new Date().toISOString().split("T")[0];
       }
@@ -105,18 +110,19 @@ function EditModal({ row, nombres, onSave, onClose, isNew }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-      <div
-        className="relative bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col animate-fade-in"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className="fixed inset-0 z-50 overflow-y-auto">
+      <div className="min-h-full flex items-center justify-center p-4 py-8">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={confirmClose} />
+        <div
+          className="relative bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[85vh] flex flex-col animate-fade-in"
+          onClick={(e) => e.stopPropagation()}
+        >
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
           <h3 className="font-semibold text-gray-900 text-lg">
             {isNew ? "Nueva Observación" : `Editar #${row.id}`}
           </h3>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600">
+          <button onClick={confirmClose} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600">
             <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -263,7 +269,7 @@ function EditModal({ row, nombres, onSave, onClose, isNew }) {
 
         {/* Footer */}
         <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-3">
-          <button onClick={onClose}
+          <button onClick={confirmClose}
             className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors">
             Cancelar
           </button>
@@ -272,6 +278,7 @@ function EditModal({ row, nombres, onSave, onClose, isNew }) {
             {saving ? "Guardando..." : (isNew ? "Crear" : "Guardar cambios")}
           </button>
         </div>
+      </div>
       </div>
 
       {/* Markdown preview nested modal */}
