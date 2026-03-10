@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import ReportesTable from "@/components/ReportesTable";
@@ -64,6 +64,16 @@ export default function ReportesPage() {
         );
     }
 
+    const lastUpdated = useMemo(() => {
+        if (tickets.length === 0) return null;
+        let max = null;
+        tickets.forEach((t) => {
+            const d = t.synced_at ? new Date(t.synced_at) : null;
+            if (d && (!max || d > max)) max = d;
+        });
+        return max;
+    }, [tickets]);
+
     return (
         <div className="space-y-6 animate-fade-in">
             {/* Header */}
@@ -76,15 +86,25 @@ export default function ReportesPage() {
                         Tablas dinámicas y resúmenes de las historias de usuario
                     </p>
                 </div>
-                <button
-                    onClick={() => router.push("/dashboard")}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-gray-600 border border-gray-200 hover:bg-gray-50 transition-all"
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                    </svg>
-                    Volver a Vista General
-                </button>
+                <div className="flex items-center gap-3">
+                    {lastUpdated && (
+                        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gray-50 border border-gray-200 text-xs text-gray-500">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span>Última actualización: <strong className="text-gray-700">{lastUpdated.toLocaleDateString("es-PE", { day: "2-digit", month: "2-digit", year: "numeric" })} {lastUpdated.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" })}</strong></span>
+                        </div>
+                    )}
+                    <button
+                        onClick={() => router.push("/dashboard")}
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-gray-600 border border-gray-200 hover:bg-gray-50 transition-all"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                        </svg>
+                        Volver a Vista General
+                    </button>
+                </div>
             </div>
 
             {/* Tabla 01: Historias por Integrante y Estado */}
