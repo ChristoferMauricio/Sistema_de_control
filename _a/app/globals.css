@@ -49,20 +49,20 @@
 :root.dark {
   --color-bg-base: #0F1117;
   --color-bg-surface: #1A1D27;
-  --color-bg-elevated: #242836;
+  --color-bg-elevated: #252A38;
   --color-bg-card: #1A1D27;
 
-  --color-text-primary: #E8EAED;
-  --color-text-secondary: #9AA0AC;
-  --color-text-muted: #6B7280;
+  --color-text-primary: #F0F1F3;
+  --color-text-secondary: #B0B7C3;
+  --color-text-muted: #8B93A5;
 
-  --color-border: #2E3345;
-  --color-border-hover: #3D4457;
+  --color-border: #323850;
+  --color-border-hover: #454D65;
 
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
-  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.4);
-  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.2), 0 1px 2px rgba(0, 0, 0, 0.15);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.25), 0 1px 2px rgba(0, 0, 0, 0.18);
 }
 
 @theme inline {
@@ -88,7 +88,7 @@
 }
 
 .dark * {
-  scrollbar-color: #2E3345 #0F1117;
+  scrollbar-color: #3A4158 #0F1117;
 }
 
 body {
@@ -110,47 +110,65 @@ h1, h2, h3, h4, h5, h6 {
 .dark .bg-gray-50 { background-color: var(--color-bg-base) !important; }
 .dark .bg-gray-100 { background-color: var(--color-bg-elevated) !important; }
 
-/* --- Text overrides --- */
-.dark .text-gray-900 { color: var(--color-text-primary) !important; }
-.dark .text-gray-800 { color: #D1D5DB !important; }
-.dark .text-gray-700 { color: #B0B5C0 !important; }
-.dark .text-gray-600 { color: var(--color-text-secondary) !important; }
-.dark .text-gray-500 { color: var(--color-text-muted) !important; }
-.dark .text-gray-400 { color: #6B7280 !important; }
+/* --- Text overrides (high contrast for readability) --- */
+.dark .text-gray-900 { color: #F0F1F3 !important; }
+.dark .text-gray-800 { color: #E2E4E9 !important; }
+.dark .text-gray-700 { color: #CBD0DA !important; }
+.dark .text-gray-600 { color: #B0B7C3 !important; }
+.dark .text-gray-500 { color: #9AA2B4 !important; }
+.dark .text-gray-400 { color: #8B93A5 !important; }
+.dark .text-gray-300 { color: #7A8299 !important; }
 
 /* --- Border overrides --- */
 .dark .border-gray-200 { border-color: var(--color-border) !important; }
-.dark .border-gray-100 { border-color: #232738 !important; }
-.dark .border-gray-50 { border-color: #1E2130 !important; }
-.dark .border-gray-300 { border-color: #3D4457 !important; }
+.dark .border-gray-100 { border-color: #272D3F !important; }
+.dark .border-gray-50 { border-color: #1F2535 !important; }
+.dark .border-gray-300 { border-color: #454D65 !important; }
 
 /* --- Hover overrides --- */
 .dark .hover\:bg-gray-50:hover { background-color: var(--color-bg-elevated) !important; }
-.dark .hover\:bg-gray-100:hover { background-color: #2E3345 !important; }
+.dark .hover\:bg-gray-100:hover { background-color: #323850 !important; }
 
 /* --- Shadow overrides --- */
 .dark .shadow-sm { box-shadow: var(--shadow-sm) !important; }
 .dark .shadow-md { box-shadow: var(--shadow-md) !important; }
 
 /* --- Specific component backgrounds --- */
-.dark .bg-gray-50\/50 { background-color: rgba(26, 29, 39, 0.5) !important; }
-.dark .bg-gray-50\/80 { background-color: rgba(26, 29, 39, 0.8) !important; }
+.dark .bg-gray-50\/50 { background-color: rgba(26, 29, 39, 0.6) !important; }
+.dark .bg-gray-50\/80 { background-color: rgba(26, 29, 39, 0.85) !important; }
 
-/* --- Status badges in dark mode --- */
-.dark .bg-blue-50 { background-color: rgba(59, 130, 246, 0.15) !important; }
-.dark .bg-green-50 { background-color: rgba(16, 185, 129, 0.15) !important; }
-.dark .bg-red-50 { background-color: rgba(239, 68, 68, 0.15) !important; }
-.dark .bg-amber-50 { background-color: rgba(245, 158, 11, 0.15) !important; }
-.dark .bg-orange-50 { background-color: rgba(249, 115, 22, 0.15) !important; }
-.dark .bg-purple-50 { background-color: rgba(139, 92, 246, 0.15) !important; }
-.dark .bg-sky-50 { background-color: rgba(56, 189, 248, 0.15) !important; }
-.dark .bg-emerald-50 { background-color: rgba(16, 185, 129, 0.15) !important; }
-.dark .bg-orange-100 { background-color: rgba(249, 115, 22, 0.2) !important; }
-.dark .bg-blue-100 { background-color: rgba(59, 130, 246, 0.2) !important; }
-.dark .bg-green-100 { background-color: rgba(16, 185, 129, 0.2) !important; }
-.dark .bg-red-100 { background-color: rgba(239, 68, 68, 0.2) !important; }
-.dark .bg-amber-100 { background-color: rgba(245, 158, 11, 0.2) !important; }
-.dark .bg-purple-100 { background-color: rgba(139, 92, 246, 0.2) !important; }
+/* --- Status badges in dark mode (stronger bg + brighter text) --- */
+.dark .bg-blue-50 { background-color: rgba(59, 130, 246, 0.2) !important; }
+.dark .bg-green-50 { background-color: rgba(16, 185, 129, 0.2) !important; }
+.dark .bg-red-50 { background-color: rgba(239, 68, 68, 0.2) !important; }
+.dark .bg-amber-50 { background-color: rgba(245, 158, 11, 0.2) !important; }
+.dark .bg-orange-50 { background-color: rgba(249, 115, 22, 0.2) !important; }
+.dark .bg-purple-50 { background-color: rgba(139, 92, 246, 0.2) !important; }
+.dark .bg-sky-50 { background-color: rgba(56, 189, 248, 0.2) !important; }
+.dark .bg-emerald-50 { background-color: rgba(16, 185, 129, 0.2) !important; }
+.dark .bg-orange-100 { background-color: rgba(249, 115, 22, 0.28) !important; }
+.dark .bg-blue-100 { background-color: rgba(59, 130, 246, 0.28) !important; }
+.dark .bg-green-100 { background-color: rgba(16, 185, 129, 0.28) !important; }
+.dark .bg-red-100 { background-color: rgba(239, 68, 68, 0.28) !important; }
+.dark .bg-amber-100 { background-color: rgba(245, 158, 11, 0.28) !important; }
+.dark .bg-purple-100 { background-color: rgba(139, 92, 246, 0.28) !important; }
+
+/* --- Badge text brightened for contrast --- */
+.dark .text-blue-700 { color: #93BBFD !important; }
+.dark .text-blue-600 { color: #7CADFC !important; }
+.dark .text-green-700 { color: #6EDCB8 !important; }
+.dark .text-green-600 { color: #5AD3A8 !important; }
+.dark .text-red-700 { color: #F8A0A0 !important; }
+.dark .text-red-600 { color: #F48585 !important; }
+.dark .text-amber-700 { color: #F5C96B !important; }
+.dark .text-amber-600 { color: #F0BC50 !important; }
+.dark .text-orange-700 { color: #FDAE6B !important; }
+.dark .text-orange-600 { color: #FB9A4A !important; }
+.dark .text-orange-500 { color: #FB923C !important; }
+.dark .text-purple-700 { color: #B5A3F7 !important; }
+.dark .text-purple-600 { color: #A78BF5 !important; }
+.dark .text-sky-700 { color: #7DD3FC !important; }
+.dark .text-emerald-700 { color: #6EDCB8 !important; }
 
 /* --- Inputs and selects --- */
 .dark input, .dark select, .dark textarea {
@@ -159,14 +177,14 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--color-text-primary) !important;
 }
 .dark input::placeholder, .dark textarea::placeholder {
-  color: var(--color-text-muted) !important;
+  color: #8B93A5 !important;
 }
 .dark input:focus, .dark select:focus, .dark textarea:focus {
-  border-color: #F97316 !important;
+  border-color: #FB923C !important;
 }
 
 /* --- Modals --- */
-.dark .bg-black\/40 { background-color: rgba(0, 0, 0, 0.6) !important; }
+.dark .bg-black\/40 { background-color: rgba(0, 0, 0, 0.65) !important; }
 
 /* --- Ticket row hover --- */
 .dark .ticket-row:hover {
