@@ -110,13 +110,12 @@ function EditModal({ row, nombres, onSave, onClose, isNew }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="min-h-full flex items-start justify-center p-4 py-8 md:py-12">
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={confirmClose} />
-        <div
-          className="relative bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[85vh] flex flex-col animate-fade-in"
-          onClick={(e) => e.stopPropagation()}
-        >
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={confirmClose} />
+      <div
+        className="relative bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col animate-fade-in"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
           <h3 className="font-semibold text-gray-900 text-lg">
@@ -278,7 +277,6 @@ function EditModal({ row, nombres, onSave, onClose, isNew }) {
             {saving ? "Guardando..." : (isNew ? "Crear" : "Guardar cambios")}
           </button>
         </div>
-      </div>
       </div>
 
       {/* Markdown preview nested modal */}
