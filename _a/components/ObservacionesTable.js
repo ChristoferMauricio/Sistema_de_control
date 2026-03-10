@@ -296,6 +296,7 @@ function EditModal({ row, nombres, onSave, onClose, isNew }) {
 
 // ─── Main Table ─────────────────────────────────────────────
 export default function ObservacionesTable({ observaciones = [], nombres = [], onRefresh }) {
+  const role = useRole();
   const [search, setSearch] = useState("");
   const [editRow, setEditRow] = useState(null);
   const [isNew, setIsNew] = useState(false);
