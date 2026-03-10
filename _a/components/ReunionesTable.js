@@ -58,6 +58,152 @@ function getPrioridadColor(p) {
     return { bg: "bg-green-50", text: "text-green-600" };
 }
 
+const DAYS_ES = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+const MONTHS_ES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+
+// ─── Calendar Component ─────────────────────────────────────
+function MeetingCalendar({ reuniones }) {
+    const today = new Date();
+    const [year, setYear] = useState(today.getFullYear());
+    const [month, setMonth] = useState(today.getMonth());
+
+    // Filter to only scheduled meetings that have a fecha_programada
+    const scheduled = useMemo(() => {
+        return reuniones.filter((r) => {
+            if (!r.fecha_programada) return false;
+            const e = (r.estado || "").toLowerCase();
+            return e.includes("programada") || e.includes("realizada");
+        });
+    }, [reuniones]);
+
+    // Build events map: dateStr -> meetings[]
+    const eventsMap = useMemo(() => {
+        const map = {};
+        scheduled.forEach((r) => {
+            const dateStr = r.fecha_programada.split(" ")[0]; // "2026-03-11"
+            if (!map[dateStr]) map[dateStr] = [];
+            map[dateStr].push(r);
+        });
+        return map;
+    }, [scheduled]);
+
+    // Build calendar grid
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    // Monday=0 ... Sunday=6
+    let startDay = firstDay.getDay() - 1;
+    if (startDay < 0) startDay = 6;
+
+    const cells = [];
+    // Padding for first week
+    for (let i = 0; i < startDay; i++) cells.push(null);
+    for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
+    function prevMonth() {
+        if (month === 0) { setMonth(11); setYear(year - 1); }
+        else setMonth(month - 1);
+    }
+    function nextMonth() {
+        if (month === 11) { setMonth(0); setYear(year + 1); }
+        else setMonth(month + 1);
+    }
+    function goToday() { setMonth(today.getMonth()); setYear(today.getFullYear()); }
+
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+
+    return (
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 mb-4">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                    <h2 className="font-semibold text-gray-900 text-lg">
+                        {MONTHS_ES[month]} {year}
+                    </h2>
+                    <button onClick={goToday}
+                        className="px-2.5 py-1 rounded-lg text-xs font-medium text-orange-600 bg-orange-50 border border-orange-200 hover:bg-orange-100 transition-colors">
+                        Hoy
+                    </button>
+                </div>
+                <div className="flex items-center gap-1">
+                    <button onClick={prevMonth}
+                        className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                        </svg>
+                    </button>
+                    <button onClick={nextMonth}
+                        className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            {/* Legend */}
+            <div className="flex items-center gap-4 mb-3">
+                <div className="flex items-center gap-1.5">
+                    <span className="w-3 h-3 rounded-sm bg-blue-500" />
+                    <span className="text-xs text-gray-500">Reunión con cliente</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                    <span className="w-3 h-3 rounded-sm bg-emerald-500" />
+                    <span className="text-xs text-gray-500">Reunión Interna</span>
+                </div>
+            </div>
+
+            {/* Day headers */}
+            <div className="grid grid-cols-7 gap-px mb-1">
+                {DAYS_ES.map((d) => (
+                    <div key={d} className="text-center text-xs font-medium text-gray-400 py-1.5">{d}</div>
+                ))}
+            </div>
+
+            {/* Calendar grid */}
+            <div className="grid grid-cols-7 gap-px bg-gray-100 rounded-lg overflow-hidden border border-gray-100">
+                {cells.map((day, i) => {
+                    if (day === null) {
+                        return <div key={`empty-${i}`} className="bg-gray-50/50 min-h-[80px]" />;
+                    }
+                    const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+                    const events = eventsMap[dateStr] || [];
+                    const isToday = dateStr === todayStr;
+                    const isWeekend = (startDay + day - 1) % 7 >= 5;
+
+                    return (
+                        <div key={dateStr}
+                            className={`min-h-[80px] p-1.5 ${isWeekend ? "bg-gray-50" : "bg-white"} transition-colors`}>
+                            <div className={`text-xs font-medium mb-1 w-6 h-6 flex items-center justify-center rounded-full
+                                ${isToday ? "bg-orange-500 text-white" : "text-gray-700"}`}>
+                                {day}
+                            </div>
+                            <div className="space-y-0.5">
+                                {events.slice(0, 3).map((ev) => {
+                                    const isCliente = ev.tipo === "Reunión con cliente";
+                                    const hora = ev.fecha_programada.split(" ")[1] || "";
+                                    return (
+                                        <div key={ev.id}
+                                            title={`${ev.tipo}\n${ev.modulo || ""}\n${ev.tema || ""}\n${hora ? "Hora: " + hora : ""}`}
+                                            className={`text-[10px] leading-tight px-1.5 py-0.5 rounded truncate cursor-default
+                                                ${isCliente ? "bg-blue-100 text-blue-800" : "bg-emerald-100 text-emerald-800"}`}>
+                                            {hora && <span className="font-semibold">{hora} </span>}
+                                            {ev.modulo || ev.tema || ev.tipo}
+                                        </div>
+                                    );
+                                })}
+                                {events.length > 3 && (
+                                    <div className="text-[10px] text-gray-400 px-1">+{events.length - 3} más</div>
+                                )}
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
+
 // ─── Confirm Delete ─────────────────────────────────────────
 function ConfirmDeleteModal({ onConfirm, onCancel }) {
     return createPortal(
@@ -440,177 +586,182 @@ export default function ReunionesTable({ reuniones = [], sprints = [], nombres =
     }
 
     return (
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-            {/* Toolbar */}
-            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-4 flex-wrap">
-                <div className="flex items-center gap-3">
-                    <h2 className="font-semibold text-gray-900">Reuniones</h2>
-                    <span className="text-xs text-gray-400">{filtered.length} registros</span>
-                </div>
+        <div>
+            {/* Calendar view */}
+            <MeetingCalendar reuniones={reuniones} />
 
-                <div className="flex items-center gap-3 flex-wrap">
-                    {/* Sprint filter */}
-                    <select value={filterSprint} onChange={(e) => { setFilterSprint(e.target.value); setCurrentPage(1); }}
-                        className="px-3 py-2 rounded-lg border border-gray-200 text-xs text-gray-600 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/40">
-                        <option value="">Sprint: Todos</option>
-                        {[...sprints, ...uniqueSprints].filter((v, i, a) => a.indexOf(v) === i).sort().map((s) => (
-                            <option key={s} value={s}>{s}</option>
-                        ))}
-                    </select>
-
-                    {/* Tipo filter */}
-                    <select value={filterTipo} onChange={(e) => { setFilterTipo(e.target.value); setCurrentPage(1); }}
-                        className="px-3 py-2 rounded-lg border border-gray-200 text-xs text-gray-600 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/40">
-                        <option value="">Tipo: Todos</option>
-                        <option value="Reunión Interna">Reunión Interna</option>
-                        <option value="Reunión con cliente">Reunión con cliente</option>
-                    </select>
-
-                    {/* Search */}
-                    <div className="relative">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                        </svg>
-                        <input type="text" value={search} onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
-                            placeholder="Buscar..."
-                            className="pl-9 pr-4 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500/40 w-48" />
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                {/* Toolbar */}
+                <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-4 flex-wrap">
+                    <div className="flex items-center gap-3">
+                        <h2 className="font-semibold text-gray-900">Reuniones</h2>
+                        <span className="text-xs text-gray-400">{filtered.length} registros</span>
                     </div>
 
-                    {/* New button */}
-                    <button onClick={openNew}
-                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium bg-orange-500 text-white hover:bg-orange-600 shadow-md shadow-orange-500/15 transition-all">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                        </svg>
-                        Nueva Reunión
-                    </button>
-                </div>
-            </div>
+                    <div className="flex items-center gap-3 flex-wrap">
+                        {/* Sprint filter */}
+                        <select value={filterSprint} onChange={(e) => { setFilterSprint(e.target.value); setCurrentPage(1); }}
+                            className="px-3 py-2 rounded-lg border border-gray-200 text-xs text-gray-600 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/40">
+                            <option value="">Sprint: Todos</option>
+                            {[...sprints, ...uniqueSprints].filter((v, i, a) => a.indexOf(v) === i).sort().map((s) => (
+                                <option key={s} value={s}>{s}</option>
+                            ))}
+                        </select>
 
-            {/* Table */}
-            <div className="overflow-x-auto">
-                <table className="w-full text-sm" style={{ minWidth: "1000px" }}>
-                    <thead>
-                        <tr className="border-b border-gray-100 text-gray-500 bg-gray-50/50">
-                            <th className="text-left px-4 py-3 font-medium whitespace-nowrap">#</th>
-                            <th className="text-left px-4 py-3 font-medium whitespace-nowrap">Sprint</th>
-                            <th className="text-left px-4 py-3 font-medium whitespace-nowrap">Tipo</th>
-                            <th className="text-left px-4 py-3 font-medium whitespace-nowrap">Módulo</th>
-                            <th className="text-left px-4 py-3 font-medium" style={{ minWidth: "200px" }}>Tema</th>
-                            <th className="text-left px-4 py-3 font-medium whitespace-nowrap">Estado</th>
-                            <th className="text-left px-4 py-3 font-medium whitespace-nowrap">Fecha</th>
-                            <th className="text-left px-4 py-3 font-medium whitespace-nowrap">Presentes</th>
-                            <th className="text-center px-4 py-3 font-medium whitespace-nowrap">Prioridad</th>
-                            <th className="text-center px-4 py-3 font-medium whitespace-nowrap w-20">Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {paginated.length === 0 ? (
-                            <tr>
-                                <td colSpan={10} className="px-4 py-12 text-center text-gray-400 text-sm">
-                                    No hay reuniones registradas
-                                </td>
+                        {/* Tipo filter */}
+                        <select value={filterTipo} onChange={(e) => { setFilterTipo(e.target.value); setCurrentPage(1); }}
+                            className="px-3 py-2 rounded-lg border border-gray-200 text-xs text-gray-600 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/40">
+                            <option value="">Tipo: Todos</option>
+                            <option value="Reunión Interna">Reunión Interna</option>
+                            <option value="Reunión con cliente">Reunión con cliente</option>
+                        </select>
+
+                        {/* Search */}
+                        <div className="relative">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                            <input type="text" value={search} onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
+                                placeholder="Buscar..."
+                                className="pl-9 pr-4 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500/40 w-48" />
+                        </div>
+
+                        {/* New button */}
+                        <button onClick={openNew}
+                            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium bg-orange-500 text-white hover:bg-orange-600 shadow-md shadow-orange-500/15 transition-all">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                            </svg>
+                            Nueva Reunión
+                        </button>
+                    </div>
+                </div>
+
+                {/* Table */}
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm" style={{ minWidth: "1000px" }}>
+                        <thead>
+                            <tr className="border-b border-gray-100 text-gray-500 bg-gray-50/50">
+                                <th className="text-left px-4 py-3 font-medium whitespace-nowrap">#</th>
+                                <th className="text-left px-4 py-3 font-medium whitespace-nowrap">Sprint</th>
+                                <th className="text-left px-4 py-3 font-medium whitespace-nowrap">Tipo</th>
+                                <th className="text-left px-4 py-3 font-medium whitespace-nowrap">Módulo</th>
+                                <th className="text-left px-4 py-3 font-medium" style={{ minWidth: "200px" }}>Tema</th>
+                                <th className="text-left px-4 py-3 font-medium whitespace-nowrap">Estado</th>
+                                <th className="text-left px-4 py-3 font-medium whitespace-nowrap">Fecha</th>
+                                <th className="text-left px-4 py-3 font-medium whitespace-nowrap">Presentes</th>
+                                <th className="text-center px-4 py-3 font-medium whitespace-nowrap">Prioridad</th>
+                                <th className="text-center px-4 py-3 font-medium whitespace-nowrap w-20">Acciones</th>
                             </tr>
-                        ) : (
-                            paginated.map((r) => {
-                                const ec = getEstadoColor(r.estado);
-                                const pc = getPrioridadColor(r.prioridad);
-                                const presentes = r.presentes || [];
-                                return (
-                                    <tr key={r.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
-                                        <td className="px-4 py-3 text-gray-400 text-xs font-mono">{r.id}</td>
-                                        <td className="px-4 py-3">
-                                            {r.sprint ? (
-                                                <span className="text-xs text-gray-700 bg-gray-100 px-2 py-1 rounded-md whitespace-nowrap">{r.sprint}</span>
-                                            ) : <span className="text-gray-300 text-xs">—</span>}
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <span className={`text-xs px-2 py-1 rounded-md whitespace-nowrap ${r.tipo === "Reunión con cliente" ? "bg-blue-50 text-blue-700" : "bg-emerald-50 text-emerald-700"}`}>
-                                                {r.tipo}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-3 text-xs text-gray-700">{r.modulo || "—"}</td>
-                                        <td className="px-4 py-3 text-xs text-gray-700 max-w-[250px] truncate" title={r.tema}>{r.tema || "—"}</td>
-                                        <td className="px-4 py-3">
-                                            <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ${ec.bg} ${ec.text}`}>
-                                                {r.estado}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">
-                                            {r.fecha_programada || (r.fechas_propuestas?.length ? `${r.fechas_propuestas.length} propuesta(s)` : "—")}
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <div className="flex flex-wrap gap-1 max-w-[200px]">
-                                                {presentes.length > 0 ? presentes.map((p) => (
-                                                    <span key={p} className="text-[10px] bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded">{p}</span>
-                                                )) : <span className="text-gray-300 text-xs">—</span>}
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-3 text-center">
-                                            <span className={`inline-flex items-center px-2 py-1 rounded-lg text-xs font-medium ${pc.bg} ${pc.text}`}>
-                                                {r.prioridad || "—"}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-3 text-center">
-                                            <div className="flex items-center justify-center gap-1">
-                                                <button onClick={() => setEditRow(r)} title="Editar"
-                                                    className="p-1.5 rounded-lg text-gray-400 hover:bg-orange-50 hover:text-orange-600 transition-colors">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                                    </svg>
-                                                </button>
-                                                <button onClick={() => setDeleteId(r.id)} title="Eliminar"
-                                                    className="p-1.5 rounded-lg text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                    </svg>
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                );
-                            })
-                        )}
-                    </tbody>
-                </table>
-            </div>
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-                <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-between">
-                    <span className="text-xs text-gray-500">
-                        Página {currentPage} de {totalPages}
-                    </span>
-                    <div className="flex gap-1">
-                        <button onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1}
-                            className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-100 disabled:opacity-40 transition-colors">
-                            ← Anterior
-                        </button>
-                        <button onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
-                            className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-100 disabled:opacity-40 transition-colors">
-                            Siguiente →
-                        </button>
-                    </div>
+                        </thead>
+                        <tbody>
+                            {paginated.length === 0 ? (
+                                <tr>
+                                    <td colSpan={10} className="px-4 py-12 text-center text-gray-400 text-sm">
+                                        No hay reuniones registradas
+                                    </td>
+                                </tr>
+                            ) : (
+                                paginated.map((r) => {
+                                    const ec = getEstadoColor(r.estado);
+                                    const pc = getPrioridadColor(r.prioridad);
+                                    const presentes = r.presentes || [];
+                                    return (
+                                        <tr key={r.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+                                            <td className="px-4 py-3 text-gray-400 text-xs font-mono">{r.id}</td>
+                                            <td className="px-4 py-3">
+                                                {r.sprint ? (
+                                                    <span className="text-xs text-gray-700 bg-gray-100 px-2 py-1 rounded-md whitespace-nowrap">{r.sprint}</span>
+                                                ) : <span className="text-gray-300 text-xs">—</span>}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <span className={`text-xs px-2 py-1 rounded-md whitespace-nowrap ${r.tipo === "Reunión con cliente" ? "bg-blue-50 text-blue-700" : "bg-emerald-50 text-emerald-700"}`}>
+                                                    {r.tipo}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-3 text-xs text-gray-700">{r.modulo || "—"}</td>
+                                            <td className="px-4 py-3 text-xs text-gray-700 max-w-[250px] truncate" title={r.tema}>{r.tema || "—"}</td>
+                                            <td className="px-4 py-3">
+                                                <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ${ec.bg} ${ec.text}`}>
+                                                    {r.estado}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">
+                                                {r.fecha_programada || (r.fechas_propuestas?.length ? `${r.fechas_propuestas.length} propuesta(s)` : "—")}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <div className="flex flex-wrap gap-1 max-w-[200px]">
+                                                    {presentes.length > 0 ? presentes.map((p) => (
+                                                        <span key={p} className="text-[10px] bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded">{p}</span>
+                                                    )) : <span className="text-gray-300 text-xs">—</span>}
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3 text-center">
+                                                <span className={`inline-flex items-center px-2 py-1 rounded-lg text-xs font-medium ${pc.bg} ${pc.text}`}>
+                                                    {r.prioridad || "—"}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-3 text-center">
+                                                <div className="flex items-center justify-center gap-1">
+                                                    <button onClick={() => setEditRow(r)} title="Editar"
+                                                        className="p-1.5 rounded-lg text-gray-400 hover:bg-orange-50 hover:text-orange-600 transition-colors">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                        </svg>
+                                                    </button>
+                                                    <button onClick={() => setDeleteId(r.id)} title="Eliminar"
+                                                        className="p-1.5 rounded-lg text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                        </svg>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })
+                            )}
+                        </tbody>
+                    </table>
                 </div>
-            )}
 
-            {/* Modals */}
-            {editRow && (
-                <EditModal
-                    row={editRow}
-                    sprints={sprints}
-                    nombres={nombres}
-                    onSave={handleSave}
-                    onClose={() => setEditRow(null)}
-                    isNew={!editRow.id}
-                />
-            )}
-            {deleteId && (
-                <ConfirmDeleteModal
-                    onConfirm={() => handleDelete(deleteId)}
-                    onCancel={() => setDeleteId(null)}
-                />
-            )}
+                {/* Pagination */}
+                {totalPages > 1 && (
+                    <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-between">
+                        <span className="text-xs text-gray-500">
+                            Página {currentPage} de {totalPages}
+                        </span>
+                        <div className="flex gap-1">
+                            <button onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1}
+                                className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-100 disabled:opacity-40 transition-colors">
+                                ← Anterior
+                            </button>
+                            <button onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
+                                className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-100 disabled:opacity-40 transition-colors">
+                                Siguiente →
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Modals */}
+                {editRow && (
+                    <EditModal
+                        row={editRow}
+                        sprints={sprints}
+                        nombres={nombres}
+                        onSave={handleSave}
+                        onClose={() => setEditRow(null)}
+                        isNew={!editRow.id}
+                    />
+                )}
+                {deleteId && (
+                    <ConfirmDeleteModal
+                        onConfirm={() => handleDelete(deleteId)}
+                        onCancel={() => setDeleteId(null)}
+                    />
+                )}
+            </div>
         </div>
     );
 }
