@@ -7,6 +7,7 @@ import ReportesTable from "@/components/ReportesTable";
 
 export default function ReportesPage() {
     const [tickets, setTickets] = useState([]);
+    const [nombres, setNombres] = useState([]);
     const [loading, setLoading] = useState(true);
     const router = useRouter();
 
@@ -30,6 +31,13 @@ export default function ReportesPage() {
         }
 
         setTickets(allData);
+
+        // Fetch Nombres
+        const { data: nombresData } = await supabase
+            .from("Nombres")
+            .select("*");
+        if (nombresData) setNombres(nombresData);
+
         setLoading(false);
     }, []);
 
@@ -80,7 +88,7 @@ export default function ReportesPage() {
             </div>
 
             {/* Tabla 01: Historias por Integrante y Estado */}
-            <ReportesTable tickets={tickets} />
+            <ReportesTable tickets={tickets} nombres={nombres} />
         </div>
     );
 }

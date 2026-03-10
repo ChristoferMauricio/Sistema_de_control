@@ -19,7 +19,7 @@ const STATUS_COLORS = {
     finalizada: "bg-green-100 text-green-700",
 };
 
-export default function ReportesTable({ tickets = [] }) {
+export default function ReportesTable({ tickets = [], nombres = [] }) {
     const [selectedSprint, setSelectedSprint] = useState("");
 
     // Solo Historias
@@ -46,29 +46,43 @@ export default function ReportesTable({ tickets = [] }) {
         return historias.filter((t) => t.sprint === selectedSprint);
     }, [historias, selectedSprint]);
 
-    // Pivotear: agrupar por asignado, contar por estado
+    // Crear mapa de Programador → Nombre (case-insensitive)
+    const nameMap = useMemo(() => {
+        const map = {};
+        nombres.forEach((n) => {
+            if (n.Programador) map[n.Programador.toLowerCase()] = n.Nombre;
+        });
+        return map;
+    }, [nombres]);
+
+    function resolveName(assigneeName) {
+        if (!assigneeName || assigneeName.trim() === "") return "Sin asignar";
+        return nameMap[assigneeName.toLowerCase()] || assigneeName;
+    }
+
+    // Pivotear: agrupar por nombre real, contar por estado
     const pivotData = useMemo(() => {
         const map = {};
 
         filtered.forEach((t) => {
-            const assignee = t.assignee || "Sin asignar";
-            if (!map[assignee]) {
-                map[assignee] = { assignee, total: 0 };
-                STATUS_COLUMNS.forEach((col) => { map[assignee][col.key] = 0; });
+            const realName = resolveName(t.assignee_name);
+            if (!map[realName]) {
+                map[realName] = { assignee: realName, total: 0 };
+                STATUS_COLUMNS.forEach((col) => { map[realName][col.key] = 0; });
             }
 
-            map[assignee].total += 1;
+            map[realName].total += 1;
 
             const matched = STATUS_COLUMNS.find((col) =>
                 col.jiraStatuses.some((s) => s.toLowerCase() === (t.status || "").toLowerCase())
             );
             if (matched) {
-                map[assignee][matched.key] += 1;
+                map[realName][matched.key] += 1;
             }
         });
 
         return Object.values(map).sort((a, b) => b.total - a.total);
-    }, [filtered]);
+    }, [filtered, nameMap]);
 
     // Totales por columna
     const totals = useMemo(() => {
