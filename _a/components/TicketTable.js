@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { formatDate, timeAgo, getStatusColor, getIssueTypeStyle, truncate } from "@/lib/utils";
+import { supabase } from "@/lib/supabase";
 import * as XLSX from "xlsx";
 
 const PAGE_SIZE = 15;
@@ -22,6 +23,8 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
   const [filterReporter, setFilterReporter] = useState("");
   const [filterKey, setFilterKey] = useState("");
   const [filterSummary, setFilterSummary] = useState("");
+  const [filterPrincipal, setFilterPrincipal] = useState("");
+  const [nombres, setNombres] = useState([]);
 
   // Dual scrollbar refs
   const topScrollRef = useRef(null);
@@ -59,14 +62,40 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
     return () => observer.disconnect();
   }, []);
 
+  // Fetch Nombres table for reporter resolution
+  useEffect(() => {
+    async function fetchNombres() {
+      const { data } = await supabase.from("Nombres").select("*");
+      if (data) setNombres(data);
+    }
+    fetchNombres();
+  }, []);
+
+  // Build Programador → Nombre map
+  const nameMap = useMemo(() => {
+    const map = {};
+    nombres.forEach((n) => {
+      if (n.Programador) map[n.Programador.toLowerCase()] = n.Nombre;
+    });
+    return map;
+  }, [nombres]);
+
+  function resolveName(rawName) {
+    if (!rawName || rawName.trim() === "") return "—";
+    return nameMap[rawName.toLowerCase()] || rawName;
+  }
+
   // Get unique values for filter dropdowns
   const uniqueTypes = useMemo(() => [...new Set(tickets.map(t => t.issue_type).filter(Boolean))].sort(), [tickets]);
   const uniqueSprints = useMemo(() => [...new Set(tickets.map(t => t.sprint).filter(Boolean))].sort(), [tickets]);
   const uniqueStatuses = useMemo(() => [...new Set(tickets.map(t => t.status).filter(Boolean))].sort(), [tickets]);
   const uniqueAssignees = useMemo(() => [...new Set(tickets.map(t => t.assignee_name).filter(Boolean))].sort(), [tickets]);
-  const uniqueReporters = useMemo(() => [...new Set(tickets.map(t => t.reporter_name).filter(Boolean))].sort(), [tickets]);
+  const uniqueReporters = useMemo(() => {
+    const resolved = tickets.map(t => resolveName(t.reporter_name)).filter(v => v && v !== "—");
+    return [...new Set(resolved)].sort();
+  }, [tickets, nameMap]);
 
-  const activeFilterCount = [filterType, filterSprint, filterStatus, filterAssignee, filterReporter, filterKey.length >= 3 ? filterKey : "", filterSummary.length >= 3 ? filterSummary : ""].filter(Boolean).length;
+  const activeFilterCount = [filterType, filterSprint, filterStatus, filterAssignee, filterReporter, filterKey.length >= 3 ? filterKey : "", filterSummary.length >= 3 ? filterSummary : "", filterPrincipal.length >= 3 ? filterPrincipal : ""].filter(Boolean).length;
 
   // Filter + Sort
   const filtered = useMemo(() => {
@@ -91,8 +120,9 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
     if (filterSummary.length >= 3) result = result.filter(t => t.summary?.toLowerCase().includes(filterSummary.toLowerCase()));
     if (filterSprint) result = result.filter(t => t.sprint === filterSprint);
     if (filterStatus) result = result.filter(t => t.status === filterStatus);
+    if (filterPrincipal.length >= 3) result = result.filter(t => t.parent_key?.toLowerCase().includes(filterPrincipal.toLowerCase()));
     if (filterAssignee) result = result.filter(t => t.assignee_name === filterAssignee);
-    if (filterReporter) result = result.filter(t => t.reporter_name === filterReporter);
+    if (filterReporter) result = result.filter(t => resolveName(t.reporter_name) === filterReporter);
 
     result.sort((a, b) => {
       const aVal = a[sortField] || "";
@@ -102,7 +132,7 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
     });
 
     return result;
-  }, [tickets, search, sortField, sortDir, filterType, filterKey, filterSummary, filterSprint, filterStatus, filterAssignee, filterReporter]);
+  }, [tickets, search, sortField, sortDir, filterType, filterKey, filterSummary, filterPrincipal, filterSprint, filterStatus, filterAssignee, filterReporter, nameMap]);
 
   // Pagination
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -125,6 +155,7 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
     setFilterType("");
     setFilterKey("");
     setFilterSummary("");
+    setFilterPrincipal("");
     setFilterSprint("");
     setFilterStatus("");
     setFilterAssignee("");
@@ -145,7 +176,7 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
       "Persona asignada": t.assignee_name || "",
       "Story Points": t.story_points ?? "",
       "Estado": t.status || "",
-      "Informador": t.reporter_name || "",
+      "Informador": resolveName(t.reporter_name),
       "Creada": t.created_at ? formatDate(t.created_at) : "",
     }));
 
@@ -385,7 +416,15 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
                 />
               </th>
               <th className="px-4 py-2" /> {/* Subtareas */}
-              <th className="px-4 py-2" /> {/* Principal */}
+              <th className="px-4 py-2">
+                <input
+                  type="text"
+                  value={filterPrincipal}
+                  onChange={(e) => { setFilterPrincipal(e.target.value); setCurrentPage(1); }}
+                  placeholder="Buscar..."
+                  className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[80px]"
+                />
+              </th>
               <th className="px-4 py-2">
                 <FilterSelect value={filterSprint} onChange={setFilterSprint} options={uniqueSprints} placeholder="Todos" />
               </th>
@@ -520,7 +559,7 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
 
                       {/* Informador */}
                       <td className="px-4 py-3">
-                        <span className="text-gray-600 text-xs">{ticket.reporter_name || "—"}</span>
+                        <span className="text-gray-600 text-xs">{resolveName(ticket.reporter_name)}</span>
                       </td>
 
                       {/* Creada */}
