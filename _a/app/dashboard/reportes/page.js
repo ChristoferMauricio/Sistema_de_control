@@ -45,6 +45,16 @@ export default function ReportesPage() {
         fetchData();
     }, [fetchData]);
 
+    const lastUpdated = useMemo(() => {
+        if (tickets.length === 0) return null;
+        let max = null;
+        tickets.forEach((t) => {
+            const d = t.synced_at ? new Date(t.synced_at) : null;
+            if (d && (!max || d > max)) max = d;
+        });
+        return max;
+    }, [tickets]);
+
     if (loading) {
         return (
             <div className="space-y-6">
@@ -64,15 +74,6 @@ export default function ReportesPage() {
         );
     }
 
-    const lastUpdated = useMemo(() => {
-        if (tickets.length === 0) return null;
-        let max = null;
-        tickets.forEach((t) => {
-            const d = t.synced_at ? new Date(t.synced_at) : null;
-            if (d && (!max || d > max)) max = d;
-        });
-        return max;
-    }, [tickets]);
 
     return (
         <div className="space-y-6 animate-fade-in">
