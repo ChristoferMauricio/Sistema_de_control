@@ -27,13 +27,23 @@ export default function ReunionesPage() {
 
         if (nombresData) setNombres(nombresData);
 
-        // Fetch tickets (for sprint list)
-        const { data: ticketData } = await supabase
-            .from("jira_tickets")
-            .select("sprint")
-            .not("sprint", "is", null);
-
-        if (ticketData) setTickets(ticketData);
+        // Fetch all sprints (paginated to bypass 1000-row limit)
+        let allSprints = [];
+        let from = 0;
+        const pageSize = 1000;
+        let hasMore = true;
+        while (hasMore) {
+            const { data } = await supabase
+                .from("jira_tickets")
+                .select("sprint")
+                .not("sprint", "is", null)
+                .range(from, from + pageSize - 1);
+            if (!data || data.length === 0) { hasMore = false; break; }
+            allSprints = [...allSprints, ...data];
+            from += pageSize;
+            hasMore = data.length === pageSize;
+        }
+        setTickets(allSprints);
 
         setLoading(false);
     }, []);
