@@ -42,19 +42,9 @@ export default function ReunionesPage() {
         fetchData();
     }, [fetchData]);
 
-    // Extract unique sprints and format as "Sprint XX"
+    // Extract unique sprints from Jira tickets (raw names)
     const sprints = useMemo(() => {
-        const raw = [...new Set(tickets.map((t) => t.sprint).filter(Boolean))];
-        // Convert "Iteración F3.12" → "Sprint 12"
-        const formatted = raw.map((s) => {
-            const match = s.match(/(\d+)$/);
-            return match ? `Sprint ${match[1]}` : s;
-        });
-        return [...new Set(formatted)].sort((a, b) => {
-            const numA = parseInt(a.replace(/\D/g, "")) || 0;
-            const numB = parseInt(b.replace(/\D/g, "")) || 0;
-            return numA - numB;
-        });
+        return [...new Set(tickets.map((t) => t.sprint).filter(Boolean))].sort();
     }, [tickets]);
 
     if (loading) {
