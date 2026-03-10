@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { getInitials } from "@/lib/utils";
+import { useTheme } from "@/app/dashboard/ThemeContext";
 
 // Configuración de navegación con permisos por rol
 const navItems = [
@@ -83,6 +84,7 @@ export default function DashboardNav({ user, role }) {
   const router = useRouter();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { theme, toggleTheme } = useTheme();
 
   // Filtrar por rol
   const visibleItems = navItems.filter((item) => item.roles.includes(role));
@@ -137,12 +139,28 @@ export default function DashboardNav({ user, role }) {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
               </svg>
             </div>
-            <div>
+            <div className="flex-1">
               <h2 className="text-lg font-bold font-[family-name:var(--font-heading)] text-gray-900">
                 Jira Dashboard
               </h2>
               <p className="text-xs text-gray-400">Panel de gestión</p>
             </div>
+            {/* Theme toggle */}
+            <button
+              onClick={toggleTheme}
+              className="p-2 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-orange-500 transition-all duration-200"
+              title={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+            >
+              {theme === "dark" ? (
+                <svg key="sun" xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 theme-icon-enter" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
+              ) : (
+                <svg key="moon" xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 theme-icon-enter" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                </svg>
+              )}
+            </button>
           </div>
         </div>
 

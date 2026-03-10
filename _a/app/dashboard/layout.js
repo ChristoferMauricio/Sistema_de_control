@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import DashboardNav from "@/components/DashboardNav";
 import { RoleProvider } from "./RoleContext";
+import { ThemeProvider } from "./ThemeContext";
 
 export default function DashboardLayout({ children }) {
   const router = useRouter();
@@ -79,18 +80,20 @@ export default function DashboardLayout({ children }) {
   }
 
   return (
-    <RoleProvider role={role}>
-      <div className="min-h-screen flex bg-gray-50">
-        {/* Sidebar Navigation */}
-        <DashboardNav user={user} role={role} />
+    <ThemeProvider>
+      <RoleProvider role={role}>
+        <div className="min-h-screen flex bg-gray-50">
+          {/* Sidebar Navigation */}
+          <DashboardNav user={user} role={role} />
 
-        {/* Main Content */}
-        <main className="flex-1 lg:ml-72 min-h-screen">
-          <div className="p-4 md:p-6 lg:p-8 max-w-7xl mx-auto">
-            {children}
-          </div>
-        </main>
-      </div>
-    </RoleProvider>
+          {/* Main Content */}
+          <main className="flex-1 lg:ml-72 min-h-screen">
+            <div className="p-4 md:p-6 lg:p-8 max-w-7xl mx-auto">
+              {children}
+            </div>
+          </main>
+        </div>
+      </RoleProvider>
+    </ThemeProvider>
   );
 }
