@@ -66,6 +66,7 @@ function MeetingCalendar({ reuniones }) {
     const today = new Date();
     const [year, setYear] = useState(today.getFullYear());
     const [month, setMonth] = useState(today.getMonth());
+    const [showTentativas, setShowTentativas] = useState(false);
 
     // Filter to only scheduled meetings that have a fecha_programada
     const scheduled = useMemo(() => {
@@ -76,16 +77,35 @@ function MeetingCalendar({ reuniones }) {
         });
     }, [reuniones]);
 
-    // Build events map: dateStr -> meetings[]
+    // Tentative meetings (use fechas_propuestas)
+    const tentativas = useMemo(() => {
+        return reuniones.filter((r) => {
+            const e = (r.estado || "").toLowerCase();
+            return e.includes("tentativa");
+        });
+    }, [reuniones]);
+
+    // Build events map: dateStr -> events[]
     const eventsMap = useMemo(() => {
         const map = {};
         scheduled.forEach((r) => {
-            const dateStr = r.fecha_programada.split(" ")[0]; // "2026-03-11"
+            const dateStr = r.fecha_programada.split(" ")[0];
             if (!map[dateStr]) map[dateStr] = [];
-            map[dateStr].push(r);
+            map[dateStr].push({ ...r, _tentativa: false });
         });
+        if (showTentativas) {
+            tentativas.forEach((r) => {
+                const propuestas = r.fechas_propuestas || [];
+                propuestas.forEach((fp) => {
+                    if (fp.fecha) {
+                        if (!map[fp.fecha]) map[fp.fecha] = [];
+                        map[fp.fecha].push({ ...r, _tentativa: true, _hora: fp.hora || "" });
+                    }
+                });
+            });
+        }
         return map;
-    }, [scheduled]);
+    }, [scheduled, tentativas, showTentativas]);
 
     // Build calendar grid
     const firstDay = new Date(year, month, 1);
@@ -124,6 +144,22 @@ function MeetingCalendar({ reuniones }) {
                         className="px-2.5 py-1 rounded-lg text-xs font-medium text-orange-600 bg-orange-50 border border-orange-200 hover:bg-orange-100 transition-colors">
                         Hoy
                     </button>
+                    <button onClick={() => setShowTentativas(!showTentativas)}
+                        title={showTentativas ? "Ocultar tentativas" : "Mostrar tentativas"}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors
+                            ${showTentativas ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100"}`}>
+                        {showTentativas ? (
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                        ) : (
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12c1.292 4.338 5.31 7.5 10.066 7.5.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
+                            </svg>
+                        )}
+                        Tentativas
+                    </button>
                 </div>
                 <div className="flex items-center gap-1">
                     <button onClick={prevMonth}
@@ -151,6 +187,12 @@ function MeetingCalendar({ reuniones }) {
                     <span className="w-3 h-3 rounded-sm bg-emerald-500" />
                     <span className="text-xs text-gray-500">Reunión Interna</span>
                 </div>
+                {showTentativas && (
+                    <div className="flex items-center gap-1.5">
+                        <span className="w-3 h-3 rounded-sm border-2 border-dashed border-amber-400 bg-amber-50" />
+                        <span className="text-xs text-gray-500">Tentativa</span>
+                    </div>
+                )}
             </div>
 
             {/* Day headers */}
@@ -179,14 +221,18 @@ function MeetingCalendar({ reuniones }) {
                                 {day}
                             </div>
                             <div className="space-y-0.5">
-                                {events.slice(0, 3).map((ev) => {
+                                {events.slice(0, 3).map((ev, evIdx) => {
                                     const isCliente = ev.tipo === "Reunión con cliente";
-                                    const hora = ev.fecha_programada.split(" ")[1] || "";
+                                    const isTent = ev._tentativa;
+                                    const hora = isTent ? (ev._hora || "") : (ev.fecha_programada?.split(" ")[1] || "");
                                     return (
-                                        <div key={ev.id}
-                                            title={`${ev.tipo}\n${ev.modulo || ""}\n${ev.tema || ""}\n${hora ? "Hora: " + hora : ""}`}
+                                        <div key={`${ev.id}-${evIdx}`}
+                                            title={`${isTent ? "[TENTATIVA] " : ""}${ev.tipo}\n${ev.modulo || ""}\n${ev.tema || ""}\n${hora ? "Hora: " + hora : ""}`}
                                             className={`text-[10px] leading-tight px-1.5 py-0.5 rounded truncate cursor-default
-                                                ${isCliente ? "bg-blue-100 text-blue-800" : "bg-emerald-100 text-emerald-800"}`}>
+                                                ${isTent
+                                                    ? "border border-dashed border-amber-300 bg-amber-50/60 text-amber-700 opacity-80"
+                                                    : isCliente ? "bg-blue-100 text-blue-800" : "bg-emerald-100 text-emerald-800"
+                                                }`}>
                                             {hora && <span className="font-semibold">{hora} </span>}
                                             {ev.modulo || ev.tema || ev.tipo}
                                         </div>
