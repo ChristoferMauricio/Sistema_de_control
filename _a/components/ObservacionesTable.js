@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { supabase } from "@/lib/supabase";
+import MarkdownEditor from "@/components/MarkdownEditor";
 
 const MODULO_OPTIONS = ["Mod. Maestros", "Mod. PAS", "Mod. Fiscalización"];
 const AMBIENTE_OPTIONS = ["Desarrollo", "Certificación", "Producción"];
@@ -158,16 +159,22 @@ function EditModal({ row, nombres, onSave, onClose, isNew }) {
             </div>
           </div>
 
-          {/* Descripción (Markdown) */}
+          {/* Descripción (Markdown con toolbar) */}
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="text-xs font-medium text-gray-500">Descripción de la observación (Markdown)</label>
+              <label className="text-xs font-medium text-gray-500">Descripción de la observación</label>
               <button onClick={() => setMdPreview("descripcion")}
-                className="text-[11px] text-orange-500 hover:text-orange-600 font-medium">Vista previa ↗</button>
+                className="text-[11px] text-orange-500 hover:text-orange-600 font-medium flex items-center gap-1">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                Vista previa
+              </button>
             </div>
-            <textarea value={form.descripcion || ""} onChange={(e) => updateField("descripcion", e.target.value)}
-              rows={4} className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-orange-500/40 resize-y"
-              placeholder="Escribe en formato Markdown..." />
+            <MarkdownEditor
+              value={form.descripcion}
+              onChange={(val) => updateField("descripcion", val)}
+              rows={5}
+              placeholder="Describe la observación..."
+            />
           </div>
 
           {/* Row 2: Obs WORD + Ambiente */}
@@ -228,16 +235,22 @@ function EditModal({ row, nombres, onSave, onClose, isNew }) {
             </div>
           </div>
 
-          {/* Observación Final (Markdown) */}
+          {/* Observación Final (Markdown con toolbar) */}
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="text-xs font-medium text-gray-500">Observación Final (Markdown)</label>
+              <label className="text-xs font-medium text-gray-500">Observación Final</label>
               <button onClick={() => setMdPreview("observacion_final")}
-                className="text-[11px] text-orange-500 hover:text-orange-600 font-medium">Vista previa ↗</button>
+                className="text-[11px] text-orange-500 hover:text-orange-600 font-medium flex items-center gap-1">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                Vista previa
+              </button>
             </div>
-            <textarea value={form.observacion_final || ""} onChange={(e) => updateField("observacion_final", e.target.value)}
-              rows={3} className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-orange-500/40 resize-y"
-              placeholder="Observación final en Markdown..." />
+            <MarkdownEditor
+              value={form.observacion_final}
+              onChange={(val) => updateField("observacion_final", val)}
+              rows={3}
+              placeholder="Observación final..."
+            />
           </div>
 
           {/* Solución WORD */}
