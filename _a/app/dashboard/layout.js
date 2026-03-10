@@ -23,13 +23,32 @@ export default function DashboardLayout({ children }) {
       setUser(session.user);
 
       // Obtener rol del usuario
-      const { data: roleData } = await supabase
+      const { data: roleData, error: roleError } = await supabase
         .from("team_roles")
         .select("role")
         .eq("user_id", session.user.id)
         .single();
 
-      setRole(roleData?.role || "viewer");
+      if (roleError) {
+        console.warn("Error obteniendo rol por user_id:", roleError.message);
+        // Fallback: buscar por email
+        const { data: roleByEmail } = await supabase
+          .from("team_roles")
+          .select("role")
+          .eq("email", session.user.email)
+          .single();
+
+        if (roleByEmail) {
+          console.log("Rol encontrado por email:", roleByEmail.role);
+          setRole(roleByEmail.role);
+        } else {
+          console.warn("No se encontró rol para:", session.user.email);
+          setRole("viewer");
+        }
+      } else {
+        setRole(roleData?.role || "viewer");
+      }
+
       setLoading(false);
     }
 

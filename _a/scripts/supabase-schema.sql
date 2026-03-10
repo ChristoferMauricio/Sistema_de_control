@@ -108,6 +108,16 @@ CREATE POLICY "Authenticated users can read status history"
 
 ALTER TABLE team_roles ENABLE ROW LEVEL SECURITY;
 
+-- Función SECURITY DEFINER para verificar admin sin recursión RLS
+CREATE OR REPLACE FUNCTION is_admin()
+RETURNS BOOLEAN AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM team_roles
+    WHERE user_id = auth.uid()
+    AND role = 'admin'
+  );
+$$ LANGUAGE sql SECURITY DEFINER;
+
 -- Política de lectura: solo tu propio registro
 DROP POLICY IF EXISTS "Users can read own role" ON team_roles;
 CREATE POLICY "Users can read own role"
@@ -116,16 +126,10 @@ CREATE POLICY "Users can read own role"
   TO authenticated
   USING (user_id = auth.uid());
 
--- Política de lectura para admins: un admin puede ver todos los roles
+-- Política de lectura para admins (usando función sin recursión)
 DROP POLICY IF EXISTS "Admins can read all roles" ON team_roles;
 CREATE POLICY "Admins can read all roles"
   ON team_roles
   FOR SELECT
   TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1 FROM team_roles tr
-      WHERE tr.user_id = auth.uid()
-      AND tr.role = 'admin'
-    )
-  );
+  USING (is_admin());
