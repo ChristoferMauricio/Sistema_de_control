@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 
 // Mapeo de estados internos de Jira → nombres de columna para el reporte
@@ -80,7 +80,7 @@ function TraceModal({ assigneeName, stories, onClose }) {
         setLoading(false);
     }, [stories]);
 
-    useState(() => { fetchHistory(); });
+    useEffect(() => { fetchHistory(); }, [fetchHistory]);
 
     // Build Gantt data: for each story, create segments [{ status, start, end }]
     const ganttData = useMemo(() => {
