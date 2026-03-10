@@ -48,17 +48,16 @@ function formatDateShort(dateStr) {
     return d.toLocaleDateString("es-PE", { day: "2-digit", month: "2-digit" });
 }
 
-// ─── Traceability Modal ─────────────────────────────────────
+// ─── Traceability Gantt Modal ────────────────────────────────
 function TraceModal({ assigneeName, stories, onClose }) {
     const [historyData, setHistoryData] = useState(null);
     const [loading, setLoading] = useState(true);
 
-    // Fetch status history for all jira_keys of this assignee
+    // Fetch status history
     const fetchHistory = useCallback(async () => {
         const keys = stories.map((s) => s.jira_key);
         if (keys.length === 0) { setHistoryData({}); setLoading(false); return; }
 
-        // Fetch all status history for these keys
         let allHistory = [];
         const batchSize = 50;
         for (let i = 0; i < keys.length; i += batchSize) {
@@ -71,7 +70,6 @@ function TraceModal({ assigneeName, stories, onClose }) {
             if (data) allHistory = [...allHistory, ...data];
         }
 
-        // Group by jira_key
         const grouped = {};
         allHistory.forEach((h) => {
             if (!grouped[h.jira_key]) grouped[h.jira_key] = [];
@@ -84,22 +82,106 @@ function TraceModal({ assigneeName, stories, onClose }) {
 
     useState(() => { fetchHistory(); });
 
+    // Build Gantt data: for each story, create segments [{ status, start, end }]
+    const ganttData = useMemo(() => {
+        if (!historyData) return [];
+
+        const now = new Date();
+        return stories.map((story) => {
+            const changes = historyData[story.jira_key] || [];
+            const segments = [];
+
+            changes.forEach((c, idx) => {
+                const start = new Date(c.changed_at);
+                const end = idx < changes.length - 1
+                    ? new Date(changes[idx + 1].changed_at)
+                    : now;
+                segments.push({
+                    status: c.new_status,
+                    start,
+                    end,
+                    oldStatus: c.old_status,
+                });
+            });
+
+            return {
+                key: story.jira_key,
+                summary: story.summary,
+                currentStatus: story.status,
+                segments,
+            };
+        });
+    }, [stories, historyData]);
+
+    // Global min/max dates for the X axis
+    const { minDate, maxDate } = useMemo(() => {
+        let min = Infinity;
+        let max = -Infinity;
+        ganttData.forEach((row) => {
+            row.segments.forEach((seg) => {
+                if (seg.start.getTime() < min) min = seg.start.getTime();
+                if (seg.end.getTime() > max) max = seg.end.getTime();
+            });
+        });
+        if (min === Infinity) { min = Date.now() - 86400000; max = Date.now(); }
+        // Add small padding
+        const range = max - min;
+        return { minDate: min - range * 0.02, maxDate: max + range * 0.02 };
+    }, [ganttData]);
+
+    const totalRange = maxDate - minDate;
+
+    // Generate date ticks for X axis
+    const dateTicks = useMemo(() => {
+        if (totalRange <= 0) return [];
+        const ticks = [];
+        const tickCount = Math.min(10, Math.max(4, Math.floor(totalRange / (86400000))));
+        const step = totalRange / tickCount;
+        for (let i = 0; i <= tickCount; i++) {
+            const ts = minDate + step * i;
+            ticks.push({
+                ts,
+                pct: ((ts - minDate) / totalRange) * 100,
+                label: new Date(ts).toLocaleDateString("es-PE", { day: "2-digit", month: "short" }),
+            });
+        }
+        return ticks;
+    }, [minDate, maxDate, totalRange]);
+
+    // Legend items (unique statuses)
+    const legendItems = useMemo(() => {
+        const seen = new Set();
+        const items = [];
+        ganttData.forEach((row) => {
+            row.segments.forEach((seg) => {
+                if (!seen.has(seg.status)) {
+                    seen.add(seg.status);
+                    items.push({ status: seg.status, color: getStatusColor(seg.status) });
+                }
+            });
+        });
+        return items;
+    }, [ganttData]);
+
+    const ROW_HEIGHT = 36;
+    const LABEL_WIDTH = 170;
+
     return (
         <div className="fixed inset-0 z-50 overflow-y-auto">
             <div className="min-h-full flex items-start justify-center p-4 py-8">
                 <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
                 <div
-                    className="relative bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[85vh] flex flex-col animate-fade-in"
+                    className="relative bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[85vh] flex flex-col animate-fade-in"
                     onClick={(e) => e.stopPropagation()}
                 >
                     {/* Header */}
                     <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between shrink-0">
                         <div>
                             <h3 className="font-semibold text-gray-900 text-lg">
-                                Trazabilidad — {assigneeName}
+                                Transiciones de Estado por Historia
                             </h3>
                             <p className="text-xs text-gray-400 mt-0.5">
-                                {stories.length} historia{stories.length !== 1 ? "s" : ""} · Cambios de estado con fechas
+                                {assigneeName} · {stories.length} historia{stories.length !== 1 ? "s" : ""}
                             </p>
                         </div>
                         <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600">
@@ -110,93 +192,130 @@ function TraceModal({ assigneeName, stories, onClose }) {
                     </div>
 
                     {/* Body */}
-                    <div className="px-6 py-5 overflow-y-auto">
+                    <div className="px-6 py-5 overflow-y-auto overflow-x-auto">
                         {loading ? (
                             <div className="flex items-center justify-center py-12">
                                 <div className="w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
                                 <span className="ml-3 text-sm text-gray-500">Cargando trazabilidad...</span>
                             </div>
                         ) : (
-                            <div className="space-y-4">
-                                {stories.map((story) => {
-                                    const changes = historyData?.[story.jira_key] || [];
-                                    return (
-                                        <div key={story.jira_key} className="border border-gray-100 rounded-xl p-4">
-                                            {/* Story header */}
-                                            <div className="flex items-center gap-3 mb-3">
-                                                <span className="text-xs font-mono font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-md">
-                                                    {story.jira_key}
-                                                </span>
-                                                <span className="text-sm text-gray-700 truncate flex-1" title={story.summary}>
-                                                    {story.summary}
-                                                </span>
-                                                <span className={`text-xs font-medium px-2 py-0.5 rounded-md`} style={{ backgroundColor: getStatusColor(story.status) + "20", color: getStatusColor(story.status) }}>
-                                                    {story.status}
+                            <>
+                                {/* Legend */}
+                                <div className="flex flex-wrap items-center gap-4 mb-5">
+                                    {legendItems.map((item) => (
+                                        <div key={item.status} className="flex items-center gap-1.5">
+                                            <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: item.color }} />
+                                            <span className="text-xs text-gray-600">{item.status}</span>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* Gantt Chart */}
+                                <div className="relative" style={{ minWidth: "700px" }}>
+                                    {/* X axis grid lines + labels (top) */}
+                                    <div className="flex" style={{ marginLeft: `${LABEL_WIDTH}px` }}>
+                                        <div className="relative w-full h-6">
+                                            {dateTicks.map((tick, i) => (
+                                                <div
+                                                    key={i}
+                                                    className="absolute text-[10px] text-gray-400 -translate-x-1/2"
+                                                    style={{ left: `${tick.pct}%` }}
+                                                >
+                                                    {tick.label}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Rows */}
+                                    {ganttData.map((row, rowIdx) => (
+                                        <div
+                                            key={row.key}
+                                            className="flex items-center border-b border-gray-50"
+                                            style={{ height: `${ROW_HEIGHT}px` }}
+                                        >
+                                            {/* Label */}
+                                            <div
+                                                className="shrink-0 pr-3 text-right"
+                                                style={{ width: `${LABEL_WIDTH}px` }}
+                                            >
+                                                <span className="text-xs font-mono font-semibold text-gray-700 truncate block" title={`${row.key}: ${row.summary}`}>
+                                                    {row.key}
                                                 </span>
                                             </div>
 
-                                            {/* Timeline chart */}
-                                            {changes.length === 0 ? (
-                                                <p className="text-xs text-gray-300 italic">Sin historial de cambios</p>
-                                            ) : (
-                                                <div className="relative">
-                                                    {/* Horizontal timeline bar */}
-                                                    <div className="flex items-stretch rounded-lg overflow-hidden h-8 bg-gray-50 border border-gray-100">
-                                                        {changes.map((c, idx) => {
-                                                            const color = getStatusColor(c.new_status);
-                                                            const widthPct = 100 / changes.length;
-                                                            return (
-                                                                <div
-                                                                    key={c.id}
-                                                                    className="relative group flex items-center justify-center text-[10px] font-medium text-white transition-all hover:opacity-90 cursor-default"
-                                                                    style={{
-                                                                        width: `${widthPct}%`,
-                                                                        backgroundColor: color,
-                                                                        minWidth: "30px",
-                                                                    }}
-                                                                    title={`${c.old_status || "—"} → ${c.new_status}\n${formatDate(c.changed_at)}`}
-                                                                >
-                                                                    <span className="truncate px-1">{idx + 1}</span>
-                                                                    {/* Tooltip */}
-                                                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-10">
-                                                                        <div className="bg-gray-900 text-white rounded-lg px-3 py-2 text-[11px] whitespace-nowrap shadow-lg">
-                                                                            <div className="font-semibold mb-0.5">
-                                                                                {c.old_status || "Inicio"} → {c.new_status}
-                                                                            </div>
-                                                                            <div className="text-gray-300">{formatDate(c.changed_at)}</div>
-                                                                        </div>
-                                                                        <div className="w-2 h-2 bg-gray-900 rotate-45 mx-auto -mt-1" />
+                                            {/* Chart area */}
+                                            <div className="relative flex-1 h-full">
+                                                {/* Grid lines */}
+                                                {dateTicks.map((tick, i) => (
+                                                    <div
+                                                        key={i}
+                                                        className="absolute top-0 bottom-0 border-l border-gray-100"
+                                                        style={{ left: `${tick.pct}%` }}
+                                                    />
+                                                ))}
+
+                                                {/* Status bars */}
+                                                {row.segments.map((seg, segIdx) => {
+                                                    const leftPct = ((seg.start.getTime() - minDate) / totalRange) * 100;
+                                                    const widthPct = ((seg.end.getTime() - seg.start.getTime()) / totalRange) * 100;
+                                                    const color = getStatusColor(seg.status);
+
+                                                    return (
+                                                        <div
+                                                            key={segIdx}
+                                                            className="absolute top-1 group cursor-default"
+                                                            style={{
+                                                                left: `${leftPct}%`,
+                                                                width: `${Math.max(widthPct, 0.3)}%`,
+                                                                height: `${ROW_HEIGHT - 8}px`,
+                                                                backgroundColor: color,
+                                                                borderRadius: "4px",
+                                                                opacity: 0.85,
+                                                            }}
+                                                            title={`${seg.status}\n${formatDate(seg.start)} → ${formatDate(seg.end)}`}
+                                                        >
+                                                            {/* Tooltip on hover */}
+                                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block z-20 pointer-events-none">
+                                                                <div className="bg-gray-900 text-white rounded-lg px-3 py-2 text-[11px] whitespace-nowrap shadow-xl">
+                                                                    <div className="font-semibold">{seg.status}</div>
+                                                                    <div className="text-gray-300 mt-0.5">
+                                                                        {formatDate(seg.start)}
+                                                                    </div>
+                                                                    <div className="text-gray-300">
+                                                                        → {formatDate(seg.end)}
                                                                     </div>
                                                                 </div>
-                                                            );
-                                                        })}
-                                                    </div>
-
-                                                    {/* Date labels */}
-                                                    <div className="flex justify-between mt-1">
-                                                        <span className="text-[10px] text-gray-400">{formatDateShort(changes[0]?.changed_at)}</span>
-                                                        {changes.length > 1 && (
-                                                            <span className="text-[10px] text-gray-400">{formatDateShort(changes[changes.length - 1]?.changed_at)}</span>
-                                                        )}
-                                                    </div>
-
-                                                    {/* Legend of transitions */}
-                                                    <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2">
-                                                        {changes.map((c, idx) => (
-                                                            <div key={c.id} className="flex items-center gap-1 text-[10px] text-gray-500">
-                                                                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: getStatusColor(c.new_status) }} />
-                                                                <span className="font-medium">{idx + 1}.</span>
-                                                                <span>{c.new_status}</span>
-                                                                <span className="text-gray-300">({formatDateShort(c.changed_at)})</span>
+                                                                <div className="w-2 h-2 bg-gray-900 rotate-45 mx-auto -mt-1" />
                                                             </div>
-                                                        ))}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    ))}
+
+                                    {/* X axis labels (bottom) */}
+                                    <div className="flex" style={{ marginLeft: `${LABEL_WIDTH}px` }}>
+                                        <div className="relative w-full h-8 border-t border-gray-200">
+                                            {dateTicks.map((tick, i) => (
+                                                <div key={i}>
+                                                    <div
+                                                        className="absolute top-0 w-px h-2 bg-gray-300"
+                                                        style={{ left: `${tick.pct}%` }}
+                                                    />
+                                                    <div
+                                                        className="absolute top-3 text-[10px] text-gray-500 font-medium -translate-x-1/2"
+                                                        style={{ left: `${tick.pct}%` }}
+                                                    >
+                                                        {tick.label}
                                                     </div>
                                                 </div>
-                                            )}
+                                            ))}
                                         </div>
-                                    );
-                                })}
-                            </div>
+                                    </div>
+                                </div>
+                            </>
                         )}
                     </div>
                 </div>
