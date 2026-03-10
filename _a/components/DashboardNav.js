@@ -57,6 +57,16 @@ const navItems = [
     ),
     roles: ["admin", "developer", "qa", "viewer"],
   },
+  {
+    label: "Reportes",
+    href: "/dashboard/reportes",
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      </svg>
+    ),
+    roles: ["admin", "developer", "qa", "viewer"],
+  },
 ];
 
 export default function DashboardNav({ user, role }) {
@@ -146,10 +156,9 @@ export default function DashboardNav({ user, role }) {
                   flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium
                   transition-all duration-200 group
                   animate-slide-left stagger-${index + 1}
-                  ${
-                    isActive
-                      ? "bg-orange-50 text-orange-600 border border-orange-200 shadow-sm"
-                      : "text-gray-600 hover:bg-gray-50 hover:text-gray-900 border border-transparent"
+                  ${isActive
+                    ? "bg-orange-50 text-orange-600 border border-orange-200 shadow-sm"
+                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900 border border-transparent"
                   }
                 `}
               >

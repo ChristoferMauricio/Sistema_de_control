@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import TicketTable from "@/components/TicketTable";
 import Card from "@/components/ui/Card";
@@ -11,6 +12,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState(null);
+  const router = useRouter();
   const [stats, setStats] = useState({
     total: 0,
     pendientes: 0,
@@ -195,33 +197,45 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        <button
-          id="sync-jira-btn"
-          onClick={handleSync}
-          disabled={syncing}
-          className={`
+        <div className="flex items-center gap-3">
+          <button
+            id="sync-jira-btn"
+            onClick={handleSync}
+            disabled={syncing}
+            className={`
             inline-flex items-center gap-2.5 px-5 py-2.5 rounded-xl
             font-medium text-sm transition-all duration-300
             ${syncing
-              ? "bg-gray-100 text-gray-400 cursor-wait"
-              : "bg-orange-500 hover:bg-orange-600 text-white shadow-md shadow-orange-500/15 hover:shadow-lg hover:shadow-orange-500/25 hover:scale-[1.02] active:scale-[0.98]"
-            }
+                ? "bg-gray-100 text-gray-400 cursor-wait"
+                : "bg-orange-500 hover:bg-orange-600 text-white shadow-md shadow-orange-500/15 hover:shadow-lg hover:shadow-orange-500/25 hover:scale-[1.02] active:scale-[0.98]"
+              }
           `}
-        >
-          {syncing ? (
-            <>
-              <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-              Sincronizando...
-            </>
-          ) : (
-            <>
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              Actualizar desde Jira
-            </>
-          )}
-        </button>
+          >
+            {syncing ? (
+              <>
+                <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                Sincronizando...
+              </>
+            ) : (
+              <>
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Actualizar desde Jira
+              </>
+            )}
+          </button>
+
+          <button
+            onClick={() => router.push("/dashboard/reportes")}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium text-sm border border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all hover:scale-[1.02] active:scale-[0.98]"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            Ver Reportes
+          </button>
+        </div>
       </div>
 
       {/* Sync result toast */}
