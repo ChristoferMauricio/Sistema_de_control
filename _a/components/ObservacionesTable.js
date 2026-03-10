@@ -110,185 +110,183 @@ function EditModal({ row, nombres, onSave, onClose, isNew }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex items-center justify-center min-h-full p-4 py-6">
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={confirmClose} />
-        <div
-          className="relative bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col animate-fade-in"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* Header */}
-          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-            <h3 className="font-semibold text-gray-900 text-lg">
-              {isNew ? "Nueva Observación" : `Editar #${row.id}`}
-            </h3>
-            <button onClick={confirmClose} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600">
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
+      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={confirmClose} />
+      <div
+        className="relative bg-white rounded-2xl shadow-2xl max-w-5xl w-full h-[calc(100vh-3rem)] flex flex-col animate-fade-in"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <h3 className="font-semibold text-gray-900 text-lg">
+            {isNew ? "Nueva Observación" : `Editar #${row.id}`}
+          </h3>
+          <button onClick={confirmClose} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600">
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Form body */}
+        <div className="px-6 py-5 overflow-y-auto space-y-4">
+          {/* Row 1: Sprint + Módulo + Submódulo */}
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Sprint</label>
+              <input type="text" value={form.sprint || ""} onChange={(e) => updateField("sprint", e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40" placeholder="Ej: Sprint 12" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Módulo</label>
+              {useCustomModulo ? (
+                <div className="flex gap-1">
+                  <input type="text" value={customModulo} onChange={(e) => setCustomModulo(e.target.value)}
+                    className="flex-1 px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40" placeholder="Módulo personalizado" />
+                  <button onClick={() => { setUseCustomModulo(false); setCustomModulo(""); }}
+                    className="px-2 rounded-lg border border-gray-200 text-gray-400 hover:text-gray-600 hover:bg-gray-50 text-xs">✕</button>
+                </div>
+              ) : (
+                <select value={form.modulo || ""} onChange={(e) => {
+                  if (e.target.value === "__custom__") { setUseCustomModulo(true); }
+                  else updateField("modulo", e.target.value);
+                }} className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40">
+                  <option value="">Seleccionar...</option>
+                  {MODULO_OPTIONS.map((m) => <option key={m} value={m}>{m}</option>)}
+                  <option value="__custom__">✏️ Otro...</option>
+                </select>
+              )}
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Submódulo</label>
+              <input type="text" value={form.submodulo || ""} onChange={(e) => updateField("submodulo", e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40" placeholder="Ej: Listado" />
+            </div>
           </div>
 
-          {/* Form body */}
-          <div className="px-6 py-5 overflow-y-auto space-y-4">
-            {/* Row 1: Sprint + Módulo + Submódulo */}
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Sprint</label>
-                <input type="text" value={form.sprint || ""} onChange={(e) => updateField("sprint", e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40" placeholder="Ej: Sprint 12" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Módulo</label>
-                {useCustomModulo ? (
-                  <div className="flex gap-1">
-                    <input type="text" value={customModulo} onChange={(e) => setCustomModulo(e.target.value)}
-                      className="flex-1 px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40" placeholder="Módulo personalizado" />
-                    <button onClick={() => { setUseCustomModulo(false); setCustomModulo(""); }}
-                      className="px-2 rounded-lg border border-gray-200 text-gray-400 hover:text-gray-600 hover:bg-gray-50 text-xs">✕</button>
-                  </div>
-                ) : (
-                  <select value={form.modulo || ""} onChange={(e) => {
-                    if (e.target.value === "__custom__") { setUseCustomModulo(true); }
-                    else updateField("modulo", e.target.value);
-                  }} className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40">
-                    <option value="">Seleccionar...</option>
-                    {MODULO_OPTIONS.map((m) => <option key={m} value={m}>{m}</option>)}
-                    <option value="__custom__">✏️ Otro...</option>
-                  </select>
-                )}
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Submódulo</label>
-                <input type="text" value={form.submodulo || ""} onChange={(e) => updateField("submodulo", e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40" placeholder="Ej: Listado" />
-              </div>
+          {/* Descripción (Markdown con toolbar) */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-medium text-gray-500">Descripción de la observación</label>
+              <button onClick={() => setMdPreview("descripcion")}
+                className="text-[11px] text-orange-500 hover:text-orange-600 font-medium flex items-center gap-1">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                Vista previa
+              </button>
             </div>
+            <MarkdownEditor
+              value={form.descripcion}
+              onChange={(val) => updateField("descripcion", val)}
+              rows={5}
+              placeholder="Describe la observación..."
+            />
+          </div>
 
-            {/* Descripción (Markdown con toolbar) */}
+          {/* Row 2: Obs WORD + Ambiente */}
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-xs font-medium text-gray-500">Descripción de la observación</label>
-                <button onClick={() => setMdPreview("descripcion")}
-                  className="text-[11px] text-orange-500 hover:text-orange-600 font-medium flex items-center gap-1">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                  Vista previa
-                </button>
-              </div>
-              <MarkdownEditor
-                value={form.descripcion}
-                onChange={(val) => updateField("descripcion", val)}
-                rows={5}
-                placeholder="Describe la observación..."
-              />
-            </div>
-
-            {/* Row 2: Obs WORD + Ambiente */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Obs WORD (Link)</label>
-                <input type="url" value={form.obs_word_link || ""} onChange={(e) => updateField("obs_word_link", e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40" placeholder="https://..." />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Ambiente</label>
-                <select value={form.ambiente || ""} onChange={(e) => updateField("ambiente", e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40">
-                  <option value="">Seleccionar...</option>
-                  {AMBIENTE_OPTIONS.map((a) => <option key={a} value={a}>{a}</option>)}
-                </select>
-              </div>
-            </div>
-
-            {/* Row 3: Quién detectó + Quién corrigió */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">¿Quién lo detectó?</label>
-                <select value={form.quien_detecto || ""} onChange={(e) => updateField("quien_detecto", e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40">
-                  <option value="">Seleccionar...</option>
-                  {nombres.map((n) => <option key={n.id} value={n.Nombre}>{n.Nombre}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">¿Quién lo corrigió?</label>
-                <select value={form.quien_corrigio || ""} onChange={(e) => updateField("quien_corrigio", e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40">
-                  <option value="">Seleccionar...</option>
-                  {nombres.map((n) => <option key={n.id} value={n.Nombre}>{n.Nombre}</option>)}
-                </select>
-              </div>
-            </div>
-
-            {/* Row 4: Estado */}
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Estado</label>
-                <select value={form.estado || "Registro"} onChange={(e) => updateField("estado", e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40">
-                  {ESTADO_OPTIONS.map((e) => <option key={e} value={e}>{e}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Fecha registro</label>
-                <input type="text" readOnly value={formatDateDDMM(form.fecha_registro)}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-100 bg-gray-50 text-sm text-gray-500" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Fecha modificación</label>
-                <input type="text" readOnly value={formatDateDDMM(form.fecha_modificacion)}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-100 bg-gray-50 text-sm text-gray-500" />
-              </div>
-            </div>
-
-            {/* Observación Final (Markdown con toolbar) */}
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-xs font-medium text-gray-500">Observación Final</label>
-                <button onClick={() => setMdPreview("observacion_final")}
-                  className="text-[11px] text-orange-500 hover:text-orange-600 font-medium flex items-center gap-1">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                  Vista previa
-                </button>
-              </div>
-              <MarkdownEditor
-                value={form.observacion_final}
-                onChange={(val) => updateField("observacion_final", val)}
-                rows={3}
-                placeholder="Observación final..."
-              />
-            </div>
-
-            {/* Solución WORD */}
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Solución WORD (Link)</label>
-              <input type="url" value={form.solucion_word_link || ""} onChange={(e) => updateField("solucion_word_link", e.target.value)}
+              <label className="block text-xs font-medium text-gray-500 mb-1">Obs WORD (Link)</label>
+              <input type="url" value={form.obs_word_link || ""} onChange={(e) => updateField("obs_word_link", e.target.value)}
                 className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40" placeholder="https://..." />
             </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Ambiente</label>
+              <select value={form.ambiente || ""} onChange={(e) => updateField("ambiente", e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40">
+                <option value="">Seleccionar...</option>
+                {AMBIENTE_OPTIONS.map((a) => <option key={a} value={a}>{a}</option>)}
+              </select>
+            </div>
           </div>
 
-          {/* Footer */}
-          <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-3">
-            <button onClick={confirmClose}
-              className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors">
-              Cancelar
-            </button>
-            <button onClick={handleSave} disabled={saving}
-              className="px-5 py-2 rounded-xl text-sm font-medium bg-orange-500 text-white hover:bg-orange-600 shadow-md shadow-orange-500/15 transition-all disabled:opacity-50 disabled:cursor-wait">
-              {saving ? "Guardando..." : (isNew ? "Crear" : "Guardar cambios")}
-            </button>
+          {/* Row 3: Quién detectó + Quién corrigió */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">¿Quién lo detectó?</label>
+              <select value={form.quien_detecto || ""} onChange={(e) => updateField("quien_detecto", e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40">
+                <option value="">Seleccionar...</option>
+                {nombres.map((n) => <option key={n.id} value={n.Nombre}>{n.Nombre}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">¿Quién lo corrigió?</label>
+              <select value={form.quien_corrigio || ""} onChange={(e) => updateField("quien_corrigio", e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40">
+                <option value="">Seleccionar...</option>
+                {nombres.map((n) => <option key={n.id} value={n.Nombre}>{n.Nombre}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* Row 4: Estado */}
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Estado</label>
+              <select value={form.estado || "Registro"} onChange={(e) => updateField("estado", e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40">
+                {ESTADO_OPTIONS.map((e) => <option key={e} value={e}>{e}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Fecha registro</label>
+              <input type="text" readOnly value={formatDateDDMM(form.fecha_registro)}
+                className="w-full px-3 py-2 rounded-lg border border-gray-100 bg-gray-50 text-sm text-gray-500" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Fecha modificación</label>
+              <input type="text" readOnly value={formatDateDDMM(form.fecha_modificacion)}
+                className="w-full px-3 py-2 rounded-lg border border-gray-100 bg-gray-50 text-sm text-gray-500" />
+            </div>
+          </div>
+
+          {/* Observación Final (Markdown con toolbar) */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-medium text-gray-500">Observación Final</label>
+              <button onClick={() => setMdPreview("observacion_final")}
+                className="text-[11px] text-orange-500 hover:text-orange-600 font-medium flex items-center gap-1">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                Vista previa
+              </button>
+            </div>
+            <MarkdownEditor
+              value={form.observacion_final}
+              onChange={(val) => updateField("observacion_final", val)}
+              rows={3}
+              placeholder="Observación final..."
+            />
+          </div>
+
+          {/* Solución WORD */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Solución WORD (Link)</label>
+            <input type="url" value={form.solucion_word_link || ""} onChange={(e) => updateField("solucion_word_link", e.target.value)}
+              className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40" placeholder="https://..." />
           </div>
         </div>
 
-        {/* Markdown preview nested modal */}
-        {mdPreview && (
-          <MarkdownModal
-            content={mdPreview === "descripcion" ? form.descripcion : form.observacion_final}
-            title={mdPreview === "descripcion" ? "Descripción" : "Observación Final"}
-            onClose={() => setMdPreview(null)}
-          />
-        )}
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-3">
+          <button onClick={confirmClose}
+            className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors">
+            Cancelar
+          </button>
+          <button onClick={handleSave} disabled={saving}
+            className="px-5 py-2 rounded-xl text-sm font-medium bg-orange-500 text-white hover:bg-orange-600 shadow-md shadow-orange-500/15 transition-all disabled:opacity-50 disabled:cursor-wait">
+            {saving ? "Guardando..." : (isNew ? "Crear" : "Guardar cambios")}
+          </button>
+        </div>
       </div>
+
+      {/* Markdown preview nested modal */}
+      {mdPreview && (
+        <MarkdownModal
+          content={mdPreview === "descripcion" ? form.descripcion : form.observacion_final}
+          title={mdPreview === "descripcion" ? "Descripción" : "Observación Final"}
+          onClose={() => setMdPreview(null)}
+        />
+      )}
     </div>
   );
 }
