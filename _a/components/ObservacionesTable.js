@@ -375,9 +375,9 @@ export default function ObservacionesTable({ observaciones = [], nombres = [], o
 
   return (
     <>
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden animate-fade-in">
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden animate-fade-in min-h-[600px] flex flex-col">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="px-6 py-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shrink-0">
           <div>
             <h3 className="text-lg font-semibold font-[family-name:var(--font-heading)] text-gray-900">
               Registro de Observaciones
