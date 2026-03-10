@@ -163,15 +163,15 @@ function TraceModal({ assigneeName, stories, onClose }) {
         return items;
     }, [ganttData]);
 
-    const ROW_HEIGHT = 36;
-    const LABEL_WIDTH = 170;
+    const ROW_HEIGHT = 56;
+    const LABEL_WIDTH = 280;
 
     return (
         <div className="fixed inset-0 z-50 overflow-y-auto">
             <div className="min-h-full flex items-start justify-center p-4 py-8">
                 <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
                 <div
-                    className="relative bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[85vh] flex flex-col animate-fade-in"
+                    className="relative bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[85vh] flex flex-col animate-fade-in"
                     onClick={(e) => e.stopPropagation()}
                 >
                     {/* Header */}
@@ -236,29 +236,20 @@ function TraceModal({ assigneeName, stories, onClose }) {
                                         >
                                             {/* Label */}
                                             <div
-                                                className="shrink-0 pr-2 flex items-center justify-end gap-1"
+                                                className="shrink-0 pr-3 flex flex-col justify-center text-right"
                                                 style={{ width: `${LABEL_WIDTH}px` }}
                                             >
                                                 <a
                                                     href={`https://supervisorservicio2020.atlassian.net/browse/${row.key}`}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
-                                                    className="text-xs font-mono font-semibold text-blue-600 hover:text-blue-800 hover:underline truncate"
+                                                    className="text-sm font-mono font-semibold text-blue-600 hover:text-blue-800 hover:underline"
                                                 >
                                                     {row.key}
                                                 </a>
-                                                <div className="relative group shrink-0">
-                                                    <div className="w-4 h-4 rounded-full bg-gray-100 text-gray-400 hover:bg-orange-50 hover:text-orange-500 flex items-center justify-center text-[10px] font-bold cursor-default transition-colors">
-                                                        i
-                                                    </div>
-                                                    <div className="absolute right-0 bottom-full mb-1 hidden group-hover:block z-30 pointer-events-none">
-                                                        <div className="bg-gray-900 text-white rounded-lg px-3 py-2 text-[11px] shadow-xl max-w-[260px]">
-                                                            <div className="font-semibold text-orange-300 mb-0.5">{row.key}</div>
-                                                            <div className="text-gray-200 leading-relaxed">{row.summary}</div>
-                                                        </div>
-                                                        <div className="w-2 h-2 bg-gray-900 rotate-45 ml-auto mr-2 -mt-1" />
-                                                    </div>
-                                                </div>
+                                                <span className="text-[11px] text-gray-400 truncate leading-tight mt-0.5" title={row.summary}>
+                                                    {row.summary}
+                                                </span>
                                             </div>
 
                                             {/* Chart area */}
