@@ -111,7 +111,7 @@ function EditModal({ row, nombres, onSave, onClose, isNew }) {
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="min-h-full flex items-center justify-center p-4 py-8">
+      <div className="min-h-full flex items-start justify-center p-4 py-8 md:py-12">
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={confirmClose} />
         <div
           className="relative bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[85vh] flex flex-col animate-fade-in"
