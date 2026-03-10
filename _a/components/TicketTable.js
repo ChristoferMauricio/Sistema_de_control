@@ -20,6 +20,8 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
   const [filterStatus, setFilterStatus] = useState("");
   const [filterAssignee, setFilterAssignee] = useState("");
   const [filterReporter, setFilterReporter] = useState("");
+  const [filterKey, setFilterKey] = useState("");
+  const [filterSummary, setFilterSummary] = useState("");
 
   // Dual scrollbar refs
   const topScrollRef = useRef(null);
@@ -64,7 +66,7 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
   const uniqueAssignees = useMemo(() => [...new Set(tickets.map(t => t.assignee_name).filter(Boolean))].sort(), [tickets]);
   const uniqueReporters = useMemo(() => [...new Set(tickets.map(t => t.reporter_name).filter(Boolean))].sort(), [tickets]);
 
-  const activeFilterCount = [filterType, filterSprint, filterStatus, filterAssignee, filterReporter].filter(Boolean).length;
+  const activeFilterCount = [filterType, filterSprint, filterStatus, filterAssignee, filterReporter, filterKey.length >= 3 ? filterKey : "", filterSummary.length >= 3 ? filterSummary : ""].filter(Boolean).length;
 
   // Filter + Sort
   const filtered = useMemo(() => {
@@ -85,6 +87,8 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
 
     // Apply column filters
     if (filterType) result = result.filter(t => t.issue_type === filterType);
+    if (filterKey.length >= 3) result = result.filter(t => t.jira_key?.toLowerCase().includes(filterKey.toLowerCase()));
+    if (filterSummary.length >= 3) result = result.filter(t => t.summary?.toLowerCase().includes(filterSummary.toLowerCase()));
     if (filterSprint) result = result.filter(t => t.sprint === filterSprint);
     if (filterStatus) result = result.filter(t => t.status === filterStatus);
     if (filterAssignee) result = result.filter(t => t.assignee_name === filterAssignee);
@@ -98,7 +102,7 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
     });
 
     return result;
-  }, [tickets, search, sortField, sortDir, filterType, filterSprint, filterStatus, filterAssignee, filterReporter]);
+  }, [tickets, search, sortField, sortDir, filterType, filterKey, filterSummary, filterSprint, filterStatus, filterAssignee, filterReporter]);
 
   // Pagination
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -119,6 +123,8 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
 
   function clearAllFilters() {
     setFilterType("");
+    setFilterKey("");
+    setFilterSummary("");
     setFilterSprint("");
     setFilterStatus("");
     setFilterAssignee("");
@@ -360,8 +366,24 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
               <th className="px-4 py-2">
                 <FilterSelect value={filterType} onChange={setFilterType} options={uniqueTypes} placeholder="Todos" />
               </th>
-              <th className="px-4 py-2" /> {/* Clave — no filter */}
-              <th className="px-4 py-2" /> {/* Resumen — use search */}
+              <th className="px-4 py-2">
+                <input
+                  type="text"
+                  value={filterKey}
+                  onChange={(e) => { setFilterKey(e.target.value); setCurrentPage(1); }}
+                  placeholder="Buscar..."
+                  className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[80px]"
+                />
+              </th>
+              <th className="px-4 py-2">
+                <input
+                  type="text"
+                  value={filterSummary}
+                  onChange={(e) => { setFilterSummary(e.target.value); setCurrentPage(1); }}
+                  placeholder="Buscar..."
+                  className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[120px]"
+                />
+              </th>
               <th className="px-4 py-2" /> {/* Subtareas */}
               <th className="px-4 py-2" /> {/* Principal */}
               <th className="px-4 py-2">
@@ -514,8 +536,8 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
                           <button
                             onClick={() => setExpandedRow(isExpanded ? null : ticket.jira_key)}
                             className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-colors ${isExpanded
-                                ? "bg-orange-50 text-orange-600 border border-orange-200"
-                                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                              ? "bg-orange-50 text-orange-600 border border-orange-200"
+                              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                               }`}
                           >
                             <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
