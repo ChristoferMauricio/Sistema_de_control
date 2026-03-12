@@ -362,7 +362,7 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
 
     // Filtrar subtareas que corresponden al sprint Y que pertenecen a historias de PF3-1799
     const filteredSubtasks = useMemo(() => {
-        const subtareas = tickets.filter(t => t.issue_type === "Soporte e Incidencias");
+        const subtareas = tickets.filter(t => t.issue_type === "Subtarea");
 
         // Match sprint directly or use parent story sprint
         const storyKeysBySprint = new Set(filtered.map(s => s.jira_key));
@@ -575,8 +575,8 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                                 <th className="text-center px-3 py-2 font-semibold text-gray-700 border-l border-gray-200" style={{ minWidth: "100px" }}>
                                     Historias
                                 </th>
-                                <th className="text-center px-3 py-2 font-semibold text-gray-700 border-l border-gray-200" style={{ minWidth: "100px" }}>
-                                    Subtareas
+                                <th className="text-center px-3 py-2 font-semibold text-gray-700 border-l border-gray-200" style={{ minWidth: "160px" }}>
+                                    Soporte e Incidencias
                                 </th>
                                 <th className="text-center px-4 py-2 font-bold text-gray-900 border-l border-gray-200 bg-orange-50/50" style={{ minWidth: "100px" }}>
                                     TOTAL
@@ -699,8 +699,8 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                                 <th className="text-center px-3 py-2 font-semibold text-gray-700 border-l border-gray-200" style={{ minWidth: "100px" }}>
                                     Total SP
                                 </th>
-                                <th className="text-center px-3 py-2 font-semibold text-gray-700 border-l border-gray-200" style={{ minWidth: "100px" }}>
-                                    Subtareas
+                                <th className="text-center px-3 py-2 font-semibold text-gray-700 border-l border-gray-200" style={{ minWidth: "160px" }}>
+                                    Soporte e Incidencias
                                 </th>
                                 <th className="text-center px-4 py-2 font-bold text-gray-900 border-l border-gray-200 bg-gray-100" style={{ minWidth: "100px" }}>
                                     TOTAL
