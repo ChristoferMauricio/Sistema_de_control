@@ -249,7 +249,7 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
     setSavingComment(true);
     try {
       const { error } = await supabase
-        .from("tickets")
+        .from("jira_tickets")
         .update({ comentario: editingComment.currentText })
         .eq("jira_key", editingComment.key);
 
