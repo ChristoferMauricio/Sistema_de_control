@@ -79,9 +79,9 @@ export default function DashboardPage() {
       const desTickets = allData.filter(t => (t.issue_type === "Historia" || t.issue_type === "Story") && t.parent_key === "PF3QA-50");
 
       const countStatuses = (arr) => {
-        const porHacer = arr.filter(t => ["por hacer", "to do", "abierto", "open"].includes((t.status || "").toLowerCase())).length;
+        const porHacer = arr.filter(t => ["por hacer", "tareas por hacer", "to do", "abierto", "open"].includes((t.status || "").toLowerCase())).length;
         const enCurso = arr.filter(t => ["en curso", "in progress", "en progreso"].includes((t.status || "").toLowerCase())).length;
-        const finalizada = arr.filter(t => ["terminada", "done", "cerrado", "resuelto", "finalizado", "finalizada"].includes((t.status || "").toLowerCase())).length;
+        const finalizada = arr.filter(t => ["terminada", "done", "cerrado", "resuelto", "finalizado", "finalizada", "cerrada"].includes((t.status || "").toLowerCase())).length;
         return { porHacer, enCurso, finalizada };
       };
 
