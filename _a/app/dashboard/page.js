@@ -17,8 +17,8 @@ export default function DashboardPage() {
   const [stats, setStats] = useState({
     total: 0,
     pendientes: 0,
-    certificacion: 0,
-    produccion: 0,
+    certificacion: { porHacer: 0, enCurso: 0, finalizada: 0 },
+    desarrollo: { porHacer: 0, enCurso: 0, finalizada: 0 },
   });
 
   // Sprint Widget State
@@ -75,17 +75,23 @@ export default function DashboardPage() {
     if (allData.length > 0) {
       setTickets(allData);
 
+      const certTickets = allData.filter(t => (t.issue_type === "Historia" || t.issue_type === "Story") && t.parent_key === "PF3QA-49");
+      const desTickets = allData.filter(t => (t.issue_type === "Historia" || t.issue_type === "Story") && t.parent_key === "PF3QA-50");
+
+      const countStatuses = (arr) => {
+        const porHacer = arr.filter(t => ["por hacer", "to do", "abierto", "open"].includes((t.status || "").toLowerCase())).length;
+        const enCurso = arr.filter(t => ["en curso", "in progress", "en progreso"].includes((t.status || "").toLowerCase())).length;
+        const finalizada = arr.filter(t => ["terminada", "done", "cerrado", "resuelto", "finalizado", "finalizada"].includes((t.status || "").toLowerCase())).length;
+        return { porHacer, enCurso, finalizada };
+      };
+
       setStats({
         total: allData.length,
         pendientes: allData.filter(
-          (t) => !["Done", "Cerrado"].some((s) => (t.status || "").includes(s))
+          (t) => !["Done", "Cerrado", "Terminada"].some((s) => (t.status || "").includes(s))
         ).length,
-        certificacion: allData.filter((t) =>
-          (t.status || "").toLowerCase().includes("certificaci")
-        ).length,
-        produccion: allData.filter((t) =>
-          (t.status || "").toLowerCase().includes("producci")
-        ).length,
+        certificacion: countStatuses(certTickets),
+        desarrollo: countStatuses(desTickets),
       });
     }
 
@@ -142,6 +148,25 @@ export default function DashboardPage() {
     setTimeout(() => setSyncResult(null), 5000);
   }
 
+  const StatusCounters = ({ data }) => (
+    <div className="flex items-center gap-2 lg:gap-3 mt-1.5 w-full">
+      <div className="flex flex-col items-center flex-1">
+        <span className="text-[1.35rem] font-bold font-[family-name:var(--font-heading)] text-gray-700 leading-none">{data.porHacer}</span>
+        <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mt-1 text-center whitespace-nowrap">Por hacer</span>
+      </div>
+      <div className="w-px h-7 bg-gray-200 rounded-full shrink-0"></div>
+      <div className="flex flex-col items-center flex-1">
+        <span className="text-[1.35rem] font-bold font-[family-name:var(--font-heading)] text-blue-600 leading-none">{data.enCurso}</span>
+        <span className="text-[9px] font-bold text-blue-400 uppercase tracking-wider mt-1 text-center whitespace-nowrap">En curso</span>
+      </div>
+      <div className="w-px h-7 bg-gray-200 rounded-full shrink-0"></div>
+      <div className="flex flex-col items-center flex-1">
+        <span className="text-[1.35rem] font-bold font-[family-name:var(--font-heading)] text-emerald-600 leading-none">{data.finalizada}</span>
+        <span className="text-[9px] font-bold text-emerald-500 uppercase tracking-wider mt-1 text-center whitespace-nowrap">Finalizada</span>
+      </div>
+    </div>
+  );
+
   const kpiCards = [
     {
       label: "Total Tickets",
@@ -166,8 +191,8 @@ export default function DashboardPage() {
       bg: "bg-amber-50",
     },
     {
-      label: "En Certificación",
-      value: stats.certificacion,
+      label: "Errores Certificación",
+      value: <StatusCounters data={stats.certificacion} />,
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
@@ -177,8 +202,8 @@ export default function DashboardPage() {
       bg: "bg-purple-50",
     },
     {
-      label: "En Producción",
-      value: stats.produccion,
+      label: "Errores Desarrollo",
+      value: <StatusCounters data={stats.desarrollo} />,
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
@@ -332,13 +357,19 @@ export default function DashboardPage() {
         {kpiCards.map((kpi, index) => (
           <Card key={kpi.label} hover className={`animate-slide-up stagger-${index + 1}`}>
             <div className="flex items-start justify-between">
-              <div>
+              <div className="flex-1 w-full min-w-0 pr-2">
                 <p className="text-gray-500 text-sm font-medium">{kpi.label}</p>
-                <p className="text-3xl font-bold font-[family-name:var(--font-heading)] text-gray-900 mt-1">
-                  {kpi.value}
-                </p>
+                {typeof kpi.value === "number" || typeof kpi.value === "string" ? (
+                  <p className="text-3xl font-bold font-[family-name:var(--font-heading)] text-gray-900 mt-1">
+                    {kpi.value}
+                  </p>
+                ) : (
+                  <div className="w-full">
+                    {kpi.value}
+                  </div>
+                )}
               </div>
-              <div className={`p-2.5 rounded-xl ${kpi.bg}`}>
+              <div className={`p-2.5 rounded-xl shrink-0 ${kpi.bg}`}>
                 <span className={kpi.color}>{kpi.icon}</span>
               </div>
             </div>
