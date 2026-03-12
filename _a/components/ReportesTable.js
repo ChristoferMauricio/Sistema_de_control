@@ -469,7 +469,7 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
             const realName = resolveName(t.assignee_name);
             const sp = parseFloat(t.story_points) || 0;
             if (!map[realName]) {
-                map[realName] = { assignee: realName, total: 0 };
+                map[realName] = { assignee: realName, total: 0, subtareasCount: 0 };
                 STATUS_COLUMNS.forEach((col) => { map[realName][col.key] = 0; });
             }
 
@@ -483,14 +483,29 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
             }
         });
 
-        return Object.values(map).sort((a, b) => b.total - a.total);
-    }, [filtered, nameMap]);
+        // Contar subtareas para la tabla de SP (cada subtarea = 1)
+        filteredSubtasks.forEach((t) => {
+            const realName = resolveName(t.assignee_name);
+            if (!map[realName]) {
+                map[realName] = { assignee: realName, total: 0, subtareasCount: 0 };
+                STATUS_COLUMNS.forEach((col) => { map[realName][col.key] = 0; });
+            }
+            map[realName].subtareasCount += 1;
+        });
+
+        return Object.values(map).map(row => ({
+            ...row,
+            puntajeTotal: row.total + row.subtareasCount
+        })).sort((a, b) => b.puntajeTotal - a.puntajeTotal);
+    }, [filtered, filteredSubtasks, nameMap]);
 
     const totalsSP = useMemo(() => {
-        const t = { total: 0 };
+        const t = { total: 0, subtareasCount: 0, puntajeTotal: 0 };
         STATUS_COLUMNS.forEach((col) => { t[col.key] = 0; });
         pivotDataSP.forEach((row) => {
             t.total += row.total;
+            t.subtareasCount += row.subtareasCount;
+            t.puntajeTotal += row.puntajeTotal;
             STATUS_COLUMNS.forEach((col) => { t[col.key] += row[col.key]; });
         });
         return t;
@@ -614,8 +629,8 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                                                     {row.subtareasCount}
                                                 </span>
                                             </td>
-                                            <td className="px-4 py-2 text-center border-l border-orange-200 bg-orange-50/50">
-                                                <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-sm font-extrabold bg-orange-500 text-white shadow-sm ring-1 ring-orange-600">
+                                            <td className="px-4 py-2 text-center border-l border-gray-100 bg-gray-50/50">
+                                                <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-sm font-bold text-gray-800">
                                                     {row.puntajeTotal}
                                                 </span>
                                             </td>
@@ -642,8 +657,8 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                                                 {totals.subtareasCount}
                                             </span>
                                         </td>
-                                        <td className="px-4 py-3 text-center border-l bg-orange-100 border-orange-200">
-                                            <span className="inline-flex items-center justify-center min-w-[36px] px-3 py-1 rounded-lg text-base font-extrabold bg-orange-600 text-white shadow-sm">
+                                        <td className="px-4 py-3 text-center border-l border-gray-200 bg-gray-100">
+                                            <span className="inline-flex items-center justify-center min-w-[36px] px-3 py-1 rounded-lg text-base font-bold text-gray-900">
                                                 {totals.puntajeTotal}
                                             </span>
                                         </td>
@@ -681,8 +696,14 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                                         {col.label}
                                     </th>
                                 ))}
-                                <th className="text-center px-3 py-2 font-semibold text-gray-700 border-l border-gray-200" style={{ minWidth: "70px" }}>
+                                <th className="text-center px-3 py-2 font-semibold text-gray-700 border-l border-gray-200" style={{ minWidth: "100px" }}>
                                     Total SP
+                                </th>
+                                <th className="text-center px-3 py-2 font-semibold text-gray-700 border-l border-gray-200" style={{ minWidth: "100px" }}>
+                                    Subtareas
+                                </th>
+                                <th className="text-center px-4 py-2 font-bold text-gray-900 border-l border-gray-200 bg-gray-100" style={{ minWidth: "100px" }}>
+                                    TOTAL
                                 </th>
                             </tr>
                         </thead>
@@ -712,8 +733,18 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                                                 </td>
                                             ))}
                                             <td className="px-3 py-2 text-center border-l border-gray-100">
-                                                <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-xs font-bold bg-purple-100 text-purple-700">
+                                                <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-xs font-bold bg-purple-50 text-purple-700 border border-purple-200">
                                                     {row.total}
+                                                </span>
+                                            </td>
+                                            <td className="px-3 py-2 text-center border-l border-gray-100">
+                                                <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                                    {row.subtareasCount}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-2 text-center border-l border-gray-100 bg-gray-50/50">
+                                                <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-sm font-bold text-gray-800">
+                                                    {row.puntajeTotal}
                                                 </span>
                                             </td>
                                         </tr>
@@ -729,9 +760,19 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                                                 </span>
                                             </td>
                                         ))}
-                                        <td className="px-4 py-3 text-center">
-                                            <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-sm font-bold bg-purple-600 text-white">
+                                        <td className="px-4 py-3 text-center border-l border-gray-100">
+                                            <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-sm font-bold bg-gray-200 text-gray-700">
                                                 {totalsSP.total}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-3 text-center border-l border-gray-100">
+                                            <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-sm font-bold bg-blue-100 text-blue-800">
+                                                {totalsSP.subtareasCount}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-3 text-center border-l border-gray-200 bg-gray-100">
+                                            <span className="inline-flex items-center justify-center min-w-[36px] px-3 py-1 rounded-lg text-base font-bold text-gray-900">
+                                                {totalsSP.puntajeTotal}
                                             </span>
                                         </td>
                                     </tr>
