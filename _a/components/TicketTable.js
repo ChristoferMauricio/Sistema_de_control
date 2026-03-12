@@ -616,7 +616,12 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
                                   )}
                                 </div>
                                 <button
-                                  onClick={() => setEditingComment({ key: ticket.jira_key, currentText: currentVal || "" })}
+                                  onClick={() => setEditingComment({ 
+                                    key: ticket.jira_key, 
+                                    summary: ticket.summary,
+                                    story_points: ticket.story_points,
+                                    currentText: currentVal || "" 
+                                  })}
                                   className="shrink-0 p-1.5 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded opacity-0 group-hover:opacity-100 transition-all focus:opacity-100"
                                   title="Editar observación"
                                 >
@@ -852,8 +857,21 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col">
             <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
-              <h3 className="text-base font-semibold text-gray-800">
-                Editar Comentario <span className="text-orange-600 font-mono text-xs ml-2 bg-orange-100 px-2 py-0.5 rounded">{editingComment.key}</span>
+              <h3 className="text-base font-semibold text-gray-800 flex items-center flex-wrap gap-2">
+                Editar Comentario
+                <span className="text-orange-600 font-mono text-xs bg-orange-100 px-2 py-0.5 rounded shrink-0">
+                  {editingComment.key}
+                </span>
+                {editingComment.story_points != null && (
+                  <span className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-amber-50 text-amber-700 text-[10px] font-bold shrink-0" title="Story Points">
+                    {editingComment.story_points}
+                  </span>
+                )}
+                {editingComment.summary && (
+                  <span className="text-sm font-normal text-gray-500 truncate max-w-[300px]" title={editingComment.summary}>
+                    {editingComment.summary}
+                  </span>
+                )}
               </h3>
               <button
                 onClick={() => setEditingComment(null)}
