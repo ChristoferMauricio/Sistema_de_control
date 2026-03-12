@@ -4,6 +4,7 @@ import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { formatDate, timeAgo, getStatusColor, getIssueTypeStyle, truncate } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import * as XLSX from "xlsx";
+import ReactMarkdown from "react-markdown";
 
 const PAGE_SIZE = 15;
 
@@ -25,7 +26,13 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
   const [filterSummary, setFilterSummary] = useState("");
   const [filterPrincipal, setFilterPrincipal] = useState("");
   const [filterEpic, setFilterEpic] = useState("");
+  const [filterComentario, setFilterComentario] = useState("");
   const [nombres, setNombres] = useState([]);
+
+  // Comentario state
+  const [editingComment, setEditingComment] = useState(null); // { key: string, currentText: string }
+  const [savingComment, setSavingComment] = useState(false);
+  const [localComments, setLocalComments] = useState({}); // Optimistic UI state { jira_key: string }
 
   // Dual scrollbar refs
   const topScrollRef = useRef(null);
@@ -137,7 +144,7 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
     return [...new Set(resolved)].sort();
   }, [tickets, nameMap]);
 
-  const activeFilterCount = [filterType, filterSprint, filterStatus, filterAssignee, filterReporter, filterKey.length >= 3 ? filterKey : "", filterSummary.length >= 3 ? filterSummary : "", filterPrincipal.length >= 3 ? filterPrincipal : "", filterEpic.length >= 3 ? filterEpic : ""].filter(Boolean).length;
+  const activeFilterCount = [filterType, filterSprint, filterStatus, filterAssignee, filterReporter, filterKey.length >= 3 ? filterKey : "", filterSummary.length >= 3 ? filterSummary : "", filterPrincipal.length >= 3 ? filterPrincipal : "", filterEpic.length >= 3 ? filterEpic : "", filterComentario.length >= 3 ? filterComentario : ""].filter(Boolean).length;
 
   // Filter + Sort
   const filtered = useMemo(() => {
@@ -170,6 +177,13 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
         return epicObj && epicObj.summary.toLowerCase().includes(qs);
       });
     }
+    if (filterComentario.length >= 3) {
+      const qc = filterComentario.toLowerCase();
+      result = result.filter(t => {
+        const c = localComments[t.jira_key] !== undefined ? localComments[t.jira_key] : t.comentario;
+        return c?.toLowerCase().includes(qc);
+      });
+    }
     if (filterAssignee) result = result.filter(t => resolveName(t.assignee_name) === filterAssignee);
     if (filterReporter) result = result.filter(t => resolveName(t.reporter_name) === filterReporter);
 
@@ -185,6 +199,9 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
         const epicB = resolveEpic(b);
         aVal = epicA ? epicA.summary : "";
         bVal = epicB ? epicB.summary : "";
+      } else if (sortField === "comentario") {
+        aVal = localComments[a.jira_key] !== undefined ? localComments[a.jira_key] : (a.comentario || "");
+        bVal = localComments[b.jira_key] !== undefined ? localComments[b.jira_key] : (b.comentario || "");
       }
 
       if (sortDir === "asc") return aVal > bVal ? 1 : -1;
@@ -192,7 +209,7 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
     });
 
     return result;
-  }, [tickets, search, sortField, sortDir, filterType, filterKey, filterSummary, filterPrincipal, filterEpic, filterSprint, filterStatus, filterAssignee, filterReporter, nameMap, resolveEpic]);
+  }, [tickets, search, sortField, sortDir, filterType, filterKey, filterSummary, filterPrincipal, filterEpic, filterComentario, filterSprint, filterStatus, filterAssignee, filterReporter, nameMap, resolveEpic, localComments]);
 
   // Pagination
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -221,9 +238,33 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
     setFilterStatus("");
     setFilterAssignee("");
     setFilterReporter("");
+    setFilterComentario("");
     setSearch("");
     setCurrentPage(1);
   }
+
+  // Save comment to Supabase
+  const handleSaveComment = async () => {
+    if (!editingComment) return;
+    setSavingComment(true);
+    try {
+      const { error } = await supabase
+        .from("tickets")
+        .update({ comentario: editingComment.currentText })
+        .eq("jira_key", editingComment.key);
+
+      if (error) throw error;
+
+      // Update local state for optimistic UI
+      setLocalComments(prev => ({ ...prev, [editingComment.key]: editingComment.currentText }));
+      setEditingComment(null);
+    } catch (err) {
+      console.error("Error saving comment:", err);
+      alert("Hubo un error guardando el comentario. Revisa la consola.");
+    } finally {
+      setSavingComment(false);
+    }
+  };
 
   // ─── Excel export ─────────────────────────────────────
   function exportToExcel(dataSet, fileName) {
@@ -240,6 +281,7 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
       "Estado": t.status || "",
       "Informador": resolveName(t.reporter_name),
       "Creada": t.created_at ? formatDate(t.created_at) : "",
+      "Comentario": localComments[t.jira_key] !== undefined ? localComments[t.jira_key] : (t.comentario || ""),
     }));
 
     const ws = XLSX.utils.json_to_sheet(rows);
@@ -449,6 +491,9 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
               <th className="text-center px-4 py-3 font-medium whitespace-nowrap" style={{ minWidth: "70px" }}>
                 Historial
               </th>
+              <th onClick={() => toggleSort("comentario")} className="text-left px-4 py-3 font-medium cursor-pointer hover:text-gray-900 transition-colors select-none whitespace-nowrap" style={{ minWidth: "250px" }}>
+                Comentario <SortIcon field="comentario" />
+              </th>
             </tr>
 
             {/* Filter row */}
@@ -510,6 +555,15 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
               </th>
               <th className="px-4 py-2" /> {/* Creada */}
               <th className="px-4 py-2" /> {/* Historial */}
+              <th className="px-4 py-2">
+                <input
+                  type="text"
+                  value={filterComentario}
+                  onChange={(e) => { setFilterComentario(e.target.value); setCurrentPage(1); }}
+                  placeholder="Buscar comentario..."
+                  className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[150px]"
+                />
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -697,6 +751,35 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
                           <span className="text-gray-300 text-xs">—</span>
                         )}
                       </td>
+
+                      {/* Comentario */}
+                      <td className="px-4 py-3 align-top min-w-[250px]">
+                        {(() => {
+                          const currentVal = localComments[ticket.jira_key] !== undefined ? localComments[ticket.jira_key] : ticket.comentario;
+                          return (
+                            <div className="group relative flex flex-col gap-1">
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="text-xs text-gray-700 max-h-[100px] overflow-y-auto prose prose-sm leading-relaxed whitespace-pre-wrap max-w-full break-words">
+                                  {currentVal ? (
+                                    <ReactMarkdown>{currentVal}</ReactMarkdown>
+                                  ) : (
+                                    <span className="text-gray-400 italic">Sin comentarios...</span>
+                                  )}
+                                </div>
+                                <button
+                                  onClick={() => setEditingComment({ key: ticket.jira_key, currentText: currentVal || "" })}
+                                  className="shrink-0 p-1.5 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded opacity-0 group-hover:opacity-100 transition-all focus:opacity-100"
+                                  title="Editar comentario"
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                  </svg>
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </td>
                     </tr>
 
                     {/* Expanded: Status History Timeline */}
@@ -760,6 +843,62 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
             >
               Siguiente
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Comment Modal */}
+      {editingComment && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col">
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+              <h3 className="text-base font-semibold text-gray-800">
+                Editar Comentario <span className="text-orange-600 font-mono text-xs ml-2 bg-orange-100 px-2 py-0.5 rounded">{editingComment.key}</span>
+              </h3>
+              <button
+                onClick={() => setEditingComment(null)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="p-6 flex-1 flex flex-col">
+              <label className="text-xs font-medium text-gray-600 uppercase tracking-wider mb-2">Formato Markdown soportado</label>
+              <textarea
+                value={editingComment.currentText}
+                onChange={(e) => setEditingComment({ ...editingComment, currentText: e.target.value })}
+                className="w-full min-h-[250px] rounded-lg border border-gray-200 p-4 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-orange-500/40 focus:border-orange-500/40 font-mono transition-all resize-y"
+                placeholder="Escribe un comentario aquí..."
+              />
+            </div>
+            <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex justify-end gap-3">
+              <button
+                onClick={() => setEditingComment(null)}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-200 transition-colors"
+                disabled={savingComment}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSaveComment}
+                disabled={savingComment}
+                className="px-5 py-2 rounded-lg text-sm font-medium text-white bg-orange-500 hover:bg-orange-600 focus:ring-4 focus:ring-orange-500/20 transition-all shadow-sm shadow-orange-500/20 disabled:opacity-50 flex items-center gap-2"
+              >
+                {savingComment ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Guardando...
+                  </>
+                ) : (
+                  "Guardar Comentario"
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
