@@ -23,7 +23,7 @@ export default function ObservacionesSupervisorPage() {
             .neq("comentario", ""),
           supabase
             .from("Nombres")
-            .select("Clave, Nombre, Rol, Área")
+            .select("*")
         ]);
 
         if (ticketsRes.error) throw ticketsRes.error;
