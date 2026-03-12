@@ -128,7 +128,10 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
   const uniqueTypes = useMemo(() => [...new Set(tickets.map(t => t.issue_type).filter(Boolean))].sort(), [tickets]);
   const uniqueSprints = useMemo(() => [...new Set(tickets.map(t => t.sprint).filter(Boolean))].sort(), [tickets]);
   const uniqueStatuses = useMemo(() => [...new Set(tickets.map(t => t.status).filter(Boolean))].sort(), [tickets]);
-  const uniqueAssignees = useMemo(() => [...new Set(tickets.map(t => t.assignee_name).filter(Boolean))].sort(), [tickets]);
+  const uniqueAssignees = useMemo(() => {
+    const resolved = tickets.map(t => resolveName(t.assignee_name)).filter(v => v && v !== "—");
+    return [...new Set(resolved)].sort();
+  }, [tickets, nameMap]);
   const uniqueReporters = useMemo(() => {
     const resolved = tickets.map(t => resolveName(t.reporter_name)).filter(v => v && v !== "—");
     return [...new Set(resolved)].sort();
@@ -146,7 +149,7 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
         (t) =>
           t.jira_key?.toLowerCase().includes(q) ||
           t.summary?.toLowerCase().includes(q) ||
-          t.assignee_name?.toLowerCase().includes(q) ||
+          resolveName(t.assignee_name)?.toLowerCase().includes(q) ||
           t.status?.toLowerCase().includes(q) ||
           t.issue_type?.toLowerCase().includes(q) ||
           t.sprint?.toLowerCase().includes(q)
@@ -167,14 +170,17 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
         return epicObj && epicObj.summary.toLowerCase().includes(qs);
       });
     }
-    if (filterAssignee) result = result.filter(t => t.assignee_name === filterAssignee);
+    if (filterAssignee) result = result.filter(t => resolveName(t.assignee_name) === filterAssignee);
     if (filterReporter) result = result.filter(t => resolveName(t.reporter_name) === filterReporter);
 
     result.sort((a, b) => {
       let aVal = a[sortField] || "";
       let bVal = b[sortField] || "";
       
-      if (sortField === "epic") {
+      if (sortField === "assignee_name") {
+        aVal = resolveName(a.assignee_name);
+        bVal = resolveName(b.assignee_name);
+      } else if (sortField === "epic") {
         const epicA = resolveEpic(a);
         const epicB = resolveEpic(b);
         aVal = epicA ? epicA.summary : "";
@@ -229,7 +235,7 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
       "Principal": t.parent_key || "",
       "Épica": resolveEpic(t)?.summary || "",
       "Sprint": t.sprint || "",
-      "Persona asignada": t.assignee_name || "",
+      "Persona asignada": resolveName(t.assignee_name),
       "Story Points": t.story_points ?? "",
       "Estado": t.status || "",
       "Informador": resolveName(t.reporter_name),
@@ -632,7 +638,7 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
                       {/* Asignado */}
                       {showAssignee && (
                         <td className="px-4 py-3">
-                          <span className="text-gray-600 text-xs">{ticket.assignee_name || "Sin asignar"}</span>
+                          <span className="text-gray-600 text-xs">{resolveName(ticket.assignee_name)}</span>
                         </td>
                       )}
 
