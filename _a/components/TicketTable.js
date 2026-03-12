@@ -24,6 +24,7 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
   const [filterKey, setFilterKey] = useState("");
   const [filterSummary, setFilterSummary] = useState("");
   const [filterPrincipal, setFilterPrincipal] = useState("");
+  const [filterEpic, setFilterEpic] = useState("");
   const [nombres, setNombres] = useState([]);
 
   // Dual scrollbar refs
@@ -85,6 +86,44 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
     return nameMap[rawName.toLowerCase()] || rawName;
   }
 
+  // Build Ticket Map for fast O(1) lookups
+  const ticketMap = useMemo(() => {
+    const map = {};
+    tickets.forEach((t) => {
+      map[t.jira_key] = t;
+    });
+    return map;
+  }, [tickets]);
+
+  // Helpers
+  const isStory = (type) => (type || "").toLowerCase().includes("histori") || (type || "").toLowerCase() === "story";
+  const isSubtask = (type) => (type || "").toLowerCase().includes("subtare") || (type || "").toLowerCase().includes("sub-task") || (type || "").toLowerCase() === "subtask";
+  const isEpic = (type) => (type || "").toLowerCase().includes("epic") || (type || "").toLowerCase().includes("épica");
+  const hasStatusHistory = (type) => !isSubtask(type) && !isEpic(type);
+
+  // Resolve Epic Summary using transitivity
+  const resolveEpic = useCallback(
+    (ticket) => {
+      if (isEpic(ticket.issue_type)) return ticket.summary;
+
+      if (isStory(ticket.issue_type) && ticket.parent_key) {
+        const parent = ticketMap[ticket.parent_key];
+        if (parent && isEpic(parent.issue_type)) return parent.summary;
+      }
+
+      if (isSubtask(ticket.issue_type) && ticket.parent_key) {
+        const parentStory = ticketMap[ticket.parent_key];
+        if (parentStory && isStory(parentStory.issue_type) && parentStory.parent_key) {
+          const grandParentEpic = ticketMap[parentStory.parent_key];
+          if (grandParentEpic && isEpic(grandParentEpic.issue_type)) return grandParentEpic.summary;
+        }
+      }
+
+      return "—";
+    },
+    [ticketMap]
+  );
+
   // Get unique values for filter dropdowns
   const uniqueTypes = useMemo(() => [...new Set(tickets.map(t => t.issue_type).filter(Boolean))].sort(), [tickets]);
   const uniqueSprints = useMemo(() => [...new Set(tickets.map(t => t.sprint).filter(Boolean))].sort(), [tickets]);
@@ -95,7 +134,7 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
     return [...new Set(resolved)].sort();
   }, [tickets, nameMap]);
 
-  const activeFilterCount = [filterType, filterSprint, filterStatus, filterAssignee, filterReporter, filterKey.length >= 3 ? filterKey : "", filterSummary.length >= 3 ? filterSummary : "", filterPrincipal.length >= 3 ? filterPrincipal : ""].filter(Boolean).length;
+  const activeFilterCount = [filterType, filterSprint, filterStatus, filterAssignee, filterReporter, filterKey.length >= 3 ? filterKey : "", filterSummary.length >= 3 ? filterSummary : "", filterPrincipal.length >= 3 ? filterPrincipal : "", filterEpic.length >= 3 ? filterEpic : ""].filter(Boolean).length;
 
   // Filter + Sort
   const filtered = useMemo(() => {
@@ -121,18 +160,31 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
     if (filterSprint) result = result.filter(t => t.sprint === filterSprint);
     if (filterStatus) result = result.filter(t => t.status === filterStatus);
     if (filterPrincipal.length >= 3) result = result.filter(t => t.parent_key?.toLowerCase().includes(filterPrincipal.toLowerCase()));
+    if (filterEpic.length >= 3) {
+      const qs = filterEpic.toLowerCase();
+      result = result.filter(t => {
+        const epicName = resolveEpic(t);
+        return epicName !== "—" && epicName.toLowerCase().includes(qs);
+      });
+    }
     if (filterAssignee) result = result.filter(t => t.assignee_name === filterAssignee);
     if (filterReporter) result = result.filter(t => resolveName(t.reporter_name) === filterReporter);
 
     result.sort((a, b) => {
-      const aVal = a[sortField] || "";
-      const bVal = b[sortField] || "";
+      let aVal = a[sortField] || "";
+      let bVal = b[sortField] || "";
+      
+      if (sortField === "epic") {
+        aVal = resolveEpic(a);
+        bVal = resolveEpic(b);
+      }
+
       if (sortDir === "asc") return aVal > bVal ? 1 : -1;
       return aVal < bVal ? 1 : -1;
     });
 
     return result;
-  }, [tickets, search, sortField, sortDir, filterType, filterKey, filterSummary, filterPrincipal, filterSprint, filterStatus, filterAssignee, filterReporter, nameMap]);
+  }, [tickets, search, sortField, sortDir, filterType, filterKey, filterSummary, filterPrincipal, filterEpic, filterSprint, filterStatus, filterAssignee, filterReporter, nameMap, resolveEpic]);
 
   // Pagination
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -156,6 +208,7 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
     setFilterKey("");
     setFilterSummary("");
     setFilterPrincipal("");
+    setFilterEpic("");
     setFilterSprint("");
     setFilterStatus("");
     setFilterAssignee("");
@@ -172,6 +225,7 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
       "Resumen": t.summary || "",
       "Subtareas": t.subtask_keys?.join(", ") || "",
       "Principal": t.parent_key || "",
+      "Épica": resolveEpic(t) || "",
       "Sprint": t.sprint || "",
       "Persona asignada": t.assignee_name || "",
       "Story Points": t.story_points ?? "",
@@ -228,12 +282,6 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
       </select>
     );
   }
-
-  // Helpers
-  const isStory = (type) => (type || "").toLowerCase().includes("histori") || (type || "").toLowerCase() === "story";
-  const isSubtask = (type) => (type || "").toLowerCase().includes("subtare") || (type || "").toLowerCase().includes("sub-task") || (type || "").toLowerCase() === "subtask";
-  const isEpic = (type) => (type || "").toLowerCase().includes("epic") || (type || "").toLowerCase().includes("épica");
-  const hasStatusHistory = (type) => !isSubtask(type) && !isEpic(type);
 
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden animate-fade-in">
@@ -367,6 +415,9 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
               <th className="text-left px-4 py-3 font-medium whitespace-nowrap" style={{ minWidth: "90px" }}>
                 Principal
               </th>
+              <th onClick={() => toggleSort("epic")} className="text-left px-4 py-3 font-medium cursor-pointer hover:text-gray-900 transition-colors select-none whitespace-nowrap" style={{ minWidth: "160px" }}>
+                Épica <SortIcon field="epic" />
+              </th>
               <th onClick={() => toggleSort("sprint")} className="text-left px-4 py-3 font-medium cursor-pointer hover:text-gray-900 transition-colors select-none whitespace-nowrap" style={{ minWidth: "130px" }}>
                 Sprint <SortIcon field="sprint" />
               </th>
@@ -423,6 +474,15 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
                   onChange={(e) => { setFilterPrincipal(e.target.value); setCurrentPage(1); }}
                   placeholder="Buscar..."
                   className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[80px]"
+                />
+              </th>
+              <th className="px-4 py-2">
+                <input
+                  type="text"
+                  value={filterEpic}
+                  onChange={(e) => { setFilterEpic(e.target.value); setCurrentPage(1); }}
+                  placeholder="Buscar..."
+                  className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[120px]"
                 />
               </th>
               <th className="px-4 py-2">
@@ -531,6 +591,13 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
                         ) : (
                           <span className="text-gray-300 text-xs">—</span>
                         )}
+                      </td>
+
+                      {/* Épica */}
+                      <td className="px-4 py-3 text-gray-800 max-w-[160px]">
+                        <span className="text-xs truncate block" title={resolveEpic(ticket)}>
+                          {resolveEpic(ticket)}
+                        </span>
                       </td>
 
                       {/* Sprint */}
