@@ -270,6 +270,7 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
   function exportToExcel(dataSet, fileName) {
     const rows = dataSet.map((t) => ({
       "Tipo": t.issue_type || "",
+      "Observaciones": localComments[t.jira_key] !== undefined ? localComments[t.jira_key] : (t.comentario || ""),
       "Clave": t.jira_key || "",
       "Resumen": t.summary || "",
       "Subtareas": t.subtask_keys?.join(", ") || "",
@@ -281,7 +282,6 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
       "Estado": t.status || "",
       "Informador": resolveName(t.reporter_name),
       "Creada": t.created_at ? formatDate(t.created_at) : "",
-      "Comentario": localComments[t.jira_key] !== undefined ? localComments[t.jira_key] : (t.comentario || ""),
     }));
 
     const ws = XLSX.utils.json_to_sheet(rows);
@@ -453,6 +453,9 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
               <th onClick={() => toggleSort("issue_type")} className="text-left px-4 py-3 font-medium cursor-pointer hover:text-gray-900 transition-colors select-none whitespace-nowrap" style={{ minWidth: "110px" }}>
                 Tipo <SortIcon field="issue_type" />
               </th>
+              <th onClick={() => toggleSort("comentario")} className="text-left px-4 py-3 font-medium cursor-pointer hover:text-gray-900 transition-colors select-none whitespace-nowrap" style={{ minWidth: "250px" }}>
+                Observaciones <SortIcon field="comentario" />
+              </th>
               <th onClick={() => toggleSort("jira_key")} className="text-left px-4 py-3 font-medium cursor-pointer hover:text-gray-900 transition-colors select-none" style={{ minWidth: "100px" }}>
                 Clave <SortIcon field="jira_key" />
               </th>
@@ -491,15 +494,21 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
               <th className="text-center px-4 py-3 font-medium whitespace-nowrap" style={{ minWidth: "70px" }}>
                 Historial
               </th>
-              <th onClick={() => toggleSort("comentario")} className="text-left px-4 py-3 font-medium cursor-pointer hover:text-gray-900 transition-colors select-none whitespace-nowrap" style={{ minWidth: "250px" }}>
-                Comentario <SortIcon field="comentario" />
-              </th>
             </tr>
 
             {/* Filter row */}
             <tr className="border-b border-gray-100 bg-gray-50/30">
               <th className="px-4 py-2">
                 <FilterSelect value={filterType} onChange={setFilterType} options={uniqueTypes} placeholder="Todos" />
+              </th>
+              <th className="px-4 py-2">
+                <input
+                  type="text"
+                  value={filterComentario}
+                  onChange={(e) => { setFilterComentario(e.target.value); setCurrentPage(1); }}
+                  placeholder="Buscar observación..."
+                  className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[150px]"
+                />
               </th>
               <th className="px-4 py-2">
                 <input
@@ -555,15 +564,6 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
               </th>
               <th className="px-4 py-2" /> {/* Creada */}
               <th className="px-4 py-2" /> {/* Historial */}
-              <th className="px-4 py-2">
-                <input
-                  type="text"
-                  value={filterComentario}
-                  onChange={(e) => { setFilterComentario(e.target.value); setCurrentPage(1); }}
-                  placeholder="Buscar comentario..."
-                  className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[150px]"
-                />
-              </th>
             </tr>
           </thead>
           <tbody>
@@ -592,13 +592,41 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
 
                 return (
                   <>
-                    <tr key={ticket.id || ticket.jira_key} className="ticket-row border-b border-gray-50">
-                      {/* Tipo de incidencia */}
+                    <tr key={ticket.id || ticket.jira_key} className="ticket-row border-b border-gray-200">
                       <td className="px-4 py-3">
                         <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium ${typeStyle.bg} ${typeStyle.text}`}>
                           <span className={`w-1.5 h-1.5 rounded-full ${typeStyle.dot}`} />
                           {ticket.issue_type || "—"}
                         </span>
+                      </td>
+
+                      {/* Observaciones (Comentario) */}
+                      <td className="px-4 py-3 align-top min-w-[250px]">
+                        {(() => {
+                          const currentVal = localComments[ticket.jira_key] !== undefined ? localComments[ticket.jira_key] : ticket.comentario;
+                          return (
+                            <div className="group relative flex flex-col gap-1">
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="text-xs text-gray-700 max-h-[100px] overflow-y-auto prose prose-sm leading-relaxed whitespace-pre-wrap max-w-full break-words">
+                                  {currentVal ? (
+                                    <ReactMarkdown>{currentVal}</ReactMarkdown>
+                                  ) : (
+                                    <span className="text-gray-400 italic">Sin observaciones...</span>
+                                  )}
+                                </div>
+                                <button
+                                  onClick={() => setEditingComment({ key: ticket.jira_key, currentText: currentVal || "" })}
+                                  className="shrink-0 p-1.5 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded opacity-0 group-hover:opacity-100 transition-all focus:opacity-100"
+                                  title="Editar observación"
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                  </svg>
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </td>
 
                       {/* Clave */}
@@ -750,35 +778,6 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
                         ) : (
                           <span className="text-gray-300 text-xs">—</span>
                         )}
-                      </td>
-
-                      {/* Comentario */}
-                      <td className="px-4 py-3 align-top min-w-[250px]">
-                        {(() => {
-                          const currentVal = localComments[ticket.jira_key] !== undefined ? localComments[ticket.jira_key] : ticket.comentario;
-                          return (
-                            <div className="group relative flex flex-col gap-1">
-                              <div className="flex items-start justify-between gap-2">
-                                <div className="text-xs text-gray-700 max-h-[100px] overflow-y-auto prose prose-sm leading-relaxed whitespace-pre-wrap max-w-full break-words">
-                                  {currentVal ? (
-                                    <ReactMarkdown>{currentVal}</ReactMarkdown>
-                                  ) : (
-                                    <span className="text-gray-400 italic">Sin comentarios...</span>
-                                  )}
-                                </div>
-                                <button
-                                  onClick={() => setEditingComment({ key: ticket.jira_key, currentText: currentVal || "" })}
-                                  className="shrink-0 p-1.5 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded opacity-0 group-hover:opacity-100 transition-all focus:opacity-100"
-                                  title="Editar comentario"
-                                >
-                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                                  </svg>
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })()}
                       </td>
                     </tr>
 
