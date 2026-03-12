@@ -232,12 +232,17 @@ export default function ObservacionesSupervisorTable({ tickets, nombresData }) {
     const { jira_key, current_comment } = editingComment;
 
     try {
-      const { error } = await supabase
-        .from("jira_tickets")
-        .update({ comentario: current_comment })
-        .eq("jira_key", jira_key);
+      const res = await fetch("/api/save-comment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jira_key,
+          comentario: current_comment,
+        }),
+      });
 
-      if (error) throw error;
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || "Error al guardar");
 
       // Optimistic Update
       setLocalComments((prev) => ({ ...prev, [jira_key]: current_comment }));

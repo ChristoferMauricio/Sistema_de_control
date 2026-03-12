@@ -244,17 +244,22 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
     setCurrentPage(1);
   }
 
-  // Save comment to Supabase
+  // Save comment to Supabase via API route (bypasses RLS)
   const handleSaveComment = async () => {
     if (!editingComment) return;
     setSavingComment(true);
     try {
-      const { error } = await supabase
-        .from("jira_tickets")
-        .update({ comentario: editingComment.currentText })
-        .eq("jira_key", editingComment.key);
+      const res = await fetch("/api/save-comment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jira_key: editingComment.key,
+          comentario: editingComment.currentText,
+        }),
+      });
 
-      if (error) throw error;
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || "Error al guardar");
 
       // Update local state for optimistic UI
       setLocalComments(prev => ({ ...prev, [editingComment.key]: editingComment.currentText }));
