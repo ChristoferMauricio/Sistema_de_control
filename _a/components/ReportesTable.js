@@ -332,10 +332,73 @@ function TraceModal({ assigneeName, stories, onClose }) {
     );
 }
 
+function SubtasksModal({ assigneeName, subtasks, onClose }) {
+    return (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+            <div className="min-h-full flex items-start justify-center p-4 py-8">
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+                <div
+                    className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col animate-fade-in"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    {/* Header */}
+                    <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between shrink-0">
+                        <div>
+                            <h3 className="font-semibold text-gray-900 text-lg">
+                                Soporte e Incidencias Asignadas
+                            </h3>
+                            <p className="text-xs text-gray-400 mt-0.5">
+                                {assigneeName} · {subtasks.length} subtarea{subtasks.length !== 1 ? "s" : ""}
+                            </p>
+                        </div>
+                        <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    {/* Body */}
+                    <div className="p-6 overflow-y-auto">
+                        {subtasks.length === 0 ? (
+                            <div className="text-center py-8 text-gray-400">No hay subtareas registradas.</div>
+                        ) : (
+                            <ul className="space-y-3">
+                                {subtasks.map((task) => {
+                                    const statusLower = (task.status || "").toLowerCase();
+                                    const isCompleted = statusLower.includes("finalizada") || statusLower.includes("terminada") || statusLower.includes("cerrado") || statusLower.includes("done");
+                                    const statusColorClass = isCompleted ? "text-green-600 hover:text-green-800" : "text-red-600 hover:text-red-800";
+                                    
+                                    return (
+                                        <li key={task.jira_key} className="p-3 bg-gray-50 rounded-xl border border-gray-100 flex gap-4 items-start">
+                                            <a 
+                                                href={`https://supervisorservicio2020.atlassian.net/browse/${task.jira_key}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className={`font-mono font-bold shrink-0 hover:underline ${statusColorClass}`}
+                                            >
+                                                {task.jira_key}
+                                            </a>
+                                            <div className="text-sm text-gray-700 whitespace-normal break-words flex-1 leading-snug">
+                                                {task.summary}
+                                            </div>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 // ─── Main Table ─────────────────────────────────────────────
 export default function ReportesTable({ tickets = [], nombres = [] }) {
     const [selectedSprint, setSelectedSprint] = useState("");
     const [traceModal, setTraceModal] = useState(null); // { assigneeName, stories }
+    const [subtasksModal, setSubtasksModal] = useState(null); // { assigneeName, subtasks }
 
     // Solo Historias
     const historias = useMemo(() => {
@@ -521,6 +584,15 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
         setTraceModal({ assigneeName, stories: storiesForAssignee });
     }
 
+    // Open subtasks modal for a given assignee
+    function openSubtasks(assigneeName) {
+        const assigneeSubtasks = filteredSubtasks.filter((t) => {
+            const resolved = resolveName(t.assignee_name);
+            return resolved === assigneeName;
+        });
+        setSubtasksModal({ assigneeName, subtasks: assigneeSubtasks });
+    }
+
     return (
         <>
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden animate-fade-in">
@@ -625,9 +697,20 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                                                 </div>
                                             </td>
                                             <td className="px-3 py-2 text-center border-l border-gray-100">
-                                                <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                                                    {row.subtareasCount}
-                                                </span>
+                                                <div className="inline-flex items-center gap-1.5">
+                                                    <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                                        {row.subtareasCount}
+                                                    </span>
+                                                    <button
+                                                        onClick={() => openSubtasks(row.assignee)}
+                                                        className="p-1 rounded-md hover:bg-gray-200 text-gray-400 hover:text-gray-600 transition-colors"
+                                                        title="Ver detalles de soporte e incidencias"
+                                                    >
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+                                                        </svg>
+                                                    </button>
+                                                </div>
                                             </td>
                                             <td className="px-4 py-2 text-center border-l border-gray-100 bg-gray-50/50">
                                                 <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-sm font-bold text-gray-800">
@@ -738,9 +821,20 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                                                 </span>
                                             </td>
                                             <td className="px-3 py-2 text-center border-l border-gray-100">
-                                                <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                                                    {row.subtareasCount}
-                                                </span>
+                                                <div className="inline-flex items-center gap-1.5">
+                                                    <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                                        {row.subtareasCount}
+                                                    </span>
+                                                    <button
+                                                        onClick={() => openSubtasks(row.assignee)}
+                                                        className="p-1 rounded-md hover:bg-gray-200 text-gray-400 hover:text-gray-600 transition-colors"
+                                                        title="Ver detalles de soporte e incidencias"
+                                                    >
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+                                                        </svg>
+                                                    </button>
+                                                </div>
                                             </td>
                                             <td className="px-4 py-2 text-center border-l border-gray-100 bg-gray-50/50">
                                                 <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-sm font-bold text-gray-800">
@@ -789,6 +883,15 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                     assigneeName={traceModal.assigneeName}
                     stories={traceModal.stories}
                     onClose={() => setTraceModal(null)}
+                />
+            )}
+
+            {/* Subtasks Modal */}
+            {subtasksModal && (
+                <SubtasksModal
+                    assigneeName={subtasksModal.assigneeName}
+                    subtasks={subtasksModal.subtasks}
+                    onClose={() => setSubtasksModal(null)}
                 />
             )}
         </>
