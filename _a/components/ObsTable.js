@@ -319,28 +319,30 @@ export default function ObservacionesSupervisorTable({ tickets, nombresData }) {
         <table className="w-full text-sm text-left whitespace-nowrap">
           <thead className="text-xs text-gray-500 uppercase bg-gray-50/80 sticky top-0 z-10 font-semibold tracking-wider">
             <tr>
-              <th className="px-5 py-3.5 border-b border-gray-200">Épica</th>
-              <th className="px-5 py-3.5 border-b border-gray-200">Principal</th>
-              <th className="px-5 py-3.5 border-b border-gray-200">Sprint</th>
-              <th className="px-5 py-3.5 border-b border-gray-200">Iteración</th>
-              <th className="px-5 py-3.5 border-b border-gray-200">Tipo</th>
-              <th className="px-5 py-3.5 border-b border-gray-200 min-w-[300px]">Comentario</th>
-              <th className="px-5 py-3.5 border-b border-gray-200">Clave</th>
-              <th className="px-5 py-3.5 border-b border-gray-200 w-full">Resumen</th>
-              <th className="px-5 py-3.5 border-b border-gray-200">Asignado</th>
+              <th className="px-5 py-3.5 border-b border-r border-gray-200">Tipo</th>
+              <th className="px-5 py-3.5 border-b border-r border-gray-200 min-w-[300px]">Observaciones</th>
+              <th className="px-5 py-3.5 border-b border-r border-gray-200">Clave</th>
+              <th className="px-5 py-3.5 border-b border-r border-gray-200 w-full">Resumen</th>
+              <th className="px-5 py-3.5 border-b border-r border-gray-200 text-center">SP</th>
+              <th className="px-5 py-3.5 border-b border-r border-gray-200">Principal</th>
+              <th className="px-5 py-3.5 border-b border-r border-gray-200">Épica</th>
+              <th className="px-5 py-3.5 border-b border-r border-gray-200">Sprint</th>
+              <th className="px-5 py-3.5 border-b border-r border-gray-200">Iteración</th>
+              <th className="px-5 py-3.5 border-b border-r border-gray-200">Asignado</th>
               <th className="px-5 py-3.5 border-b border-gray-200">Estado</th>
             </tr>
             {/* Filter Row */}
             <tr className="bg-white border-b border-gray-200">
-              <th className="p-2"><input type="text" placeholder="Filtrar Épica" className="w-full text-xs p-1.5 border border-gray-200 rounded bg-gray-50 font-normal" value={filters.epica} onChange={(e) => handleFilterChange("epica", e.target.value)} /></th>
-              <th className="p-2"><input type="text" placeholder="Filtrar Principal" className="w-full text-xs p-1.5 border border-gray-200 rounded bg-gray-50 font-normal" value={filters.parent_key} onChange={(e) => handleFilterChange("parent_key", e.target.value)} /></th>
-              <th className="p-2"><input type="text" placeholder="Filtrar Sprint" className="w-[120px] text-xs p-1.5 border border-gray-200 rounded bg-gray-50 font-normal" value={filters.sprint_name} onChange={(e) => handleFilterChange("sprint_name", e.target.value)} /></th>
-              <th className="p-2"><input type="text" placeholder="Filtrar iteración" className="w-[110px] text-xs p-1.5 border border-gray-200 rounded bg-gray-50 font-normal" value={filters.iteration_name} onChange={(e) => handleFilterChange("iteration_name", e.target.value)} /></th>
-              <th className="p-2"></th>
-              <th className="p-2"><input type="text" placeholder="Filtrar Comentario" className="w-full text-xs p-1.5 border border-gray-200 rounded bg-gray-50 font-normal" value={filters.comentario} onChange={(e) => handleFilterChange("comentario", e.target.value)} /></th>
-              <th className="p-2"></th>
-              <th className="p-2"></th>
-              <th className="p-2"><input type="text" placeholder="Filtrar Asignado" className="w-[120px] text-xs p-1.5 border border-gray-200 rounded bg-gray-50 font-normal" value={filters.assignee} onChange={(e) => handleFilterChange("assignee", e.target.value)} /></th>
+              <th className="p-2 border-r border-gray-200"></th>
+              <th className="p-2 border-r border-gray-200"><input type="text" placeholder="Filtrar Observación" className="w-full text-xs p-1.5 border border-gray-200 rounded bg-gray-50 font-normal" value={filters.comentario} onChange={(e) => handleFilterChange("comentario", e.target.value)} /></th>
+              <th className="p-2 border-r border-gray-200"></th>
+              <th className="p-2 border-r border-gray-200"></th>
+              <th className="p-2 border-r border-gray-200"></th>
+              <th className="p-2 border-r border-gray-200"><input type="text" placeholder="Filtrar Principal" className="w-full text-xs p-1.5 border border-gray-200 rounded bg-gray-50 font-normal" value={filters.parent_key} onChange={(e) => handleFilterChange("parent_key", e.target.value)} /></th>
+              <th className="p-2 border-r border-gray-200"><input type="text" placeholder="Filtrar Épica" className="w-full text-xs p-1.5 border border-gray-200 rounded bg-gray-50 font-normal" value={filters.epica} onChange={(e) => handleFilterChange("epica", e.target.value)} /></th>
+              <th className="p-2 border-r border-gray-200"><input type="text" placeholder="Filtrar Sprint" className="w-[120px] text-xs p-1.5 border border-gray-200 rounded bg-gray-50 font-normal" value={filters.sprint_name} onChange={(e) => handleFilterChange("sprint_name", e.target.value)} /></th>
+              <th className="p-2 border-r border-gray-200"><input type="text" placeholder="Filtrar iteración" className="w-[110px] text-xs p-1.5 border border-gray-200 rounded bg-gray-50 font-normal" value={filters.iteration_name} onChange={(e) => handleFilterChange("iteration_name", e.target.value)} /></th>
+              <th className="p-2 border-r border-gray-200"><input type="text" placeholder="Filtrar Asignado" className="w-[120px] text-xs p-1.5 border border-gray-200 rounded bg-gray-50 font-normal" value={filters.assignee} onChange={(e) => handleFilterChange("assignee", e.target.value)} /></th>
               <th className="p-2"><input type="text" placeholder="Filtrar Estado" className="w-full text-xs p-1.5 border border-gray-200 rounded bg-gray-50 font-normal" value={filters.status} onChange={(e) => handleFilterChange("status", e.target.value)} /></th>
             </tr>
           </thead>
@@ -348,124 +350,69 @@ export default function ObservacionesSupervisorTable({ tickets, nombresData }) {
             {paginatedData.map((row) => {
               const rowKey = row.jira_key;
               const isEpic = row.issue_type === "Épica" || row.issue_type === "Epic";
-              
               return (
                 <tr key={rowKey} className="ticket-row group cursor-pointer border-b border-gray-200 bg-white">
-                  {/* Épica */}
-                  <td className="px-5 py-4">
-                    <span className={`text-xs px-2 py-0.5 rounded-md ${
-                      row.resolved_epic === "-" 
-                        ? "text-gray-400" 
-                        : "bg-purple-50 text-purple-700 font-bold border border-purple-200 shadow-sm"
-                    }`}>
-                      {row.resolved_epic !== "-" ? row.resolved_epic.slice(0, 30) + (row.resolved_epic.length > 30 ? "..." : "") : "-"}
-                    </span>
-                  </td>
-                  
-                  {/* Principal */}
-                  <td className="px-5 py-4">
-                    <span className="text-gray-500 font-mono text-xs px-2 py-1 bg-gray-50 rounded-md border border-gray-200">
-                      {row.parent_key || "-"}
-                    </span>
-                  </td>
-                  
-                  {/* Sprint */}
-                  <td className="px-5 py-4">
-                    <span className={`text-xs px-2 py-1 rounded-md border text-gray-700 font-semibold ${
-                      row.sprint_name ? "bg-blue-50 border-blue-200" : "bg-gray-50 border-gray-200"
-                    }`}>
-                      {row.sprint_name || "Backlog"}
-                    </span>
-                  </td>
-                  
-                  {/* Iteración */}
-                  <td className="px-5 py-4">
-                    <div className="flex items-center gap-1.5 text-orange-700 font-semibold bg-orange-50/50 px-2 py-1 rounded-md border border-orange-100 w-max">
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 text-orange-500">
-                        <path fillRule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25zM12.75 6a.75.75 0 00-1.5 0v6c0 .414.336.75.75.75h4.5a.75.75 0 000-1.5h-3.75V6z" clipRule="evenodd" />
-                      </svg>
-                      {row.iteration_name}
-                    </div>
-                  </td>
-                  
                   {/* Tipo */}
-                  <td className="px-5 py-4">
+                  <td className="px-5 py-4 border-r border-gray-200">
                     <div className="flex items-center justify-center p-1.5 bg-gray-50 rounded-md border border-gray-200 w-max" title={row.issue_type}>
                       <TypeIcon type={row.issue_type} />
                     </div>
                   </td>
-
-                  {/* COMENTARIO (Observación del supervisor) */}
-                  <td className="px-5 py-4 whitespace-normal min-w-[300px] w-[400px] border-l border-r border-gray-100 bg-gray-50/30 group-hover:bg-gray-50 relative">
+                  {/* Observaciones */}
+                  <td className="px-5 py-4 whitespace-normal min-w-[300px] w-[400px] border-r border-gray-200 bg-gray-50/30 group-hover:bg-gray-50 relative">
                     <div className="flex items-start justify-between gap-3">
                       <div className="text-xs text-gray-700 leading-relaxed font-normal prose prose-sm prose-p:my-0 prose-ul:my-0 prose-ol:my-0 w-full break-words line-clamp-3 overflow-hidden">
-                        {/* We use Markdown formatting simply as text representation here or you could use ReactMarkdown */}
                         {row.display_comment}
                       </div>
-
-                      {/* Edit Button */}
-                      <button
-                        onClick={() => setEditingComment({
-                          jira_key: row.jira_key,
-                          current_comment: row.display_comment,
-                          summary: row.summary,
-                          story_points: row.story_points,
-                        })}
-                        className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 hover:text-orange-500 hover:bg-orange-50 rounded-md transition-all shrink-0"
-                        title="Editar Comentario"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                        </svg>
+                      <button onClick={() => setEditingComment({ jira_key: row.jira_key, current_comment: row.display_comment, summary: row.summary, story_points: row.story_points })} className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 hover:text-orange-500 hover:bg-orange-50 rounded-md transition-all shrink-0" title="Editar Comentario">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                       </button>
                     </div>
                   </td>
-
                   {/* Clave */}
-                  <td className="px-5 py-4">
+                  <td className="px-5 py-4 border-r border-gray-200">
                     <div className="flex items-center gap-2">
-                       <PriorityIcon priority={row.priority} />
-                       <a 
-                          href={`https://supervisorservicio2020.atlassian.net/browse/${row.jira_key}`} 
-                          target="_blank" 
-                          rel="noopener noreferrer" 
-                          className="font-mono text-xs font-bold text-orange-600 bg-orange-50 px-2 py-1 rounded border border-orange-200 hover:bg-orange-600 hover:text-white transition-colors"
-                        >
-                          {row.jira_key}
-                        </a>
+                      <PriorityIcon priority={row.priority} />
+                      <a href={`https://supervisorservicio2020.atlassian.net/browse/${row.jira_key}`} target="_blank" rel="noopener noreferrer" className="font-mono text-xs font-bold text-orange-600 bg-orange-50 px-2 py-1 rounded border border-orange-200 hover:bg-orange-600 hover:text-white transition-colors">{row.jira_key}</a>
                     </div>
                   </td>
-                  
                   {/* Resumen */}
-                  <td className="px-5 py-4 text-gray-800 whitespace-normal min-w-[250px] leading-snug">
-                    <span className={isEpic ? "font-bold text-purple-700" : ""}>
-                      {row.summary}
-                    </span>
+                  <td className="px-5 py-4 text-gray-800 whitespace-normal min-w-[250px] leading-snug border-r border-gray-200">
+                    <span className={isEpic ? "font-bold text-purple-700" : ""}>{row.summary}</span>
                   </td>
-                  
-                  {/* Asignado */}
-                  <td className="px-5 py-4">
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-bold text-gray-600 border border-gray-300">
-                        {row.assignee_full !== "Sin asignar" ? row.assignee_full.slice(0, 2).toUpperCase() : "?"}
-                      </div>
-                      <span className="text-gray-700 text-sm">
-                        {row.assignee_full}
-                      </span>
+                  {/* SP */}
+                  <td className="px-5 py-4 text-center border-r border-gray-200">
+                    <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2 py-1 rounded border border-amber-200">{row.story_points || 0}</span>
+                  </td>
+                  {/* Principal */}
+                  <td className="px-5 py-4 border-r border-gray-200">
+                    <span className="text-gray-500 font-mono text-xs px-2 py-1 bg-gray-50 rounded-md border border-gray-200">{row.parent_key || "-"}</span>
+                  </td>
+                  {/* Épica */}
+                  <td className="px-5 py-4 border-r border-gray-200">
+                    <span className={`text-xs px-2 py-0.5 rounded-md ${row.resolved_epic === "-" ? "text-gray-400" : "bg-purple-50 text-purple-700 font-bold border border-purple-200 shadow-sm"}`}>{row.resolved_epic !== "-" ? row.resolved_epic.slice(0, 30) + (row.resolved_epic.length > 30 ? "..." : "") : "-"}</span>
+                  </td>
+                  {/* Sprint */}
+                  <td className="px-5 py-4 border-r border-gray-200">
+                    <span className={`text-xs px-2 py-1 rounded-md border text-gray-700 font-semibold ${row.sprint_name ? "bg-blue-50 border-blue-200" : "bg-gray-50 border-gray-200"}`}>{row.sprint_name || "Backlog"}</span>
+                  </td>
+                  {/* Iteración */}
+                  <td className="px-5 py-4 border-r border-gray-200">
+                    <div className="flex items-center gap-1.5 text-orange-700 font-semibold bg-orange-50/50 px-2 py-1 rounded-md border border-orange-100 w-max">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 text-orange-500"><path fillRule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25zM12.75 6a.75.75 0 00-1.5 0v6c0 .414.336.75.75.75h4.5a.75.75 0 000-1.5h-3.75V6z" clipRule="evenodd" /></svg>
+                      {row.iteration_name}
                     </div>
                   </td>
-                  
+                  {/* Asignado */}
+                  <td className="px-5 py-4 border-r border-gray-200">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-bold text-gray-600 border border-gray-300">{row.assignee_full !== "Sin asignar" ? row.assignee_full.slice(0, 2).toUpperCase() : "?"}</div>
+                      <span className="text-gray-700 text-sm">{row.assignee_full}</span>
+                    </div>
+                  </td>
                   {/* Estado */}
                   <td className="px-5 py-4">
-                    <span className={`px-2.5 py-1 text-xs font-bold rounded-full border shadow-sm ${
-                      row.status === "Terminada" || row.status === "Done"
-                        ? "bg-green-50 text-green-700 border-green-200"
-                        : row.status === "En curso" || row.status === "In Progress"
-                        ? "bg-blue-50 text-blue-700 border-blue-200"
-                        : "bg-gray-50 text-gray-700 border-gray-200"
-                    }`}>
-                      {row.status}
-                    </span>
+                    <span className={`px-2.5 py-1 text-xs font-bold rounded-full border shadow-sm ${row.status === "Terminada" || row.status === "Done" ? "bg-green-50 text-green-700 border-green-200" : row.status === "En curso" || row.status === "In Progress" ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-gray-50 text-gray-700 border-gray-200"}`}>{row.status}</span>
                   </td>
                 </tr>
               );
@@ -473,7 +420,7 @@ export default function ObservacionesSupervisorTable({ tickets, nombresData }) {
             
             {paginatedData.length === 0 && (
               <tr>
-                <td colSpan={9} className="px-5 py-12 text-center text-gray-500 bg-gray-50/50">
+                <td colSpan={11} className="px-5 py-12 text-center text-gray-500 bg-gray-50/50">
                   <div className="flex flex-col items-center gap-2">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
