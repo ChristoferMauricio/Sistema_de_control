@@ -359,3 +359,10 @@ h1, h2, h3, h4, h5, h6 {
 .w-md-editor-preview li {
   margin-bottom: 0.25em !important;
 }
+
+/* Fix dark mode textarea overrides breaking MDEditor */
+.dark .w-md-editor-text-input,
+.dark .w-md-editor-text-pre {
+  background-color: transparent !important;
+  color: inherit !important;
+}
