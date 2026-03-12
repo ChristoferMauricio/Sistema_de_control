@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import TicketTable from "@/components/TicketTable";
 import Card from "@/components/ui/Card";
+import { getCurrentSprint, formatCronogramaDate } from "@/lib/cronogramaData";
 
 export default function DashboardPage() {
   const [tickets, setTickets] = useState([]);
@@ -19,6 +20,33 @@ export default function DashboardPage() {
     certificacion: 0,
     produccion: 0,
   });
+
+  // Sprint Widget State
+  const [currentSprint, setCurrentSprint] = useState(null);
+  const [daysLeft, setDaysLeft] = useState(null);
+
+  useEffect(() => {
+    // Calculamos el sprint actual
+    const todayObject = new Date();
+    // Usa un desfase en el constructor si necesitas simular un día específico (ej. new Date("2026-03-12T00:00:00"))
+    const cSprint = getCurrentSprint(todayObject);
+    setCurrentSprint(cSprint);
+
+    if (cSprint && cSprint.fechaMaxima) {
+        // Calculate days left to present deliverable
+        const [y, m, d] = cSprint.fechaMaxima.split("-").map(Number);
+        // Date de la fecha maxima al final del dia
+        const maximaDate = new Date(y, m - 1, d, 23, 59, 59, 999);
+        
+        // Difference in milliseconds
+        const diffMs = maximaDate - todayObject;
+        // Convert to days
+        const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+        setDaysLeft(diffDays);
+    } else {
+        setDaysLeft(null);
+    }
+  }, []);
 
   const fetchData = useCallback(async () => {
     // Supabase limita a 1000 filas por query — paginar para traer todo
@@ -259,6 +287,43 @@ export default function DashboardPage() {
             </svg>
           )}
           {syncResult.message}
+        </div>
+      )}
+
+      {/* Widget de Sprint Actual */}
+      {currentSprint && (
+        <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl p-5 shadow-sm animate-fade-in flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+                <div className="p-3 bg-emerald-100 rounded-xl text-emerald-600 shadow-sm border border-emerald-200">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z" />
+                    </svg>
+                </div>
+                <div>
+                    <h2 className="text-xl font-bold font-[family-name:var(--font-heading)] text-emerald-900 border-b-2 border-emerald-600/30 w-max pb-0.5">
+                        {currentSprint.iteracion}
+                    </h2>
+                    <p className="text-sm font-medium text-emerald-700 mt-1.5 flex items-center gap-1.5">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        Inició: {formatCronogramaDate(currentSprint.fechaInicio)} — Finaliza: {formatCronogramaDate(currentSprint.fechaFin)}
+                    </p>
+                </div>
+            </div>
+
+            {daysLeft !== null && (
+                <div className="bg-white rounded-xl py-3 px-6 shadow-sm border border-emerald-100 flex flex-col items-center justify-center min-w-[140px] w-full md:w-auto mt-2 md:mt-0">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-1">Entregable en</p>
+                    <div className="flex items-baseline gap-1.5">
+                        <span className={`text-3xl font-black ${daysLeft <= 3 ? "text-red-500" : daysLeft <= 7 ? "text-amber-500" : "text-emerald-600"}`}>
+                            {daysLeft > 0 ? daysLeft : 0}
+                        </span>
+                        <span className="text-sm font-medium text-gray-500">días</span>
+                    </div>
+                </div>
+            )}
         </div>
       )}
 
