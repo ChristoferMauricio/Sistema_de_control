@@ -481,9 +481,14 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
 
                       {/* Clave */}
                       <td className="px-4 py-3">
-                        <span className="font-mono text-xs font-semibold text-orange-600 bg-orange-50 px-2 py-1 rounded-md whitespace-nowrap">
+                        <a
+                          href={`https://supervisorservicio2020.atlassian.net/browse/${ticket.jira_key}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-mono text-xs font-semibold text-orange-600 bg-orange-50 px-2 py-1 rounded-md whitespace-nowrap hover:underline hover:text-orange-800"
+                        >
                           {ticket.jira_key}
-                        </span>
+                        </a>
                       </td>
 
                       {/* Resumen */}
@@ -496,9 +501,15 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
                         {isStory(ticket.issue_type) && ticket.subtask_keys?.length > 0 ? (
                           <div className="flex flex-wrap gap-1">
                             {ticket.subtask_keys.map((sk) => (
-                              <span key={sk} className="text-[10px] font-mono bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">
+                              <a
+                                key={sk}
+                                href={`https://supervisorservicio2020.atlassian.net/browse/${sk}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-[10px] font-mono bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded hover:underline hover:text-blue-600 hover:bg-blue-50"
+                              >
                                 {sk}
-                              </span>
+                              </a>
                             ))}
                           </div>
                         ) : (
@@ -509,9 +520,14 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
                       {/* Principal — solo para Subtarea o Historia */}
                       <td className="px-4 py-3">
                         {(isSubtask(ticket.issue_type) || isStory(ticket.issue_type)) && ticket.parent_key ? (
-                          <span className="font-mono text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded-md">
+                          <a
+                            href={`https://supervisorservicio2020.atlassian.net/browse/${ticket.parent_key}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-mono text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded-md hover:underline hover:text-blue-800"
+                          >
                             {ticket.parent_key}
-                          </span>
+                          </a>
                         ) : (
                           <span className="text-gray-300 text-xs">—</span>
                         )}

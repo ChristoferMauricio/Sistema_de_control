@@ -125,9 +125,14 @@ export default function IncidenciasTable({ incidencias, role }) {
                 filteredIncidencias.map((inc) => (
                   <tr key={inc.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors">
                     <td className="px-6 py-4">
-                      <span className="font-semibold text-orange-600 dark:text-orange-500 bg-orange-50 dark:bg-orange-500/10 px-2 py-1 rounded-md text-xs">
+                      <a
+                        href={`https://supervisorservicio2020.atlassian.net/browse/${inc.clave}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-semibold text-orange-600 dark:text-orange-500 bg-orange-50 dark:bg-orange-500/10 px-2 py-1 rounded-md text-xs hover:underline hover:text-orange-800 dark:hover:text-orange-400"
+                      >
                         {inc.clave}
-                      </span>
+                      </a>
                     </td>
                     <td className="px-6 py-4 text-gray-900 dark:text-gray-100 whitespace-normal min-w-[300px]">
                       {inc.resumen}
