@@ -362,8 +362,8 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
 
     // Filtrar subtareas que corresponden al sprint Y que pertenecen a historias de PF3-1799
     const filteredSubtasks = useMemo(() => {
-        const subtareas = tickets.filter(t => t.issue_type === "Subtarea");
-        
+        const subtareas = tickets.filter(t => t.issue_type === "Soporte e Incidencias");
+
         // Match sprint directly or use parent story sprint
         const storyKeysBySprint = new Set(filtered.map(s => s.jira_key));
 
