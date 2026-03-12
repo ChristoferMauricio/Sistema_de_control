@@ -13,7 +13,8 @@ export default function ErroresCertificacionPage() {
       const { data, error } = await supabase
         .from("jira_tickets")
         .select("*")
-        .ilike("status", "%certificaci%")
+        .in("issue_type", ["Historia", "Story"])
+        .eq("parent_key", "PF3QA-49")
         .order("updated_at", { ascending: false });
 
       if (!error && data) {
@@ -58,7 +59,7 @@ export default function ErroresCertificacionPage() {
           </h1>
         </div>
         <p className="text-gray-500 mt-2">
-          Tickets con estado en fase de certificación
+          Historias asociadas a la épica PF3QA-49
         </p>
       </div>
 

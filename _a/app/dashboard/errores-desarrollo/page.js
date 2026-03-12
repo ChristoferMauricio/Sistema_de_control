@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import TicketTable from "@/components/TicketTable";
 
-export default function ErroresProduccionPage() {
+export default function ErroresDesarrolloPage() {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -13,7 +13,8 @@ export default function ErroresProduccionPage() {
       const { data, error } = await supabase
         .from("jira_tickets")
         .select("*")
-        .ilike("status", "%producci%")
+        .in("issue_type", ["Historia", "Story"])
+        .eq("parent_key", "PF3QA-50")
         .order("updated_at", { ascending: false });
 
       if (!error && data) {
@@ -54,11 +55,11 @@ export default function ErroresProduccionPage() {
             </svg>
           </div>
           <h1 className="text-2xl md:text-3xl font-bold font-[family-name:var(--font-heading)] text-gray-900">
-            Errores de Producción
+            Errores de Desarrollo
           </h1>
         </div>
         <p className="text-gray-500 mt-2">
-          Tickets con errores reportados en el entorno de producción
+          Historias asociadas a la épica PF3QA-50
         </p>
       </div>
 
@@ -66,12 +67,12 @@ export default function ErroresProduccionPage() {
       <div className="bg-white rounded-xl border border-gray-200 px-5 py-3 inline-flex items-center gap-3 animate-fade-in shadow-sm">
         <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
         <span className="text-sm text-gray-600">
-          <span className="font-semibold text-gray-900">{tickets.length}</span> ticket{tickets.length !== 1 ? "s" : ""} en producción
+          <span className="font-semibold text-gray-900">{tickets.length}</span> ticket{tickets.length !== 1 ? "s" : ""} en desarrollo
         </span>
       </div>
 
       {/* Table */}
-      <TicketTable tickets={tickets} title="Tickets en Producción" />
+      <TicketTable tickets={tickets} title="Tickets en Desarrollo" />
     </div>
   );
 }
