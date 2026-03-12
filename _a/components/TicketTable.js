@@ -5,6 +5,7 @@ import { formatDate, timeAgo, getStatusColor, getIssueTypeStyle, truncate } from
 import { supabase } from "@/lib/supabase";
 import * as XLSX from "xlsx";
 import ReactMarkdown from "react-markdown";
+import MarkdownEditor from "@/components/MarkdownEditor";
 
 const PAGE_SIZE = 15;
 
@@ -863,14 +864,16 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
                 </svg>
               </button>
             </div>
-            <div className="p-6 flex-1 flex flex-col">
+            <div className="p-6 flex-1 flex flex-col min-h-[350px]">
               <label className="text-xs font-medium text-gray-600 uppercase tracking-wider mb-2">Formato Markdown soportado</label>
-              <textarea
-                value={editingComment.currentText}
-                onChange={(e) => setEditingComment({ ...editingComment, currentText: e.target.value })}
-                className="w-full min-h-[250px] rounded-lg border border-gray-200 p-4 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-orange-500/40 focus:border-orange-500/40 font-mono transition-all resize-y"
-                placeholder="Escribe un comentario aquí..."
-              />
+              <div className="flex-1 w-full relative">
+                <MarkdownEditor
+                  value={editingComment.currentText}
+                  onChange={(val) => setEditingComment({ ...editingComment, currentText: val })}
+                  rows={10}
+                  placeholder="Escribe un comentario aquí..."
+                />
+              </div>
             </div>
             <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex justify-end gap-3">
               <button
