@@ -122,10 +122,10 @@ export async function POST() {
       );
     }
 
-    // Construir JQL — traer todos los tickets del proyecto
     let jql = "ORDER BY updated DESC";
     if (JIRA_PROJECT_KEY) {
-      jql = `project = ${JIRA_PROJECT_KEY} ORDER BY updated DESC`;
+      const projects = JIRA_PROJECT_KEY.split(",").map(p => `"${p.trim()}"`).join(", ");
+      jql = `project in (${projects}) ORDER BY updated DESC`;
     }
 
     // 1. Buscar en Jira
