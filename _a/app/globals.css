@@ -2,6 +2,9 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
+/* Force Tailwind v4 dark mode to trigger only when the .dark class is present */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* ═══════════════════════════════════════════════════════════
    JIRA DASHBOARD — DESIGN SYSTEM
    Light + Dark theme with orange/amber accents
