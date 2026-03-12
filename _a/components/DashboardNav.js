@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { getInitials } from "@/lib/utils";
@@ -107,6 +107,51 @@ export default function DashboardNav({ user, role }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
 
+  const [counts, setCounts] = useState({
+    certificacion: 0,
+    desarrollo: 0,
+    observaciones: 0
+  });
+
+  useEffect(() => {
+    async function fetchCounts() {
+      try {
+        const [
+          { count: countCert },
+          { count: countDes },
+          { data: obsData }
+        ] = await Promise.all([
+          supabase
+            .from("jira_tickets")
+            .select("*", { count: "exact", head: true })
+            .in("issue_type", ["Historia", "Story"])
+            .eq("parent_key", "PF3QA-49"),
+          supabase
+            .from("jira_tickets")
+            .select("*", { count: "exact", head: true })
+            .in("issue_type", ["Historia", "Story"])
+            .eq("parent_key", "PF3QA-50"),
+          supabase
+            .from("jira_tickets")
+            .select("comentario")
+            .not("comentario", "is", null)
+            .neq("comentario", "")
+        ]);
+
+        const countObs = (obsData || []).filter(t => t.comentario && t.comentario.trim().length > 0).length;
+
+        setCounts({
+          certificacion: countCert || 0,
+          desarrollo: countDes || 0,
+          observaciones: countObs || 0
+        });
+      } catch (err) {
+        console.error("Error fetching nav counts:", err);
+      }
+    }
+    fetchCounts();
+  }, []);
+
   // Filtrar por rol
   const visibleItems = navItems.filter((item) => item.roles.includes(role));
 
@@ -192,6 +237,12 @@ export default function DashboardNav({ user, role }) {
           </p>
           {visibleItems.map((item, index) => {
             const isActive = pathname === item.href;
+            
+            let badgeCount = null;
+            if (item.label === "Errores Certificación") badgeCount = counts.certificacion;
+            if (item.label === "Errores Desarrollo") badgeCount = counts.desarrollo;
+            if (item.label === "Observ. del Supervisor") badgeCount = counts.observaciones;
+
             return (
               <a
                 key={item.href}
@@ -211,11 +262,24 @@ export default function DashboardNav({ user, role }) {
                   }
                 `}
               >
-                <span className={`${isActive ? "text-orange-500" : "text-gray-400 group-hover:text-gray-600"} transition-colors`}>
-                  {item.icon}
-                </span>
-                {item.label}
-                {isActive && (
+                <div className="flex items-center gap-3 flex-1">
+                  <span className={`${isActive ? "text-orange-500" : "text-gray-400 group-hover:text-gray-600"} transition-colors`}>
+                    {item.icon}
+                  </span>
+                  {item.label}
+                </div>
+                
+                {badgeCount !== null && badgeCount > 0 && (
+                  <span className={`px-2 py-0.5 text-xs font-bold rounded-full border ${
+                    isActive 
+                      ? "bg-orange-100 text-orange-700 border-orange-200" 
+                      : "bg-gray-100 text-gray-600 border-gray-200"
+                  }`}>
+                    {badgeCount}
+                  </span>
+                )}
+
+                {isActive && badgeCount === null && (
                   <span className="ml-auto w-1.5 h-1.5 rounded-full bg-orange-500" />
                 )}
               </a>
