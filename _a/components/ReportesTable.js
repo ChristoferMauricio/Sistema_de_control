@@ -360,6 +360,31 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
         return historias.filter((t) => t.sprint === selectedSprint);
     }, [historias, selectedSprint]);
 
+    // Filtrar subtareas que corresponden al sprint Y que pertenecen a historias de PF3-1799
+    const filteredSubtasks = useMemo(() => {
+        const subtareas = tickets.filter(t => t.issue_type === "Subtarea");
+        
+        // Match sprint directly or use parent story sprint
+        const storyKeysBySprint = new Set(filtered.map(s => s.jira_key));
+
+        // Get all stories that are part of the stabilizing epic PF3-1799.
+        // We identify them by checking if the epic is PF3-1799 or if their summary has "(Iteraci[oó]n"
+        const validParentKeys = new Set(
+            tickets
+                .filter(t => t.issue_type === "Historia" && (t.parent_key === "PF3-1799" || t.summary.match(/\(Iteraci[oó]n/i)))
+                .map(t => t.jira_key)
+        );
+
+        return subtareas.filter(t => {
+            // First, it MUST belong to one of the PF3-1799 iteration stories
+            if (!validParentKeys.has(t.parent_key)) return false;
+
+            // Second, it must pass the sprint filter if one is selected
+            if (!selectedSprint) return true;
+            return t.sprint === selectedSprint || storyKeysBySprint.has(t.parent_key);
+        });
+    }, [tickets, selectedSprint, filtered]);
+
     // Crear mapa de Programador → Nombre (case-insensitive)
     const nameMap = useMemo(() => {
         const map = {};
@@ -393,7 +418,7 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
         filtered.forEach((t) => {
             const realName = resolveName(t.assignee_name);
             if (!map[realName]) {
-                map[realName] = { assignee: realName, total: 0 };
+                map[realName] = { assignee: realName, total: 0, subtareasCount: 0 };
                 STATUS_COLUMNS.forEach((col) => { map[realName][col.key] = 0; });
             }
 
@@ -407,15 +432,30 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
             }
         });
 
-        return Object.values(map).sort((a, b) => b.total - a.total);
-    }, [filtered, nameMap]);
+        // Contar subtareas
+        filteredSubtasks.forEach((t) => {
+            const realName = resolveName(t.assignee_name);
+            if (!map[realName]) {
+                map[realName] = { assignee: realName, total: 0, subtareasCount: 0 };
+                STATUS_COLUMNS.forEach((col) => { map[realName][col.key] = 0; });
+            }
+            map[realName].subtareasCount += 1;
+        });
+
+        return Object.values(map).map(row => ({
+            ...row,
+            puntajeTotal: row.total + row.subtareasCount
+        })).sort((a, b) => b.puntajeTotal - a.puntajeTotal);
+    }, [filtered, filteredSubtasks, nameMap]);
 
     // Totales por columna
     const totals = useMemo(() => {
-        const t = { total: 0 };
+        const t = { total: 0, subtareasCount: 0, puntajeTotal: 0 };
         STATUS_COLUMNS.forEach((col) => { t[col.key] = 0; });
         pivotData.forEach((row) => {
             t.total += row.total;
+            t.subtareasCount += row.subtareasCount;
+            t.puntajeTotal += row.puntajeTotal;
             STATUS_COLUMNS.forEach((col) => { t[col.key] += row[col.key]; });
         });
         return t;
@@ -518,7 +558,13 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                                     </th>
                                 ))}
                                 <th className="text-center px-3 py-2 font-semibold text-gray-700 border-l border-gray-200" style={{ minWidth: "100px" }}>
-                                    Total
+                                    Historias
+                                </th>
+                                <th className="text-center px-3 py-2 font-semibold text-gray-700 border-l border-gray-200" style={{ minWidth: "100px" }}>
+                                    Subtareas
+                                </th>
+                                <th className="text-center px-4 py-2 font-bold text-gray-900 border-l border-gray-200 bg-orange-50/50" style={{ minWidth: "100px" }}>
+                                    TOTAL
                                 </th>
                             </tr>
                         </thead>
@@ -549,19 +595,29 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                                             ))}
                                             <td className="px-3 py-2 text-center border-l border-gray-100">
                                                 <div className="inline-flex items-center gap-1.5">
-                                                    <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-xs font-bold bg-orange-100 text-orange-700">
+                                                    <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-xs font-bold bg-gray-100 text-gray-700 border border-gray-200">
                                                         {row.total}
                                                     </span>
                                                     <button
                                                         onClick={() => openTrace(row.assignee)}
-                                                        className="p-1 rounded-md hover:bg-orange-50 text-gray-400 hover:text-orange-600 transition-colors"
-                                                        title="Ver trazabilidad"
+                                                        className="p-1 rounded-md hover:bg-gray-200 text-gray-400 hover:text-gray-600 transition-colors"
+                                                        title="Ver trazabilidad de historias"
                                                     >
                                                         <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                                             <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                                                         </svg>
                                                     </button>
                                                 </div>
+                                            </td>
+                                            <td className="px-3 py-2 text-center border-l border-gray-100">
+                                                <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                                    {row.subtareasCount}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-2 text-center border-l border-orange-200 bg-orange-50/50">
+                                                <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-sm font-extrabold bg-orange-500 text-white shadow-sm ring-1 ring-orange-600">
+                                                    {row.puntajeTotal}
+                                                </span>
                                             </td>
                                         </tr>
                                     ))}
@@ -576,9 +632,19 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                                                 </span>
                                             </td>
                                         ))}
-                                        <td className="px-4 py-3 text-center">
-                                            <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-sm font-bold bg-orange-500 text-white">
+                                        <td className="px-4 py-3 text-center border-l border-gray-100">
+                                            <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-sm font-bold bg-gray-200 text-gray-700">
                                                 {totals.total}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-3 text-center border-l border-gray-100">
+                                            <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-sm font-bold bg-blue-100 text-blue-800">
+                                                {totals.subtareasCount}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-3 text-center border-l bg-orange-100 border-orange-200">
+                                            <span className="inline-flex items-center justify-center min-w-[36px] px-3 py-1 rounded-lg text-base font-extrabold bg-orange-600 text-white shadow-sm">
+                                                {totals.puntajeTotal}
                                             </span>
                                         </td>
                                     </tr>
