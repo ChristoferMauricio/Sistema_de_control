@@ -101,25 +101,25 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
   const isEpic = (type) => (type || "").toLowerCase().includes("epic") || (type || "").toLowerCase().includes("épica");
   const hasStatusHistory = (type) => !isSubtask(type) && !isEpic(type);
 
-  // Resolve Epic Summary using transitivity
+  // Resolve Epic Summary using transitivity (Returns object { key, summary })
   const resolveEpic = useCallback(
     (ticket) => {
-      if (isEpic(ticket.issue_type)) return ticket.summary;
+      if (isEpic(ticket.issue_type)) return { key: ticket.jira_key, summary: ticket.summary };
 
       if (isStory(ticket.issue_type) && ticket.parent_key) {
         const parent = ticketMap[ticket.parent_key];
-        if (parent && isEpic(parent.issue_type)) return parent.summary;
+        if (parent && isEpic(parent.issue_type)) return { key: parent.jira_key, summary: parent.summary };
       }
 
       if (isSubtask(ticket.issue_type) && ticket.parent_key) {
         const parentStory = ticketMap[ticket.parent_key];
         if (parentStory && isStory(parentStory.issue_type) && parentStory.parent_key) {
           const grandParentEpic = ticketMap[parentStory.parent_key];
-          if (grandParentEpic && isEpic(grandParentEpic.issue_type)) return grandParentEpic.summary;
+          if (grandParentEpic && isEpic(grandParentEpic.issue_type)) return { key: grandParentEpic.jira_key, summary: grandParentEpic.summary };
         }
       }
 
-      return "—";
+      return null;
     },
     [ticketMap]
   );
@@ -163,8 +163,8 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
     if (filterEpic.length >= 3) {
       const qs = filterEpic.toLowerCase();
       result = result.filter(t => {
-        const epicName = resolveEpic(t);
-        return epicName !== "—" && epicName.toLowerCase().includes(qs);
+        const epicObj = resolveEpic(t);
+        return epicObj && epicObj.summary.toLowerCase().includes(qs);
       });
     }
     if (filterAssignee) result = result.filter(t => t.assignee_name === filterAssignee);
@@ -175,8 +175,10 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
       let bVal = b[sortField] || "";
       
       if (sortField === "epic") {
-        aVal = resolveEpic(a);
-        bVal = resolveEpic(b);
+        const epicA = resolveEpic(a);
+        const epicB = resolveEpic(b);
+        aVal = epicA ? epicA.summary : "";
+        bVal = epicB ? epicB.summary : "";
       }
 
       if (sortDir === "asc") return aVal > bVal ? 1 : -1;
@@ -225,7 +227,7 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
       "Resumen": t.summary || "",
       "Subtareas": t.subtask_keys?.join(", ") || "",
       "Principal": t.parent_key || "",
-      "Épica": resolveEpic(t) || "",
+      "Épica": resolveEpic(t)?.summary || "",
       "Sprint": t.sprint || "",
       "Persona asignada": t.assignee_name || "",
       "Story Points": t.story_points ?? "",
@@ -595,9 +597,25 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
 
                       {/* Épica */}
                       <td className="px-4 py-3 text-gray-800 max-w-[160px]">
-                        <span className="text-xs truncate block" title={resolveEpic(ticket)}>
-                          {resolveEpic(ticket)}
-                        </span>
+                        {(() => {
+                          const epic = resolveEpic(ticket);
+                          if (!epic) return <span className="text-gray-300 text-xs">—</span>;
+                          return (
+                            <div className="flex flex-col gap-0.5" title={epic.summary}>
+                              <a
+                                href={`https://supervisorservicio2020.atlassian.net/browse/${epic.key}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="font-mono text-[10px] text-blue-600 hover:text-blue-800 hover:underline inline-block w-max"
+                              >
+                                {epic.key}
+                              </a>
+                              <span className="text-xs truncate block text-gray-700">
+                                {epic.summary}
+                              </span>
+                            </div>
+                          );
+                        })()}
                       </td>
 
                       {/* Sprint */}
