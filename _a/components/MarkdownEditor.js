@@ -82,6 +82,7 @@ export default function MarkdownEditor({ value, onChange, rows = 4, placeholder 
               key={btn.id}
               type="button"
               title={btn.title}
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => applyFormat(btn)}
               className={`px-2 py-1 rounded-md text-xs text-gray-600 hover:bg-white hover:text-orange-600 hover:shadow-sm transition-all ${btn.style}`}
             >
