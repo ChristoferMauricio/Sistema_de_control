@@ -6,10 +6,12 @@ import { supabase } from "@/lib/supabase";
 import * as XLSX from "xlsx";
 import ReactMarkdown from "react-markdown";
 import MarkdownEditor from "@/components/MarkdownEditor";
+import { useRole } from "@/app/dashboard/RoleContext";
 
 const PAGE_SIZE = 15;
 
 export default function TicketTable({ tickets = [], title, showAssignee = true, statusHistory = {} }) {
+  const role = useRole();
   const [search, setSearch] = useState("");
   const [sortField, setSortField] = useState("updated_at");
   const [sortDir, setSortDir] = useState("desc");
@@ -620,20 +622,22 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
                                     <span className="text-gray-400 italic">Sin observaciones...</span>
                                   )}
                                 </div>
-                                <button
-                                  onClick={() => setEditingComment({ 
-                                    key: ticket.jira_key, 
-                                    summary: ticket.summary,
-                                    story_points: ticket.story_points,
-                                    currentText: currentVal || "" 
-                                  })}
-                                  className="shrink-0 p-1.5 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded opacity-0 group-hover:opacity-100 transition-all focus:opacity-100"
-                                  title="Editar observación"
-                                >
-                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                                  </svg>
-                                </button>
+                                {role !== "viewer" && (
+                                  <button
+                                    onClick={() => setEditingComment({ 
+                                      key: ticket.jira_key, 
+                                      summary: ticket.summary,
+                                      story_points: ticket.story_points,
+                                      currentText: currentVal || "" 
+                                    })}
+                                    className="shrink-0 p-1.5 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded opacity-0 group-hover:opacity-100 transition-all focus:opacity-100"
+                                    title="Editar observación"
+                                  >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                    </svg>
+                                  </button>
+                                )}
                               </div>
                             </div>
                           );
