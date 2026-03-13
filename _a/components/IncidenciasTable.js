@@ -58,23 +58,22 @@ export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
     return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700">{status}</span>;
   };
 
-  // Extraer "Usuario reportante" o "Usuario solicitante" de la descripción
   const parseReporter = (description) => {
     if (!description) return null;
     
-    // Primero buscar reportante
-    let match = description.match(/Usuario reportante:\s*(.+)/i) || 
-                description.match(/Usuario\s*reportante:\s*(.+)/i) ||
-                description.match(/Reportante:\s*(.+)/i);
+    // Primero buscar reportante (sin importar asteriscos o formato Markdown)
+    let match = description.match(/Usuario reportante:\s*([^\n\r\*]+)/i) || 
+                description.match(/Usuario\s*reportante:\s*([^\n\r\*]+)/i) ||
+                description.match(/Reportante:\s*([^\n\r\*]+)/i);
                 
     if (match && match[1]) {
       return match[1].trim();
     }
     
     // Luego buscar solicitante si no hay reportante
-    let solicitanteMatch = description.match(/Usuario solicitante:\s*(.+)/i) || 
-                           description.match(/Usuario\s*solicitante:\s*(.+)/i) ||
-                           description.match(/Solicitante:\s*(.+)/i);
+    let solicitanteMatch = description.match(/Usuario solicitante:\s*([^\n\r\*]+)/i) || 
+                           description.match(/Usuario\s*solicitante:\s*([^\n\r\*]+)/i) ||
+                           description.match(/Solicitante:\s*([^\n\r\*]+)/i);
                            
     if (solicitanteMatch && solicitanteMatch[1]) {
       return solicitanteMatch[1].trim();
@@ -185,19 +184,22 @@ export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
                     </td>
                     <td className="px-6 py-4">
                       {(() => {
+                        if (!inc.description) {
+                          return <span className="text-gray-300 dark:text-gray-600 font-bold" title="Sin descripción en BD">—</span>;
+                        }
                         const reporter = parseReporter(inc.description);
                         if (reporter) {
                           return (
                             <button
                               onClick={() => handleProfileClick(reporter)}
-                              className="text-left text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline focus:outline-none transition-colors"
+                              className="text-left text-sm text-blue-600 dark:text-blue-400 font-semibold hover:text-blue-800 dark:hover:text-blue-300 hover:underline focus:outline-none transition-colors"
                               title="Ver información GSM"
                             >
                               {reporter}
                             </button>
                           );
                         }
-                        return <span className="text-gray-400 dark:text-gray-500 text-xs italic">—</span>;
+                        return <span className="text-gray-400 dark:text-gray-500 text-xs italic" title="Descripción encontrada pero sin nombre válido">—</span>;
                       })()}
                     </td>
                     <td className="px-6 py-4">

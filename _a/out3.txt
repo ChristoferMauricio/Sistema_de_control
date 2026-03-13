@@ -1,0 +1,25 @@
+Found tickets in Supabase: 4
+
+=== TICKET: PF3-3174 ===
+Contains 'Usuario reportante': true
+Contains 'Usuario solicitante': false
+Description preview:
+*Nota:*\n\n* Usuario reportante: Magaly Curi\n* fecha: mar, 10 mar, 11:09\n* Correo: Solicitud: INCIDENCIA EN EL PGIM - CONTRATO SUP2500010 LQ-219
+
+=== TICKET: PF3-3175 ===
+Contains 'Usuario reportante': false
+Contains 'Usuario solicitante': true
+Description preview:
+Se requiere elaborar las especificaciones técnicas de nuevos métodos requeridos en la capa de integración Siged, Para que el equipo del Siged los implemente y por consiguiente sean utilizados en la im
+
+=== TICKET: PF3-3176 ===
+Contains 'Usuario reportante': true
+Contains 'Usuario solicitante': true
+Description preview:
+*Nota:*\n\n* Usuario solicitante: Carlos Omar Calero Cueva\n* Usuario reportante: Daniel Alcides Valenzuela Narvaez\n* fecha: lun, 2 mar, 17:13\n* Correo: Error PGIM 202500191513
+
+=== TICKET: PF3-3177 ===
+Contains 'Usuario reportante': false
+Contains 'Usuario solicitante': true
+Description preview:
+Se requiere elaborar las especificaciones técnicas de nuevos métodos requeridos en la capa de integración Siged, Para que el equipo del Siged los implemente y por consiguiente sean utilizados en la im
