@@ -39,7 +39,7 @@ export default function IncidenciasPage() {
       // 2. Fetch subtasks belonging to these stories
       const { data: subtasks, error: subtasksError } = await supabase
         .from("jira_tickets")
-        .select("jira_key, summary, status, assignee_name, created_at, parent_key")
+        .select("jira_key, summary, status, assignee_name, created_at, parent_key, description")
         .eq("issue_type", "Subtarea")
         .in("parent_key", parentKeys)
         .order("created_at", { ascending: false });
@@ -108,6 +108,13 @@ export default function IncidenciasPage() {
           asignado: resolvedName,
           asignado_original: t.assignee_name // Kept for debugging
         };
+      });
+
+      console.log("DEBUG: Raw descriptions from Supabase:");
+      formattedData.forEach(item => {
+        if (item.clave.includes("3177") || item.clave.includes("3176") || item.clave.includes("3175")) {
+          console.log(`${item.clave} - DESC:`, item.description);
+        }
       });
 
       setIncidencias(formattedData);
