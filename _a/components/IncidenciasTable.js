@@ -5,9 +5,10 @@ import { Search, Filter, AlertCircle, Calendar } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
-export default function IncidenciasTable({ incidencias, role }) {
+export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterIteracion, setFilterIteracion] = useState("Todas");
+  const [selectedProfile, setSelectedProfile] = useState(null);
 
   // Derive unique iterations from the data
   const iteraciones = useMemo(() => {
@@ -55,6 +56,50 @@ export default function IncidenciasTable({ incidencias, role }) {
     }
     // Default / To Do
     return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700">{status}</span>;
+  };
+
+  // Extraer "Usuario reportante" o "Usuario solicitante" de la descripción
+  const parseReporter = (description) => {
+    if (!description) return null;
+    
+    // Primero buscar reportante
+    let match = description.match(/Usuario reportante:\s*(.+)/i) || 
+                description.match(/Usuario\s*reportante:\s*(.+)/i) ||
+                description.match(/Reportante:\s*(.+)/i);
+                
+    if (match && match[1]) {
+      return match[1].trim();
+    }
+    
+    // Luego buscar solicitante si no hay reportante
+    let solicitanteMatch = description.match(/Usuario solicitante:\s*(.+)/i) || 
+                           description.match(/Usuario\s*solicitante:\s*(.+)/i) ||
+                           description.match(/Solicitante:\s*(.+)/i);
+                           
+    if (solicitanteMatch && solicitanteMatch[1]) {
+      return solicitanteMatch[1].trim();
+    }
+    
+    return null;
+  };
+
+  // Manejar el clic sobre el solicitante
+  const handleProfileClick = (name) => {
+    if (!name) return;
+    const lowerName = name.toLowerCase();
+    
+    // Exact or partial match inside the GSM array
+    const profile = gsmData.find(g => 
+      g.nombre.toLowerCase() === lowerName || 
+      g.nombre.toLowerCase().includes(lowerName) ||
+      lowerName.includes(g.nombre.toLowerCase())
+    );
+
+    if (profile) {
+      setSelectedProfile(profile);
+    } else {
+      setSelectedProfile({ error: true, searchedName: name });
+    }
   };
 
   return (
@@ -105,6 +150,7 @@ export default function IncidenciasTable({ incidencias, role }) {
               <tr>
                 <th className="px-6 py-4">Clave</th>
                 <th className="px-6 py-4 w-1/3">Resumen</th>
+                <th className="px-6 py-4">Reportante</th>
                 <th className="px-6 py-4">Iteración</th>
                 <th className="px-6 py-4">Asignado</th>
                 <th className="px-6 py-4">Estado</th>
@@ -138,6 +184,23 @@ export default function IncidenciasTable({ incidencias, role }) {
                       {inc.resumen}
                     </td>
                     <td className="px-6 py-4">
+                      {(() => {
+                        const reporter = parseReporter(inc.description);
+                        if (reporter) {
+                          return (
+                            <button
+                              onClick={() => handleProfileClick(reporter)}
+                              className="text-left text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline focus:outline-none transition-colors"
+                              title="Ver información GSM"
+                            >
+                              {reporter}
+                            </button>
+                          );
+                        }
+                        return <span className="text-gray-400 dark:text-gray-500 text-xs italic">—</span>;
+                      })()}
+                    </td>
+                    <td className="px-6 py-4">
                       <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
                         <Calendar className="w-3.5 h-3.5" />
                         <span>{inc.iteracion}</span>
@@ -166,6 +229,93 @@ export default function IncidenciasTable({ incidencias, role }) {
           </table>
         </div>
       </div>
+
+      {/* Modal Profile Popup */}
+      {selectedProfile && (
+        <>
+          {/* Backdrop */}
+          <div 
+            className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm z-40 transition-opacity flex items-center justify-center p-4"
+            onClick={() => setSelectedProfile(null)}
+          >
+            {/* Modal Content */}
+            <div 
+              className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-slide-up"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {selectedProfile.error ? (
+                <div className="p-6 text-center">
+                  <div className="mx-auto w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-4">
+                    <AlertCircle className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-2">Usuario no encontrado</h3>
+                  <p className="text-gray-500 dark:text-gray-400">
+                    No pudimos encontrar el perfil GSM para: <br/>
+                    <strong className="text-gray-700 dark:text-gray-300 mt-2 block">"{selectedProfile.searchedName}"</strong>
+                  </p>
+                  <button 
+                    onClick={() => setSelectedProfile(null)}
+                    className="mt-6 w-full py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium rounded-xl transition-colors"
+                  >
+                    Cerrar
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="h-24 bg-gradient-to-r from-cyan-500 to-blue-500 relative">
+                    <button 
+                      onClick={() => setSelectedProfile(null)}
+                      className="absolute top-3 right-3 text-white/80 hover:text-white bg-black/10 hover:bg-black/20 p-1.5 rounded-full transition-colors"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                  <div className="px-6 pb-6 relative">
+                    {/* Avatar Circle */}
+                    <div className="absolute -top-12 left-6 w-20 h-20 bg-white dark:bg-gray-900 rounded-full flex items-center justify-center shadow-sm">
+                      <div className="w-16 h-16 bg-cyan-100 dark:bg-cyan-900/50 text-cyan-700 dark:text-cyan-300 rounded-full flex items-center justify-center text-2xl font-bold">
+                        {selectedProfile.nombre.charAt(0).toUpperCase()}
+                      </div>
+                    </div>
+                    
+                    <div className="pt-10">
+                      <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                        {selectedProfile.nombre}
+                      </h2>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-xs font-mono px-2 py-0.5 rounded border border-gray-200 dark:border-gray-700">
+                          {selectedProfile.modalidad}
+                        </span>
+                        <span className="text-sm font-medium text-cyan-600 dark:text-cyan-400">
+                          {selectedProfile.cargo}
+                        </span>
+                      </div>
+
+                      <div className="mt-6 space-y-4">
+                        <div className="flex items-start gap-3">
+                          <div className="p-2 border border-gray-100 dark:border-gray-800 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-400 dark:text-gray-500">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+                            </svg>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">Correo Electrónico</p>
+                            <a href={`mailto:${selectedProfile.correo}`} className="text-sm text-gray-900 dark:text-gray-100 hover:text-blue-600 dark:hover:text-blue-400 hover:underline">
+                              {selectedProfile.correo}
+                            </a>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

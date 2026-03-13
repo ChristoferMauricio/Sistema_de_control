@@ -34,7 +34,7 @@ async function searchJira(jql) {
   let nextPageToken = null;
 
   while (true) {
-    const fields = "key,summary,status,assignee,priority,issuetype,created,updated,reporter,parent,subtasks,customfield_10036,customfield_10020";
+    const fields = "key,summary,status,assignee,priority,issuetype,created,updated,reporter,parent,subtasks,customfield_10036,customfield_10020,description";
     const params = new URLSearchParams({
       jql,
       maxResults: String(maxResults),
@@ -45,7 +45,7 @@ async function searchJira(jql) {
       params.set("nextPageToken", nextPageToken);
     }
 
-    const url = `${JIRA_BASE_URL}/rest/api/3/search/jql?${params.toString()}`;
+    const url = `${JIRA_BASE_URL}/rest/api/2/search/jql?${params.toString()}`;
 
     const response = await fetch(url, {
       method: "GET",
@@ -90,6 +90,7 @@ function transformIssue(issue) {
   return {
     jira_key: issue.key,
     summary: fields.summary || "",
+    description: fields.description || null,
     status: fields.status?.name || "",
     assignee_email: fields.assignee?.emailAddress || "",
     assignee_name: fields.assignee?.displayName || "",

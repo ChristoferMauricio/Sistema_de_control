@@ -8,6 +8,7 @@ import { useRole } from "../RoleContext";
 export default function IncidenciasPage() {
   const { role, loading: roleLoading } = useRole();
   const [incidencias, setIncidencias] = useState([]);
+  const [gsmData, setGsmData] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -42,6 +43,15 @@ export default function IncidenciasPage() {
         .eq("issue_type", "Subtarea")
         .in("parent_key", parentKeys)
         .order("created_at", { ascending: false });
+
+      // Fetch GSM for description matching
+      const { data: gsm, error: gsmError } = await supabase
+        .from("gsm")
+        .select("*");
+
+      if (gsm && !gsmError) {
+        setGsmData(gsm);
+      }
 
       if (subtasksError) {
         console.error("Error fetching subtasks:", subtasksError);
@@ -93,6 +103,7 @@ export default function IncidenciasPage() {
           resumen: t.summary,
           estado: t.status,
           creado: t.created_at,
+          description: t.description, // Added description propagation
           iteracion: iterationMap[t.parent_key] || "Iteración Desconocida",
           asignado: resolvedName,
           asignado_original: t.assignee_name // Kept for debugging
@@ -139,7 +150,7 @@ export default function IncidenciasPage() {
       </div>
 
       {/* Table Component */}
-      <IncidenciasTable incidencias={incidencias} role={role} />
+      <IncidenciasTable incidencias={incidencias} role={role} gsmData={gsmData} />
     </div>
   );
 }
