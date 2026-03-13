@@ -237,12 +237,12 @@ export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
         <>
           {/* Backdrop */}
           <div 
-            className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm z-40 transition-opacity flex items-center justify-center p-4"
+            className="fixed inset-0 bg-gray-900/40 z-40 transition-opacity flex justify-center items-start pt-[15vh] overflow-y-auto pb-10 px-4"
             onClick={() => setSelectedProfile(null)}
           >
             {/* Modal Content */}
             <div 
-              className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-slide-up"
+              className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-slide-up relative my-auto sm:my-0"
               onClick={(e) => e.stopPropagation()}
             >
               {selectedProfile.error ? (
