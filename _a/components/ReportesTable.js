@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
-import * as XLSX from "xlsx";
+import * as XLSX from "xlsx-js-style";
 import { Download } from "lucide-react";
 
 // Mapeo de estados internos de Jira → nombres de columna para el reporte
@@ -651,6 +651,80 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
             "Story Points": t.story_points || ""
         }));
         const wsRaw = XLSX.utils.json_to_sheet(rowsRaw, { header: headersRaw });
+
+        // --- Aplicar Estilos a las Hojas ---
+        const applyTableStyles = (ws, isRaw = false) => {
+            if (!ws['!ref']) return;
+            const range = XLSX.utils.decode_range(ws['!ref']);
+            
+            // Configurar anchos de columna
+            if (!isRaw) {
+                ws['!cols'] = [
+                    { wch: 18 }, // Integrante
+                    ...STATUS_COLUMNS.map(() => ({ wch: 16 })), // Statuses
+                    { wch: 12 }, // Historias / Total SP
+                    { wch: 20 }, // Soporte e Incidencias
+                    { wch: 12 }  // TOTAL
+                ];
+            } else {
+                ws['!cols'] = [
+                    { wch: 14 }, // Clave
+                    { wch: 55 }, // Resumen
+                    { wch: 18 }, // Asignado
+                    { wch: 16 }, // Estado
+                    { wch: 16 }, // Sprint
+                    { wch: 12 }  // Story Points
+                ];
+            }
+
+            for (let R = range.s.r; R <= range.e.r; ++R) {
+                for (let C = range.s.c; C <= range.e.c; ++C) {
+                    const cellRef = XLSX.utils.encode_cell({ c: C, r: R });
+                    if (!ws[cellRef]) continue;
+
+                    const isHeader = (R === 0);
+                    const isLastRow = (!isRaw && R === range.e.r);
+                    const isLastCol = (!isRaw && C === range.e.c);
+
+                    let font = { name: "Arial", sz: 10 };
+                    let fill = null;
+                    let alignment = { vertical: "center", horizontal: "center" };
+                    
+                    // Alinear primer columna a la izquierda
+                    if (C === 0) alignment.horizontal = "left"; 
+                    if (isRaw && C === 1) alignment.horizontal = "left"; // Resumen left align
+                    
+                    if (isHeader) {
+                        font.bold = true;
+                        font.color = { rgb: "FFFFFFFF" };
+                        fill = { fgColor: { rgb: "FF4B5563" } }; // Gray-600
+                        alignment.horizontal = "center";
+                    } else if (isLastRow) {
+                        font.bold = true;
+                        fill = { fgColor: { rgb: "FFF3F4F6" } }; // Gray-100
+                    } else if (isLastCol) {
+                        font.bold = true;
+                        fill = { fgColor: { rgb: "FFFFF7ED" } }; // Orange-50
+                    }
+
+                    ws[cellRef].s = {
+                        font,
+                        alignment,
+                        fill,
+                        border: {
+                            top: { style: "thin", color: { rgb: "FFD1D5DB" } },
+                            bottom: { style: "thin", color: { rgb: "FFD1D5DB" } },
+                            left: { style: "thin", color: { rgb: "FFD1D5DB" } },
+                            right: { style: "thin", color: { rgb: "FFD1D5DB" } }
+                        }
+                    };
+                }
+            }
+        };
+
+        applyTableStyles(ws1, false);
+        applyTableStyles(wsSP, false);
+        applyTableStyles(wsRaw, true);
 
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws1, "Historias");
