@@ -2,6 +2,8 @@
 
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import * as XLSX from "xlsx";
+import { Download } from "lucide-react";
 
 // Mapeo de estados internos de Jira → nombres de columna para el reporte
 const STATUS_COLUMNS = [
@@ -593,6 +595,71 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
         setSubtasksModal({ assigneeName, subtasks: assigneeSubtasks });
     }
 
+    const exportToExcel = () => {
+        const now = new Date();
+        const dateStr = now.toLocaleDateString("es-PE").replace(/\//g, "-");
+
+        // --- Hoja 1: Historias por integrante ---
+        const headers1 = ["Integrante", ...STATUS_COLUMNS.map(c => c.label), "Historias", "Soporte e Incidencias", "TOTAL"];
+        const rows1 = pivotData.map(row => {
+            const data = { Integrante: row.assignee };
+            STATUS_COLUMNS.forEach(col => { data[col.label] = row[col.key]; });
+            data["Historias"] = row.total;
+            data["Soporte e Incidencias"] = row.subtareasCount;
+            data["TOTAL"] = row.puntajeTotal;
+            return data;
+        });
+
+        // Totales row 1
+        const tRow1 = { Integrante: "TOTAL" };
+        STATUS_COLUMNS.forEach(col => { tRow1[col.label] = totals[col.key]; });
+        tRow1["Historias"] = totals.total;
+        tRow1["Soporte e Incidencias"] = totals.subtareasCount;
+        tRow1["TOTAL"] = totals.puntajeTotal;
+        rows1.push(tRow1);
+
+        const ws1 = XLSX.utils.json_to_sheet(rows1, { header: headers1 });
+
+        // --- Hoja 2: Story Points por integrante ---
+        const headersSP = ["Integrante", ...STATUS_COLUMNS.map(c => c.label), "Total SP", "Soporte e Incidencias", "TOTAL"];
+        const rowsSP = pivotDataSP.map(row => {
+            const data = { Integrante: row.assignee };
+            STATUS_COLUMNS.forEach(col => { data[col.label] = row[col.key]; });
+            data["Total SP"] = row.total;
+            data["Soporte e Incidencias"] = row.subtareasCount;
+            data["TOTAL"] = row.puntajeTotal;
+            return data;
+        });
+
+        const tRowSP = { Integrante: "TOTAL" };
+        STATUS_COLUMNS.forEach(col => { tRowSP[col.label] = totalsSP[col.key]; });
+        tRowSP["Total SP"] = totalsSP.total;
+        tRowSP["Soporte e Incidencias"] = totalsSP.subtareasCount;
+        tRowSP["TOTAL"] = totalsSP.puntajeTotal;
+        rowsSP.push(tRowSP);
+
+        const wsSP = XLSX.utils.json_to_sheet(rowsSP, { header: headersSP });
+
+        // --- Hoja 3: Historias filtradas (detalle) ---
+        const headersRaw = ["Clave", "Resumen", "Asignado", "Estado", "Sprint", "Story Points"];
+        const rowsRaw = filtered.map(t => ({
+            "Clave": t.jira_key,
+            "Resumen": t.summary,
+            "Asignado": resolveName(t.assignee_name),
+            "Estado": t.status,
+            "Sprint": t.sprint || "",
+            "Story Points": t.story_points || ""
+        }));
+        const wsRaw = XLSX.utils.json_to_sheet(rowsRaw, { header: headersRaw });
+
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws1, "Historias");
+        XLSX.utils.book_append_sheet(wb, wsSP, "Story Points");
+        XLSX.utils.book_append_sheet(wb, wsRaw, "Detalle (Raw)");
+
+        XLSX.writeFile(wb, `Reporte_Jira_${selectedSprint ? selectedSprint.replace(/\s+/g, '_') : 'Todos'}_${dateStr}.xlsx`);
+    };
+
     return (
         <>
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden animate-fade-in">
@@ -607,27 +674,38 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                         </p>
                     </div>
 
-                    {/* Sprint filter */}
-                    <div className="flex items-center gap-2">
-                        <label className="text-xs font-medium text-gray-500">Sprint:</label>
-                        <select
-                            value={selectedSprint}
-                            onChange={(e) => setSelectedSprint(e.target.value)}
-                            className="px-3 py-2 rounded-lg border border-gray-200 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[180px]"
+                    {/* Actions & Filters */}
+                    <div className="flex items-center gap-4">
+                        <button
+                            onClick={exportToExcel}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg shadow-sm transition-colors"
+                            title="Descargar datos actuales en formato Excel"
                         >
-                            <option value="">Todos los sprints</option>
-                            {sprints.map((s) => (
-                                <option key={s} value={s}>{s}</option>
-                            ))}
-                        </select>
-                        {selectedSprint && (
-                            <button
-                                onClick={() => setSelectedSprint("")}
-                                className="text-xs text-orange-500 hover:text-orange-600 font-medium whitespace-nowrap"
+                            <Download className="w-4 h-4" />
+                            <span className="hidden sm:inline">Exportar Excel</span>
+                        </button>
+
+                        <div className="flex items-center gap-2 border-l border-gray-200 pl-4">
+                            <label className="text-xs font-medium text-gray-500">Sprint:</label>
+                            <select
+                                value={selectedSprint}
+                                onChange={(e) => setSelectedSprint(e.target.value)}
+                                className="px-3 py-2 rounded-lg border border-gray-200 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[180px]"
                             >
-                                Limpiar
-                            </button>
-                        )}
+                                <option value="">Todos los sprints</option>
+                                {sprints.map((s) => (
+                                    <option key={s} value={s}>{s}</option>
+                                ))}
+                            </select>
+                            {selectedSprint && (
+                                <button
+                                    onClick={() => setSelectedSprint("")}
+                                    className="text-xs text-orange-500 hover:text-orange-600 font-medium whitespace-nowrap"
+                                >
+                                    Limpiar
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </div>
 
