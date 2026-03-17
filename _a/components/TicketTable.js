@@ -511,6 +511,15 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
               <th className="px-4 py-3 font-medium min-w-[120px]">
                 {mode === "errores" ? "Actividades vinculadas" : "Principal"}
               </th>
+              {mode === "errores" && (
+                <th
+                  onClick={() => toggleSort("storySprint")}
+                  className="px-4 py-3 cursor-pointer hover:bg-gray-100 transition-colors whitespace-nowrap"
+                  style={{ minWidth: "120px" }}
+                >
+                  Sprint Historia <SortIcon field="storySprint" />
+                </th>
+              )}
               {mode !== "errores" && (
                 <th onClick={() => toggleSort("epic")} className="px-4 py-3 font-medium cursor-pointer hover:bg-gray-100 transition-colors whitespace-nowrap" style={{ minWidth: "160px" }}>
                   Épica <SortIcon field="epic" />
@@ -627,6 +636,17 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
                   className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[80px]"
                 />
               </th>
+              {mode === "errores" && (
+                <th className="px-4 py-2">
+                  <input
+                    type="text"
+                    value={filterSprint}
+                    onChange={(e) => { setFilterSprint(e.target.value); setCurrentPage(1); }}
+                    placeholder="Filtrar sprint..."
+                    className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[80px]"
+                  />
+                </th>
+              )}
               
               {mode !== "errores" && (
                 <th className="px-4 py-2">
@@ -822,6 +842,19 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
                           <span className="text-gray-300 text-xs">—</span>
                         )}
                       </td>
+
+                      {/* Sprint de la Historia - solo para Errores */}
+                      {mode === "errores" && (
+                        <td className="px-4 py-3">
+                          {ticket.storySprint && ticket.storySprint !== "—" ? (
+                            <span className="text-xs text-gray-700 bg-gray-100 border border-gray-200 px-2 py-1 rounded-md whitespace-nowrap">
+                              {ticket.storySprint}
+                            </span>
+                          ) : (
+                            <span className="text-gray-300 text-xs">—</span>
+                          )}
+                        </td>
+                      )}
 
                       {/* Épica */}
                       {mode !== "errores" && (

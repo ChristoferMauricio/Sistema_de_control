@@ -49,9 +49,14 @@ export default function ErroresDesarrolloPage() {
         });
 
         // 4. Transform rendering structure
-        const updatedTickets = desBugs.map(b => ({
-          ...b,
-        }));
+        const updatedTickets = desBugs.map(b => {
+          const links = Array.isArray(b.linked_keys) ? b.linked_keys : [];
+          const sprints = [...new Set(links.map(lk => linkedStoriesMap[lk]).filter(Boolean))];
+          return {
+            ...b,
+            storySprint: sprints.join(', ') || '—'
+          };
+        });
 
         setTickets(updatedTickets);
       }

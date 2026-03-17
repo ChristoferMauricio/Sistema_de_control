@@ -50,13 +50,15 @@ export default function ErroresCertificacionPage() {
           });
         });
 
-        // 4. Transform rendering structure to show Actividades vinculadas in place of iteration
-        const updatedTickets = certBugs.map(b => ({
-          ...b,
-          // Hijack the summary field to show linked keys easily on TicketTable without massive refactors
-          // Usually, the app uses 'parent_key' for Epics, but for bugs we can append it conceptually
-          // We will render it directly as 'Actividades vinculadas' inside the Custom Table later on.
-        }));
+        // 4. Pass story sprints to table
+        const updatedTickets = certBugs.map(b => {
+          const links = Array.isArray(b.linked_keys) ? b.linked_keys : [];
+          const sprints = [...new Set(links.map(lk => linkedStoriesMap[lk]).filter(Boolean))];
+          return {
+            ...b,
+            storySprint: sprints.join(', ') || '—'
+          };
+        });
 
         setTickets(updatedTickets);
       }
