@@ -3,8 +3,145 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import * as XLSX from "xlsx-js-style";
+import JSZip from "jszip";
 import { Download } from "lucide-react";
 import { getCurrentSprint } from "@/lib/cronogramaData";
+
+// ── Helpers para generar XML de Tabla Dinámica (PivotTable OOXML) ──────────────
+
+function _xe(str) {
+    return String(str ?? "")
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+}
+
+const _SHEET4_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+           xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheetData/>
+</worksheet>`;
+
+const _SHEET4_RELS = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1"
+    Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotTable"
+    Target="../pivotTables/pivotTable1.xml"/>
+</Relationships>`;
+
+const _CACHE_DEF_RELS = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1"
+    Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheRecords"
+    Target="pivotCacheRecords1.xml"/>
+</Relationships>`;
+
+const _PIVOT_TABLE_RELS = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1"
+    Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheDefinition"
+    Target="../pivotCache/pivotCacheDefinition1.xml"/>
+</Relationships>`;
+
+function _buildCacheDef(rowsRaw, uSprints, uPersonas, uEstados, maxSP, spCount) {
+    const totalRows = rowsRaw.length + 1;
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<pivotCacheDefinition xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+  r:id="rId1" refreshedBy="Excel" refreshedDate="1" createdVersion="3"
+  refreshedVersion="3" recordCount="${rowsRaw.length}" upgradeOnRefresh="1">
+  <cacheSource type="worksheet">
+    <worksheetSource ref="A1:L${totalRows}" sheet="Detalle (Raw)"/>
+  </cacheSource>
+  <cacheFields count="12">
+    <cacheField name="Tipo" numFmtId="0"><sharedItems count="0"/></cacheField>
+    <cacheField name="Clave" numFmtId="0"><sharedItems count="0"/></cacheField>
+    <cacheField name="Resumen" numFmtId="0"><sharedItems count="0"/></cacheField>
+    <cacheField name="Subtareas" numFmtId="0"><sharedItems count="0"/></cacheField>
+    <cacheField name="Principal" numFmtId="0"><sharedItems count="0"/></cacheField>
+    <cacheField name="Épica" numFmtId="0"><sharedItems count="0"/></cacheField>
+    <cacheField name="Sprint" numFmtId="0">
+      <sharedItems containsSemiMixedTypes="0" containsNonDate="1" containsDate="0" count="${uSprints.length}">${uSprints.map(v => `<s v="${_xe(v)}"/>`).join("")}</sharedItems>
+    </cacheField>
+    <cacheField name="Persona asignada" numFmtId="0">
+      <sharedItems containsSemiMixedTypes="0" containsNonDate="1" containsDate="0" count="${uPersonas.length}">${uPersonas.map(v => `<s v="${_xe(v)}"/>`).join("")}</sharedItems>
+    </cacheField>
+    <cacheField name="Story Points" numFmtId="0">
+      <sharedItems containsSemiMixedTypes="0" containsNonDate="1" containsDate="0" containsString="0" minValue="0" maxValue="${maxSP}" count="${spCount}"/>
+    </cacheField>
+    <cacheField name="Estado" numFmtId="0">
+      <sharedItems containsSemiMixedTypes="0" containsNonDate="1" containsDate="0" count="${uEstados.length}">${uEstados.map(v => `<s v="${_xe(v)}"/>`).join("")}</sharedItems>
+    </cacheField>
+    <cacheField name="Informador" numFmtId="0"><sharedItems count="0"/></cacheField>
+    <cacheField name="Creada" numFmtId="0"><sharedItems count="0"/></cacheField>
+  </cacheFields>
+</pivotCacheDefinition>`;
+}
+
+function _buildCacheRecords(rowsRaw, sprintIdx, personaIdx, estadoIdx) {
+    const records = rowsRaw.map(row => {
+        const sIdx = sprintIdx[row["Sprint"] ?? ""] ?? 0;
+        const pIdx = personaIdx[row["Persona asignada"] ?? ""] ?? 0;
+        const eIdx = estadoIdx[row["Estado"] ?? ""] ?? 0;
+        const sp = row["Story Points"];
+        const spVal = (sp !== "" && sp != null) ? `<n v="${Number(sp)}"/>` : `<m/>`;
+        const claveVal = row["Clave"] ? `<s v="${_xe(row["Clave"])}"/>` : `<m/>`;
+        return `<r><m/>${claveVal}<m/><m/><m/><m/><x v="${sIdx}"/><x v="${pIdx}"/>${spVal}<x v="${eIdx}"/><m/><m/></r>`;
+    }).join("");
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<pivotCacheRecords xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+  count="${rowsRaw.length}">${records}</pivotCacheRecords>`;
+}
+
+function _buildPivotTable(uSprints, uPersonas, uEstados) {
+    const fieldItems = (arr) =>
+        arr.map((_, i) => `<item x="${i}"/>`).join("") + `<item t="default"/>`;
+
+    const rowItems = uPersonas.map((_, i) => `<i><x v="${i}"/></i>`).join("") + `<i t="grand"><x/></i>`;
+
+    let colItemsXml = "";
+    for (let i = 0; i < uEstados.length; i++) {
+        colItemsXml += `<i r="0"><x v="${i}"/><x v="0"/></i>`;
+        colItemsXml += `<i r="0" i="1"><x v="${i}"/><x v="1"/></i>`;
+    }
+    colItemsXml += `<i t="grand" r="0"><x v="0"/></i><i t="grand" r="0" i="1"><x v="1"/></i>`;
+    const colItemsCount = uEstados.length * 2 + 2;
+
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<pivotTableDefinition xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+  name="Tabla Dinámica1" cacheId="0" dataOnRows="0"
+  applyNumberFormats="0" applyBorderFormats="0" applyFontFormats="0"
+  applyPatternFormats="0" applyAlignmentFormats="0" applyWidthHeightFormats="1"
+  dataCaption="Valores" updatedVersion="3" minRefreshableVersion="3"
+  useAutoFormatting="1" itemPrintTitles="1" createdVersion="3"
+  indent="2" outline="1" outlineData="1" multipleFieldFilters="0">
+  <location ref="A1:Z50" firstHeaderRow="1" firstDataRow="2" firstDataCol="1" rowPageCount="1" colPageCount="1"/>
+  <pivotFields count="12">
+    <pivotField showAll="0"/>
+    <pivotField showAll="0"/>
+    <pivotField showAll="0"/>
+    <pivotField showAll="0"/>
+    <pivotField showAll="0"/>
+    <pivotField showAll="0"/>
+    <pivotField axis="axisPage" showAll="0"><items count="${uSprints.length + 1}">${fieldItems(uSprints)}</items></pivotField>
+    <pivotField axis="axisRow" showAll="0" outline="0" subtotalTop="0"><items count="${uPersonas.length + 1}">${fieldItems(uPersonas)}</items></pivotField>
+    <pivotField dataField="1" showAll="0"/>
+    <pivotField axis="axisCol" showAll="0" outline="0" subtotalTop="0"><items count="${uEstados.length + 1}">${fieldItems(uEstados)}</items></pivotField>
+    <pivotField showAll="0"/>
+    <pivotField showAll="0"/>
+  </pivotFields>
+  <rowFields count="1"><field x="7"/></rowFields>
+  <rowItems count="${uPersonas.length + 1}">${rowItems}</rowItems>
+  <colFields count="2"><field x="9"/><field x="-2"/></colFields>
+  <colItems count="${colItemsCount}">${colItemsXml}</colItems>
+  <pageFields count="1"><pageField fld="6" item="4294967294" hier="-1"/></pageFields>
+  <dataFields count="2">
+    <dataField name="Suma de Story Points" fld="8" baseField="0" baseItem="0"/>
+    <dataField name="Cuenta de Clave" fld="1" subtotal="count" baseField="0" baseItem="0"/>
+  </dataFields>
+</pivotTableDefinition>`;
+}
 
 // Mapeo de estados internos de Jira → nombres de columna para el reporte
 const STATUS_COLUMNS = [
@@ -628,7 +765,7 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
         setSubtasksModal({ assigneeName, subtasks: assigneeSubtasks });
     }
 
-    const exportToExcel = () => {
+    const exportToExcel = async () => {
         const now = new Date();
         const dateStr = now.toLocaleDateString("es-PE").replace(/\//g, "-");
 
@@ -776,7 +913,80 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
         XLSX.utils.book_append_sheet(wb, wsSP, "Story Points");
         XLSX.utils.book_append_sheet(wb, wsRaw, "Detalle (Raw)");
 
-        XLSX.writeFile(wb, `Reporte_Jira_${selectedSprint ? selectedSprint.replace(/\s+/g, '_') : 'Todos'}_${dateStr}.xlsx`);
+        // ── Inyectar Tabla Dinámica real (PivotTable OOXML) ───────────────────
+        try {
+            const uSprints  = [...new Set(rowsRaw.map(r => r["Sprint"] ?? ""))].sort();
+            const uPersonas = [...new Set(rowsRaw.map(r => r["Persona asignada"] ?? ""))].sort();
+            const uEstados  = [...new Set(rowsRaw.map(r => r["Estado"] ?? ""))].sort();
+            const sprintIdx  = Object.fromEntries(uSprints.map((v, i) => [v, i]));
+            const personaIdx = Object.fromEntries(uPersonas.map((v, i) => [v, i]));
+            const estadoIdx  = Object.fromEntries(uEstados.map((v, i) => [v, i]));
+            const maxSP   = Math.max(0, ...rowsRaw.map(r => Number(r["Story Points"]) || 0));
+            const spCount = rowsRaw.filter(r => r["Story Points"] !== "" && r["Story Points"] != null).length;
+
+            const xlsxBuf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+            const zip = await JSZip.loadAsync(xlsxBuf);
+
+            // Detectar número de relaciones existentes para asignar IDs únicos
+            const wbRelsRaw = await zip.file("xl/_rels/workbook.xml.rels").async("string");
+            const existingCount = (wbRelsRaw.match(/<Relationship /g) || []).length;
+            const sheet4RId = `rId${existingCount + 1}`;
+            const cacheRId  = `rId${existingCount + 2}`;
+
+            // Modificar [Content_Types].xml
+            let ctXml = await zip.file("[Content_Types].xml").async("string");
+            ctXml = ctXml.replace("</Types>",
+                `<Override PartName="/xl/worksheets/sheet4.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>` +
+                `<Override PartName="/xl/pivotCache/pivotCacheDefinition1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.pivotCacheDefinition+xml"/>` +
+                `<Override PartName="/xl/pivotCache/pivotCacheRecords1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.pivotCacheRecords+xml"/>` +
+                `<Override PartName="/xl/pivotTables/pivotTable1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.pivotTable+xml"/>` +
+                `</Types>`);
+            zip.file("[Content_Types].xml", ctXml);
+
+            // Modificar xl/_rels/workbook.xml.rels
+            const newWbRels = wbRelsRaw.replace("</Relationships>",
+                `<Relationship Id="${sheet4RId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet4.xml"/>` +
+                `<Relationship Id="${cacheRId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheDefinition" Target="pivotCache/pivotCacheDefinition1.xml"/>` +
+                `</Relationships>`);
+            zip.file("xl/_rels/workbook.xml.rels", newWbRels);
+
+            // Modificar xl/workbook.xml — agregar hoja + pivotCaches
+            let wbXml = await zip.file("xl/workbook.xml").async("string");
+            wbXml = wbXml.replace("</sheets>",
+                `<sheet name="Tabla Dinámica" sheetId="4" r:id="${sheet4RId}"/></sheets>`);
+            if (!wbXml.includes("<pivotCaches>")) {
+                wbXml = wbXml.replace("</workbook>",
+                    `<pivotCaches><pivotCache cacheId="0" r:id="${cacheRId}"/></pivotCaches></workbook>`);
+            }
+            zip.file("xl/workbook.xml", wbXml);
+
+            // Inyectar archivos nuevos
+            zip.file("xl/worksheets/sheet4.xml", _SHEET4_XML);
+            zip.file("xl/worksheets/_rels/sheet4.xml.rels", _SHEET4_RELS);
+            zip.file("xl/pivotCache/pivotCacheDefinition1.xml",
+                _buildCacheDef(rowsRaw, uSprints, uPersonas, uEstados, maxSP, spCount));
+            zip.file("xl/pivotCache/_rels/pivotCacheDefinition1.xml.rels", _CACHE_DEF_RELS);
+            zip.file("xl/pivotCache/pivotCacheRecords1.xml",
+                _buildCacheRecords(rowsRaw, sprintIdx, personaIdx, estadoIdx));
+            zip.file("xl/pivotTables/pivotTable1.xml",
+                _buildPivotTable(uSprints, uPersonas, uEstados));
+            zip.file("xl/pivotTables/_rels/pivotTable1.xml.rels", _PIVOT_TABLE_RELS);
+
+            // Descargar
+            const blob = await zip.generateAsync({ type: "blob" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `Reporte_Jira_${selectedSprint ? selectedSprint.replace(/\s+/g, '_') : 'Todos'}_${dateStr}.xlsx`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error("Error al generar Tabla Dinámica:", err);
+            // Fallback: descarga sin tabla dinámica
+            XLSX.writeFile(wb, `Reporte_Jira_${selectedSprint ? selectedSprint.replace(/\s+/g, '_') : 'Todos'}_${dateStr}.xlsx`);
+        }
     };
 
     return (
