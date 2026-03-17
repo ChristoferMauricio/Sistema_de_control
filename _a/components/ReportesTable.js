@@ -402,6 +402,38 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
     const [traceModal, setTraceModal] = useState(null); // { assigneeName, stories }
     const [subtasksModal, setSubtasksModal] = useState(null); // { assigneeName, subtasks }
 
+    // Helpers para tipos de issue
+    const isStory = (type) => (type || "").toLowerCase().includes("histori") || (type || "").toLowerCase() === "story";
+    const isSubtask = (type) => (type || "").toLowerCase().includes("subtare") || (type || "").toLowerCase().includes("sub-task") || (type || "").toLowerCase() === "subtask";
+    const isEpic = (type) => (type || "").toLowerCase().includes("epic") || (type || "").toLowerCase().includes("épica");
+
+    // Mapa completo de tickets O(1)
+    const ticketMap = useMemo(() => {
+        const map = {};
+        tickets.forEach((t) => { map[t.jira_key] = t; });
+        return map;
+    }, [tickets]);
+
+    // Resolver resumen de la Épica igual que en Vista General
+    const resolveEpic = useCallback((ticket) => {
+        if (!ticket) return null;
+        if (isEpic(ticket.issue_type)) return { key: ticket.jira_key, summary: ticket.summary };
+
+        if (isStory(ticket.issue_type) && ticket.parent_key) {
+            const parent = ticketMap[ticket.parent_key];
+            if (parent && isEpic(parent.issue_type)) return { key: parent.jira_key, summary: parent.summary };
+        }
+
+        if (isSubtask(ticket.issue_type) && ticket.parent_key) {
+            const parentStory = ticketMap[ticket.parent_key];
+            if (parentStory && isStory(parentStory.issue_type) && parentStory.parent_key) {
+                const grandParentEpic = ticketMap[parentStory.parent_key];
+                if (grandParentEpic && isEpic(grandParentEpic.issue_type)) return { key: grandParentEpic.jira_key, summary: grandParentEpic.summary };
+            }
+        }
+        return null;
+    }, [ticketMap]);
+
     // Solo Historias
     const historias = useMemo(() => {
         return tickets.filter((t) => t.issue_type === "Historia");
@@ -641,14 +673,20 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
         const wsSP = XLSX.utils.json_to_sheet(rowsSP, { header: headersSP });
 
         // --- Hoja 3: Historias filtradas (detalle) ---
-        const headersRaw = ["Clave", "Resumen", "Asignado", "Estado", "Sprint", "Story Points"];
+        const headersRaw = ["Tipo", "Clave", "Resumen", "Subtareas", "Principal", "Épica", "Sprint", "Persona asignada", "Story Points", "Estado", "Informador", "Creada"];
         const rowsRaw = filtered.map(t => ({
-            "Clave": t.jira_key,
-            "Resumen": t.summary,
-            "Asignado": resolveName(t.assignee_name),
-            "Estado": t.status,
+            "Tipo": t.issue_type || "",
+            "Clave": t.jira_key || "",
+            "Resumen": t.summary || "",
+            "Subtareas": t.subtask_keys?.join(", ") || "",
+            "Principal": t.parent_key || "",
+            "Épica": resolveEpic(t)?.summary || "",
             "Sprint": t.sprint || "",
-            "Story Points": t.story_points || ""
+            "Persona asignada": resolveName(t.assignee_name),
+            "Story Points": t.story_points ?? "",
+            "Estado": t.status || "",
+            "Informador": resolveName(t.reporter_name),
+            "Creada": t.created_at ? formatDate(t.created_at) : "",
         }));
         const wsRaw = XLSX.utils.json_to_sheet(rowsRaw, { header: headersRaw });
 
@@ -668,12 +706,18 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                 ];
             } else {
                 ws['!cols'] = [
+                    { wch: 10 }, // Tipo
                     { wch: 14 }, // Clave
-                    { wch: 55 }, // Resumen
-                    { wch: 18 }, // Asignado
+                    { wch: 45 }, // Resumen
+                    { wch: 20 }, // Subtareas
+                    { wch: 12 }, // Principal
+                    { wch: 30 }, // Épica
+                    { wch: 14 }, // Sprint
+                    { wch: 18 }, // Persona asignada
+                    { wch: 12 }, // Story Points
                     { wch: 16 }, // Estado
-                    { wch: 16 }, // Sprint
-                    { wch: 12 }  // Story Points
+                    { wch: 18 }, // Informador
+                    { wch: 16 }  // Creada
                 ];
             }
 
