@@ -10,7 +10,7 @@ import { useRole } from "@/app/dashboard/RoleContext";
 
 const PAGE_SIZE = 15;
 
-export default function TicketTable({ tickets = [], title, showAssignee = true, statusHistory = {} }) {
+export default function TicketTable({ tickets = [], title, showAssignee = true, statusHistory = {}, mode = "default" }) {
   const role = useRole();
   const [search, setSearch] = useState("");
   const [sortField, setSortField] = useState("updated_at");
@@ -455,88 +455,141 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
         className="overflow-x-auto"
       >
         <table className="w-full text-sm" style={{ minWidth: "1200px" }}>
-          <thead>
-            {/* Sortable header row */}
-            <tr className="border-b border-gray-100 text-gray-500 bg-gray-50/50">
-              <th onClick={() => toggleSort("issue_type")} className="text-left px-4 py-3 font-medium cursor-pointer hover:text-gray-900 transition-colors select-none whitespace-nowrap" style={{ minWidth: "110px" }}>
-                Tipo <SortIcon field="issue_type" />
-              </th>
-              <th onClick={() => toggleSort("comentario")} className="text-left px-4 py-3 font-medium cursor-pointer hover:text-gray-900 transition-colors select-none whitespace-nowrap" style={{ minWidth: "250px" }}>
-                Observaciones <SortIcon field="comentario" />
-              </th>
-              <th onClick={() => toggleSort("jira_key")} className="text-left px-4 py-3 font-medium cursor-pointer hover:text-gray-900 transition-colors select-none" style={{ minWidth: "100px" }}>
-                Clave <SortIcon field="jira_key" />
-              </th>
-              <th onClick={() => toggleSort("summary")} className="text-left px-4 py-3 font-medium cursor-pointer hover:text-gray-900 transition-colors select-none" style={{ minWidth: "200px" }}>
-                Resumen <SortIcon field="summary" />
-              </th>
-              <th className="text-left px-4 py-3 font-medium whitespace-nowrap" style={{ minWidth: "100px" }}>
-                Subtareas
-              </th>
-              <th className="text-left px-4 py-3 font-medium whitespace-nowrap" style={{ minWidth: "90px" }}>
-                Principal
-              </th>
-              <th onClick={() => toggleSort("epic")} className="text-left px-4 py-3 font-medium cursor-pointer hover:text-gray-900 transition-colors select-none whitespace-nowrap" style={{ minWidth: "160px" }}>
-                Épica <SortIcon field="epic" />
-              </th>
-              <th onClick={() => toggleSort("sprint")} className="text-left px-4 py-3 font-medium cursor-pointer hover:text-gray-900 transition-colors select-none whitespace-nowrap" style={{ minWidth: "130px" }}>
-                Sprint <SortIcon field="sprint" />
-              </th>
-              {showAssignee && (
-                <th onClick={() => toggleSort("assignee_name")} className="text-left px-4 py-3 font-medium cursor-pointer hover:text-gray-900 transition-colors select-none whitespace-nowrap" style={{ minWidth: "130px" }}>
-                  Asignado <SortIcon field="assignee_name" />
+          <thead className="text-xs uppercase bg-gray-50/80 text-gray-500 font-semibold sticky top-0 z-10 font-[family-name:var(--font-heading)] backdrop-blur-sm">
+            <tr>
+              {mode !== "errores" && (
+                <th
+                  onClick={() => toggleSort("issue_type")}
+                  className="px-4 py-3 cursor-pointer hover:bg-gray-100 transition-colors whitespace-nowrap"
+                  style={{ minWidth: "120px" }}
+                >
+                  Tipo <SortIcon field="issue_type" />
                 </th>
               )}
-              <th onClick={() => toggleSort("story_points")} className="text-center px-4 py-3 font-medium cursor-pointer hover:text-gray-900 transition-colors select-none whitespace-nowrap" style={{ minWidth: "50px" }}>
-                SP <SortIcon field="story_points" />
+              {mode !== "errores" && (
+                <th onClick={() => toggleSort("comentario")} className="px-4 py-3 cursor-pointer hover:bg-gray-100 transition-colors whitespace-nowrap" style={{ minWidth: "250px" }}>
+                  Observaciones <SortIcon field="comentario" />
+                </th>
+              )}
+              {mode !== "errores" && (
+                <th
+                  onClick={() => toggleSort("jira_key")}
+                  className="px-4 py-3 cursor-pointer hover:bg-gray-100 transition-colors whitespace-nowrap"
+                  style={{ minWidth: "90px" }}
+                >
+                  Clave <SortIcon field="jira_key" />
+                </th>
+              )}
+              {mode !== "errores" && (
+                <th
+                  onClick={() => toggleSort("summary")}
+                  className="px-4 py-3 cursor-pointer hover:bg-gray-100 transition-colors min-w-[200px]"
+                >
+                  Resumen <SortIcon field="summary" />
+                </th>
+              )}
+              {mode !== "errores" && (
+                <th className="px-4 py-3 font-medium min-w-[120px]">Subtareas</th>
+              )}
+              <th className="px-4 py-3 font-medium min-w-[120px]">
+                {mode === "errores" ? "Actividades vinculadas" : "Principal"}
               </th>
-              <th onClick={() => toggleSort("status")} className="text-left px-4 py-3 font-medium cursor-pointer hover:text-gray-900 transition-colors select-none whitespace-nowrap" style={{ minWidth: "110px" }}>
+              {mode !== "errores" && (
+                <th onClick={() => toggleSort("epic")} className="px-4 py-3 font-medium cursor-pointer hover:bg-gray-100 transition-colors whitespace-nowrap" style={{ minWidth: "160px" }}>
+                  Épica <SortIcon field="epic" />
+                </th>
+              )}
+              {mode !== "errores" && (
+                <th
+                  onClick={() => toggleSort("sprint")}
+                  className="px-4 py-3 cursor-pointer hover:bg-gray-100 transition-colors whitespace-nowrap"
+                  style={{ minWidth: "90px" }}
+                >
+                  Sprint <SortIcon field="sprint" />
+                </th>
+              )}
+              {showAssignee && (
+                <th
+                  onClick={() => toggleSort("assignee_name")}
+                  className="px-4 py-3 cursor-pointer hover:bg-gray-100 transition-colors whitespace-nowrap"
+                  style={{ minWidth: "140px" }}
+                >
+                  Persona asignada <SortIcon field="assignee_name" />
+                </th>
+              )}
+              {mode !== "errores" && (
+                <th className="px-4 py-3 font-medium text-center whitespace-nowrap" style={{ minWidth: "70px" }}>SP</th>
+              )}
+              <th
+                onClick={() => toggleSort("status")}
+                className="px-4 py-3 cursor-pointer hover:bg-gray-100 transition-colors whitespace-nowrap"
+                style={{ minWidth: "100px" }}
+              >
                 Estado <SortIcon field="status" />
               </th>
-              <th onClick={() => toggleSort("reporter_name")} className="text-left px-4 py-3 font-medium cursor-pointer hover:text-gray-900 transition-colors select-none whitespace-nowrap" style={{ minWidth: "130px" }}>
+              <th
+                onClick={() => toggleSort("reporter_name")}
+                className="px-4 py-3 cursor-pointer hover:bg-gray-100 transition-colors whitespace-nowrap"
+                style={{ minWidth: "140px" }}
+              >
                 Informador <SortIcon field="reporter_name" />
               </th>
-              <th onClick={() => toggleSort("created_at")} className="text-left px-4 py-3 font-medium cursor-pointer hover:text-gray-900 transition-colors select-none whitespace-nowrap" style={{ minWidth: "90px" }}>
-                Creada <SortIcon field="created_at" />
+              <th
+                onClick={() => toggleSort("created_at")}
+                className="px-4 py-3 cursor-pointer hover:bg-gray-100 transition-colors whitespace-nowrap"
+                style={{ minWidth: "90px" }}
+              >
+                {mode === "errores" ? "Fecha de Creación" : "Creada"} <SortIcon field="created_at" />
               </th>
-              <th className="text-center px-4 py-3 font-medium whitespace-nowrap" style={{ minWidth: "70px" }}>
-                Historial
-              </th>
+              {mode !== "errores" && (
+                <th className="text-center px-4 py-3 font-medium whitespace-nowrap" style={{ minWidth: "70px" }}>
+                  Historial
+                </th>
+              )}
             </tr>
 
             {/* Filter row */}
             <tr className="border-b border-gray-100 bg-gray-50/30">
-              <th className="px-4 py-2">
-                <FilterSelect value={filterType} onChange={setFilterType} options={uniqueTypes} placeholder="Todos" />
-              </th>
-              <th className="px-4 py-2">
-                <input
-                  type="text"
-                  value={filterComentario}
-                  onChange={(e) => { setFilterComentario(e.target.value); setCurrentPage(1); }}
-                  placeholder="Buscar observación..."
-                  className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[150px]"
-                />
-              </th>
-              <th className="px-4 py-2">
-                <input
-                  type="text"
-                  value={filterKey}
-                  onChange={(e) => { setFilterKey(e.target.value); setCurrentPage(1); }}
-                  placeholder="Buscar..."
-                  className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[80px]"
-                />
-              </th>
-              <th className="px-4 py-2">
-                <input
-                  type="text"
-                  value={filterSummary}
-                  onChange={(e) => { setFilterSummary(e.target.value); setCurrentPage(1); }}
-                  placeholder="Buscar..."
-                  className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[120px]"
-                />
-              </th>
-              <th className="px-4 py-2" /> {/* Subtareas */}
+              {mode !== "errores" && (
+                <th className="px-4 py-2">
+                  <FilterSelect value={filterType} onChange={setFilterType} options={uniqueTypes} placeholder="Todos" />
+                </th>
+              )}
+              {mode !== "errores" && (
+                <th className="px-4 py-2">
+                  <input
+                    type="text"
+                    value={filterComentario}
+                    onChange={(e) => { setFilterComentario(e.target.value); setCurrentPage(1); }}
+                    placeholder="Buscar observación..."
+                    className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[150px]"
+                  />
+                </th>
+              )}
+              {mode !== "errores" && (
+                <th className="px-4 py-2">
+                  <input
+                    type="text"
+                    value={filterKey}
+                    onChange={(e) => { setFilterKey(e.target.value); setCurrentPage(1); }}
+                    placeholder="Buscar..."
+                    className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[80px]"
+                  />
+                </th>
+              )}
+              {mode !== "errores" && (
+                <th className="px-4 py-2">
+                  <input
+                    type="text"
+                    value={filterSummary}
+                    onChange={(e) => { setFilterSummary(e.target.value); setCurrentPage(1); }}
+                    placeholder="Buscar..."
+                    className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[120px]"
+                  />
+                </th>
+              )}
+              {mode !== "errores" && <th className="px-4 py-2" />} {/* Subtareas */}
+              
               <th className="px-4 py-2">
                 <input
                   type="text"
@@ -546,24 +599,30 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
                   className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[80px]"
                 />
               </th>
-              <th className="px-4 py-2">
-                <input
-                  type="text"
-                  value={filterEpic}
-                  onChange={(e) => { setFilterEpic(e.target.value); setCurrentPage(1); }}
-                  placeholder="Buscar..."
-                  className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[120px]"
-                />
-              </th>
-              <th className="px-4 py-2">
-                <FilterSelect value={filterSprint} onChange={setFilterSprint} options={uniqueSprints} placeholder="Todos" />
-              </th>
+              
+              {mode !== "errores" && (
+                <th className="px-4 py-2">
+                  <input
+                    type="text"
+                    value={filterEpic}
+                    onChange={(e) => { setFilterEpic(e.target.value); setCurrentPage(1); }}
+                    placeholder="Buscar..."
+                    className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[120px]"
+                  />
+                </th>
+              )}
+              {mode !== "errores" && (
+                <th className="px-4 py-2">
+                  <FilterSelect value={filterSprint} onChange={setFilterSprint} options={uniqueSprints} placeholder="Todos" />
+                </th>
+              )}
+              
               {showAssignee && (
                 <th className="px-4 py-2">
                   <FilterSelect value={filterAssignee} onChange={setFilterAssignee} options={uniqueAssignees} placeholder="Todos" />
                 </th>
               )}
-              <th className="px-4 py-2" /> {/* SP */}
+              {mode !== "errores" && <th className="px-4 py-2" />} {/* SP */}
               <th className="px-4 py-2">
                 <FilterSelect value={filterStatus} onChange={setFilterStatus} options={uniqueStatuses} placeholder="Todos" />
               </th>
@@ -571,7 +630,7 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
                 <FilterSelect value={filterReporter} onChange={setFilterReporter} options={uniqueReporters} placeholder="Todos" />
               </th>
               <th className="px-4 py-2" /> {/* Creada */}
-              <th className="px-4 py-2" /> {/* Historial */}
+              {mode !== "errores" && <th className="px-4 py-2" />} {/* Historial */}
             </tr>
           </thead>
           <tbody>
@@ -601,88 +660,98 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
                 return (
                   <>
                     <tr key={ticket.id || ticket.jira_key} className="ticket-row border-b border-gray-200">
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium ${typeStyle.bg} ${typeStyle.text}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${typeStyle.dot}`} />
-                          {ticket.issue_type || "—"}
-                        </span>
-                      </td>
+                      {mode !== "errores" && (
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium ${typeStyle.bg} ${typeStyle.text}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${typeStyle.dot}`} />
+                            {ticket.issue_type || "—"}
+                          </span>
+                        </td>
+                      )}
 
                       {/* Observaciones (Comentario) */}
-                      <td className="px-4 py-3 align-top min-w-[250px]">
-                        {(() => {
-                          const currentVal = localComments[ticket.jira_key] !== undefined ? localComments[ticket.jira_key] : ticket.comentario;
-                          return (
-                            <div className="group relative flex flex-col gap-1">
-                              <div className="flex items-start justify-between gap-2">
-                                <div className="text-xs text-gray-700 max-h-[100px] overflow-y-auto prose prose-sm leading-relaxed whitespace-pre-wrap max-w-full break-words">
-                                  {currentVal ? (
-                                    <ReactMarkdown>{currentVal}</ReactMarkdown>
-                                  ) : (
-                                    <span className="text-gray-400 italic">Sin observaciones...</span>
+                      {mode !== "errores" && (
+                        <td className="px-4 py-3 align-top min-w-[250px]">
+                          {(() => {
+                            const currentVal = localComments[ticket.jira_key] !== undefined ? localComments[ticket.jira_key] : ticket.comentario;
+                            return (
+                              <div className="group relative flex flex-col gap-1">
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="text-xs text-gray-700 max-h-[100px] overflow-y-auto prose prose-sm leading-relaxed whitespace-pre-wrap max-w-full break-words">
+                                    {currentVal ? (
+                                      <ReactMarkdown>{currentVal}</ReactMarkdown>
+                                    ) : (
+                                      <span className="text-gray-400 italic">Sin observaciones...</span>
+                                    )}
+                                  </div>
+                                  {role !== "viewer" && (
+                                    <button
+                                      onClick={() => setEditingComment({ 
+                                        key: ticket.jira_key, 
+                                        summary: ticket.summary,
+                                        story_points: ticket.story_points,
+                                        currentText: currentVal || "" 
+                                      })}
+                                      className="shrink-0 p-1.5 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded opacity-0 group-hover:opacity-100 transition-all focus:opacity-100"
+                                      title="Editar observación"
+                                    >
+                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                      </svg>
+                                    </button>
                                   )}
                                 </div>
-                                {role !== "viewer" && (
-                                  <button
-                                    onClick={() => setEditingComment({ 
-                                      key: ticket.jira_key, 
-                                      summary: ticket.summary,
-                                      story_points: ticket.story_points,
-                                      currentText: currentVal || "" 
-                                    })}
-                                    className="shrink-0 p-1.5 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded opacity-0 group-hover:opacity-100 transition-all focus:opacity-100"
-                                    title="Editar observación"
-                                  >
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                      <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                                    </svg>
-                                  </button>
-                                )}
                               </div>
-                            </div>
-                          );
-                        })()}
-                      </td>
+                            );
+                          })()}
+                        </td>
+                      )}
 
                       {/* Clave */}
-                      <td className="px-4 py-3">
-                        <a
-                          href={`https://supervisorservicio2020.atlassian.net/browse/${ticket.jira_key}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="font-mono text-xs font-semibold text-orange-600 bg-orange-50 px-2 py-1 rounded-md whitespace-nowrap hover:underline hover:text-orange-800"
-                        >
-                          {ticket.jira_key}
-                        </a>
-                      </td>
+                      {mode !== "errores" && (
+                        <td className="px-4 py-3">
+                          <a
+                            href={`https://supervisorservicio2020.atlassian.net/browse/${ticket.jira_key}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-mono text-xs font-semibold text-orange-600 bg-orange-50 px-2 py-1 rounded-md whitespace-nowrap hover:underline hover:text-orange-800"
+                          >
+                            {ticket.jira_key}
+                          </a>
+                        </td>
+                      )}
 
                       {/* Resumen */}
-                      <td className="px-4 py-3 text-gray-800 max-w-xs">
-                        <span title={ticket.summary}>{truncate(ticket.summary, 45)}</span>
-                      </td>
+                      {mode !== "errores" && (
+                        <td className="px-4 py-3 text-gray-800 max-w-xs">
+                          <span title={ticket.summary}>{truncate(ticket.summary, 45)}</span>
+                        </td>
+                      )}
 
                       {/* Subtareas — solo para Historia */}
-                      <td className="px-4 py-3">
-                        {isStory(ticket.issue_type) && ticket.subtask_keys?.length > 0 ? (
-                          <div className="flex flex-wrap gap-1">
-                            {ticket.subtask_keys.map((sk) => (
-                              <a
-                                key={sk}
-                                href={`https://supervisorservicio2020.atlassian.net/browse/${sk}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-[10px] font-mono bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded hover:underline hover:text-blue-600 hover:bg-blue-50"
-                              >
-                                {sk}
-                              </a>
-                            ))}
-                          </div>
-                        ) : !isStory(ticket.issue_type) && ['Bug', 'Error', 'Error Desarrollo', 'Error Certificación'].includes(ticket.issue_type) ? (
-                            <span className="text-gray-400 text-xs italic">N/A</span>
-                        ) : (
-                          <span className="text-gray-300 text-xs">—</span>
-                        )}
-                      </td>
+                      {mode !== "errores" && (
+                        <td className="px-4 py-3">
+                          {isStory(ticket.issue_type) && ticket.subtask_keys?.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {ticket.subtask_keys.map((sk) => (
+                                <a
+                                  key={sk}
+                                  href={`https://supervisorservicio2020.atlassian.net/browse/${sk}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-[10px] font-mono bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded hover:underline hover:text-blue-600 hover:bg-blue-50"
+                                >
+                                  {sk}
+                                </a>
+                              ))}
+                            </div>
+                          ) : !isStory(ticket.issue_type) && ['Bug', 'Error', 'Error Desarrollo', 'Error Certificación'].includes(ticket.issue_type) ? (
+                              <span className="text-gray-400 text-xs italic">N/A</span>
+                          ) : (
+                            <span className="text-gray-300 text-xs">—</span>
+                          )}
+                        </td>
+                      )}
 
                       {/* Principal — solo para Subtarea o Historia, o "Actividades vinculadas" para Errores  */}
                       <td className="px-4 py-3">
@@ -715,38 +784,42 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
                       </td>
 
                       {/* Épica */}
-                      <td className="px-4 py-3 text-gray-800 max-w-[160px]">
-                        {(() => {
-                          const epic = resolveEpic(ticket);
-                          if (!epic) return <span className="text-gray-300 text-xs">—</span>;
-                          return (
-                            <div className="flex flex-col gap-0.5" title={epic.summary}>
-                              <a
-                                href={`https://supervisorservicio2020.atlassian.net/browse/${epic.key}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="font-mono text-[10px] text-blue-600 hover:text-blue-800 hover:underline inline-block w-max"
-                              >
-                                {epic.key}
-                              </a>
-                              <span className="text-xs truncate block text-gray-700">
-                                {epic.summary}
-                              </span>
-                            </div>
-                          );
-                        })()}
-                      </td>
+                      {mode !== "errores" && (
+                        <td className="px-4 py-3 text-gray-800 max-w-[160px]">
+                          {(() => {
+                            const epic = resolveEpic(ticket);
+                            if (!epic) return <span className="text-gray-300 text-xs">—</span>;
+                            return (
+                              <div className="flex flex-col gap-0.5" title={epic.summary}>
+                                <a
+                                  href={`https://supervisorservicio2020.atlassian.net/browse/${epic.key}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="font-mono text-[10px] text-blue-600 hover:text-blue-800 hover:underline inline-block w-max"
+                                >
+                                  {epic.key}
+                                </a>
+                                <span className="text-xs truncate block text-gray-700">
+                                  {epic.summary}
+                                </span>
+                              </div>
+                            );
+                          })()}
+                        </td>
+                      )}
 
                       {/* Sprint */}
-                      <td className="px-4 py-3">
-                        {ticket.sprint ? (
-                          <span className="text-xs text-gray-700 bg-gray-100 px-2 py-1 rounded-md whitespace-nowrap">
-                            {ticket.sprint}
-                          </span>
-                        ) : (
-                          <span className="text-gray-300 text-xs">—</span>
-                        )}
-                      </td>
+                      {mode !== "errores" && (
+                        <td className="px-4 py-3">
+                          {ticket.sprint ? (
+                            <span className="text-xs text-gray-700 bg-gray-100 px-2 py-1 rounded-md whitespace-nowrap">
+                              {ticket.sprint}
+                            </span>
+                          ) : (
+                            <span className="text-gray-300 text-xs">—</span>
+                          )}
+                        </td>
+                      )}
 
                       {/* Asignado */}
                       {showAssignee && (
@@ -756,19 +829,21 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
                       )}
 
                       {/* Story Points — solo para Historia */}
-                      <td className="px-4 py-3 text-center">
-                        {isStory(ticket.issue_type) && ticket.story_points != null ? (
-                          <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-amber-50 text-amber-700 text-xs font-bold">
-                            {ticket.story_points}
-                          </span>
-                        ) : (
-                          <span className="text-gray-300 text-xs">—</span>
-                        )}
-                      </td>
+                      {mode !== "errores" && (
+                        <td className="px-4 py-3 text-center">
+                          {isStory(ticket.issue_type) && ticket.story_points != null ? (
+                            <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-amber-50 text-amber-700 text-xs font-bold">
+                              {ticket.story_points}
+                            </span>
+                          ) : (
+                            <span className="text-gray-300 text-xs">—</span>
+                          )}
+                        </td>
+                      )}
 
                       {/* Estado — solo para Historia */}
                       <td className="px-4 py-3">
-                        {isStory(ticket.issue_type) ? (
+                        {isStory(ticket.issue_type) || mode === "errores" ? (
                           <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ${statusColor.bg} ${statusColor.text}`}>
                             {ticket.status}
                           </span>
@@ -785,31 +860,33 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
                       {/* Creada */}
                       <td className="px-4 py-3">
                         <span className="text-gray-400 text-xs whitespace-nowrap" title={formatDate(ticket.created_at)}>
-                          {timeAgo(ticket.created_at)}
+                          {mode === "errores" ? formatDate(ticket.created_at) : timeAgo(ticket.created_at)}
                         </span>
                       </td>
 
                       {/* Historial de estados — No aplica para Subtarea ni Épica */}
-                      <td className="px-4 py-3 text-center">
-                        {hasStatusHistory(ticket.issue_type) && history.length > 0 ? (
-                          <button
-                            onClick={() => setExpandedRow(isExpanded ? null : ticket.jira_key)}
-                            className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-colors ${isExpanded
-                              ? "bg-orange-50 text-orange-600 border border-orange-200"
-                              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                              }`}
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            {history.length}
-                          </button>
-                        ) : hasStatusHistory(ticket.issue_type) ? (
-                          <span className="text-gray-300 text-xs">0</span>
-                        ) : (
-                          <span className="text-gray-300 text-xs">—</span>
-                        )}
-                      </td>
+                      {mode !== "errores" && (
+                        <td className="text-center px-4 py-3">
+                          {hasStatusHistory(ticket.issue_type) && history.length > 0 ? (
+                            <button
+                              onClick={() => setExpandedRow(isExpanded ? null : ticket.jira_key)}
+                              className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-colors ${isExpanded
+                                ? "bg-orange-50 text-orange-600 border border-orange-200"
+                                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                                }`}
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              {history.length}
+                            </button>
+                          ) : hasStatusHistory(ticket.issue_type) ? (
+                            <span className="text-gray-300 text-xs">0</span>
+                          ) : (
+                            <span className="text-gray-300 text-xs">—</span>
+                          )}
+                        </td>
+                      )}
                     </tr>
 
                     {/* Expanded: Status History Timeline */}

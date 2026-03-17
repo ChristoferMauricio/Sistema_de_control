@@ -84,7 +84,7 @@ async function searchJira(jql) {
     // Campos: key, summary, status, assignee, priority, issuetype, created, updated
     //         + sprint (customfield_10020), story_points (customfield_10016),
     //         + reporter, parent, subtasks
-    const fields = "key,summary,status,assignee,priority,issuetype,created,updated,reporter,parent,subtasks,customfield_10036,customfield_10020";
+    const fields = "key,summary,status,assignee,priority,issuetype,created,updated,reporter,parent,subtasks,customfield_10036,customfield_10020,issuelinks";
     const params = new URLSearchParams({
       jql,
       maxResults: String(maxResults),
@@ -146,6 +146,14 @@ function extractSprintName(sprintField) {
  */
 function transformIssue(issue) {
   const fields = issue.fields || {};
+
+  // Extract linked issue keys from issuelinks
+  const linkedKeys = (fields.issuelinks || []).reduce((acc, link) => {
+    if (link.inwardIssue?.key) acc.push(link.inwardIssue.key);
+    if (link.outwardIssue?.key) acc.push(link.outwardIssue.key);
+    return acc;
+  }, []);
+
   return {
     jira_key: issue.key,
     summary: fields.summary || "",
@@ -162,6 +170,7 @@ function transformIssue(issue) {
     subtask_keys: fields.subtasks && fields.subtasks.length > 0
       ? fields.subtasks.map(s => s.key)
       : null,
+    linked_keys: linkedKeys.length > 0 ? linkedKeys : null,
     created_at: fields.created || null,
     updated_at: fields.updated || null,
     synced_at: new Date().toISOString(),

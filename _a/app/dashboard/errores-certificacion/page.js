@@ -19,6 +19,8 @@ export default function ErroresCertificacionPage() {
         .eq("sprint", "Tablero Sprint 2")
         .order("updated_at", { ascending: false });
 
+      console.log("[Errores Certificación] PF3QA bugs encontrados:", bugsQA?.length, error);
+
       if (!error && bugsQA && bugsQA.length > 0) {
         // 2. Extract unique linked keys
         const allLinkedKeys = Array.from(new Set(
@@ -110,7 +112,7 @@ export default function ErroresCertificacionPage() {
       </div>
 
       {/* Table */}
-      <TicketTable tickets={tickets} title="Tickets en Certificación" />
+      <TicketTable tickets={tickets} title="Tickets en Certificación" mode="errores" />
     </div>
   );
 }

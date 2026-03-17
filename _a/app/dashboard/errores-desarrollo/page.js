@@ -107,7 +107,7 @@ export default function ErroresDesarrolloPage() {
       </div>
 
       {/* Table */}
-      <TicketTable tickets={tickets} title="Tickets en Desarrollo" />
+      <TicketTable tickets={tickets} title="Tickets en Desarrollo" mode="errores" />
     </div>
   );
 }
