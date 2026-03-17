@@ -75,8 +75,39 @@ export default function DashboardPage() {
     if (allData.length > 0) {
       setTickets(allData);
 
-      const certTickets = allData.filter(t => (t.issue_type === "Historia" || t.issue_type === "Story") && t.parent_key === "PF3QA-49");
-      const desTickets = allData.filter(t => (t.issue_type === "Historia" || t.issue_type === "Story") && t.parent_key === "PF3QA-50");
+      const pf3Tickets = allData.filter(t => t.jira_key?.startsWith("PF3-"));
+
+      // --- Errores classification via linked_keys ---
+      const bugsQA = allData.filter(t =>
+        ["Bug", "Error", "Error Desarrollo", "Error Certificación", "Error en Certificación"].includes(t.issue_type) &&
+        t.jira_key?.startsWith("PF3QA-") &&
+        t.sprint === "Tablero Sprint 2"
+      );
+
+      // Build a map of linked PF3 story sprints
+      const linkedStoriesMap = {};
+      const allLinkedKeys = Array.from(new Set(
+        bugsQA.flatMap(bug => (Array.isArray(bug.linked_keys) ? bug.linked_keys : []))
+      ));
+      pf3Tickets
+        .filter(t => allLinkedKeys.includes(t.jira_key))
+        .forEach(t => { linkedStoriesMap[t.jira_key] = t.sprint || ""; });
+
+      const certBugs = bugsQA.filter(bug => {
+        const links = Array.isArray(bug.linked_keys) ? bug.linked_keys : [];
+        return links.some(lk => {
+          const s = linkedStoriesMap[lk] || "";
+          return s.includes("F3.01") || s.includes("F3.02");
+        });
+      });
+
+      const desBugs = bugsQA.filter(bug => {
+        const links = Array.isArray(bug.linked_keys) ? bug.linked_keys : [];
+        return links.some(lk => {
+          const s = linkedStoriesMap[lk] || "";
+          return s.includes("F3.03") || s.includes("F3.4") || s.includes("F3.5");
+        });
+      });
 
       const countStatuses = (arr) => {
         const porHacer = arr.filter(t => ["por hacer", "tareas por hacer", "to do", "abierto", "open"].includes((t.status || "").toLowerCase())).length;
@@ -90,8 +121,8 @@ export default function DashboardPage() {
         pendientes: allData.filter(
           (t) => !["Done", "Cerrado", "Terminada"].some((s) => (t.status || "").includes(s))
         ).length,
-        certificacion: countStatuses(certTickets),
-        desarrollo: countStatuses(desTickets),
+        certificacion: countStatuses(certBugs),
+        desarrollo: countStatuses(desBugs),
       });
     }
 
