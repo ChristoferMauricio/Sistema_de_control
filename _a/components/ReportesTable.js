@@ -42,23 +42,23 @@ const _PIVOT_TABLE_RELS = `<?xml version="1.0" encoding="UTF-8" standalone="yes"
     Target="../pivotCache/pivotCacheDefinition1.xml"/>
 </Relationships>`;
 
-function _buildCacheDef(rowsRaw, uSprints, uPersonas, uEstados, maxSP, spCount) {
+function _buildCacheDef(rowsRaw, uSprints, uPersonas, uEstados, maxSP) {
     const totalRows = rowsRaw.length + 1;
     return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <pivotCacheDefinition xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
   xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
-  r:id="rId1" refreshedBy="Excel" refreshedDate="1" createdVersion="3"
-  refreshedVersion="3" recordCount="${rowsRaw.length}" upgradeOnRefresh="1">
+  r:id="rId1" createdVersion="3" refreshedVersion="3" minRefreshableVersion="3"
+  recordCount="${rowsRaw.length}">
   <cacheSource type="worksheet">
     <worksheetSource ref="A1:L${totalRows}" sheet="Detalle (Raw)"/>
   </cacheSource>
   <cacheFields count="12">
     <cacheField name="Tipo" numFmtId="0"><sharedItems count="0"/></cacheField>
-    <cacheField name="Clave" numFmtId="0"><sharedItems count="0"/></cacheField>
+    <cacheField name="Clave" numFmtId="0"><sharedItems containsString="1" count="0"/></cacheField>
     <cacheField name="Resumen" numFmtId="0"><sharedItems count="0"/></cacheField>
     <cacheField name="Subtareas" numFmtId="0"><sharedItems count="0"/></cacheField>
     <cacheField name="Principal" numFmtId="0"><sharedItems count="0"/></cacheField>
-    <cacheField name="Épica" numFmtId="0"><sharedItems count="0"/></cacheField>
+    <cacheField name="&#201;pica" numFmtId="0"><sharedItems count="0"/></cacheField>
     <cacheField name="Sprint" numFmtId="0">
       <sharedItems containsSemiMixedTypes="0" containsNonDate="1" containsDate="0" count="${uSprints.length}">${uSprints.map(v => `<s v="${_xe(v)}"/>`).join("")}</sharedItems>
     </cacheField>
@@ -66,7 +66,7 @@ function _buildCacheDef(rowsRaw, uSprints, uPersonas, uEstados, maxSP, spCount) 
       <sharedItems containsSemiMixedTypes="0" containsNonDate="1" containsDate="0" count="${uPersonas.length}">${uPersonas.map(v => `<s v="${_xe(v)}"/>`).join("")}</sharedItems>
     </cacheField>
     <cacheField name="Story Points" numFmtId="0">
-      <sharedItems containsSemiMixedTypes="0" containsNonDate="1" containsDate="0" containsString="0" minValue="0" maxValue="${maxSP}" count="${spCount}"/>
+      <sharedItems containsString="0" containsNumber="1" containsInteger="1" minValue="0" maxValue="${maxSP}" count="0"/>
     </cacheField>
     <cacheField name="Estado" numFmtId="0">
       <sharedItems containsSemiMixedTypes="0" containsNonDate="1" containsDate="0" count="${uEstados.length}">${uEstados.map(v => `<s v="${_xe(v)}"/>`).join("")}</sharedItems>
@@ -83,7 +83,8 @@ function _buildCacheRecords(rowsRaw, sprintIdx, personaIdx, estadoIdx) {
         const pIdx = personaIdx[row["Persona asignada"] ?? ""] ?? 0;
         const eIdx = estadoIdx[row["Estado"] ?? ""] ?? 0;
         const sp = row["Story Points"];
-        const spVal = (sp !== "" && sp != null) ? `<n v="${Number(sp)}"/>` : `<m/>`;
+        const spNum = Number(sp);
+        const spVal = (sp !== "" && sp != null && !isNaN(spNum)) ? `<n v="${spNum}"/>` : `<m/>`;
         const claveVal = row["Clave"] ? `<s v="${_xe(row["Clave"])}"/>` : `<m/>`;
         return `<r><m/>${claveVal}<m/><m/><m/><m/><x v="${sIdx}"/><x v="${pIdx}"/>${spVal}<x v="${eIdx}"/><m/><m/></r>`;
     }).join("");
@@ -97,20 +98,25 @@ function _buildPivotTable(uSprints, uPersonas, uEstados) {
     const fieldItems = (arr) =>
         arr.map((_, i) => `<item x="${i}"/>`).join("") + `<item t="default"/>`;
 
-    const rowItems = uPersonas.map((_, i) => `<i><x v="${i}"/></i>`).join("") + `<i t="grand"><x/></i>`;
+    // rowItems: una <i> por persona + grand total sin hijos
+    const rowItems = uPersonas.map((_, i) => `<i><x v="${i}"/></i>`).join("") + `<i t="grand"/>`;
 
+    // colItems: colFields = [Estado(9), Values(-2)]
+    // cada <i> tiene 2 <x>: primero el índice de Estado, segundo el índice del campo de datos (0 o 1)
     let colItemsXml = "";
     for (let i = 0; i < uEstados.length; i++) {
-        colItemsXml += `<i r="0"><x v="${i}"/><x v="0"/></i>`;
-        colItemsXml += `<i r="0" i="1"><x v="${i}"/><x v="1"/></i>`;
+        colItemsXml += `<i><x v="${i}"/><x v="0"/></i>`;   // Estado[i], Suma SP
+        colItemsXml += `<i><x v="${i}"/><x v="1"/></i>`;   // Estado[i], Cuenta Clave
     }
-    colItemsXml += `<i t="grand" r="0"><x v="0"/></i><i t="grand" r="0" i="1"><x v="1"/></i>`;
+    // grand totals: uno por campo de datos
+    colItemsXml += `<i t="grand"><x v="0"/></i>`;
+    colItemsXml += `<i t="grand"><x v="1"/></i>`;
     const colItemsCount = uEstados.length * 2 + 2;
 
     return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <pivotTableDefinition xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
   xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
-  name="Tabla Dinámica1" cacheId="0" dataOnRows="0"
+  name="Tabla Dinamica1" cacheId="0" dataOnRows="0"
   applyNumberFormats="0" applyBorderFormats="0" applyFontFormats="0"
   applyPatternFormats="0" applyAlignmentFormats="0" applyWidthHeightFormats="1"
   dataCaption="Valores" updatedVersion="3" minRefreshableVersion="3"
@@ -137,8 +143,8 @@ function _buildPivotTable(uSprints, uPersonas, uEstados) {
   <colItems count="${colItemsCount}">${colItemsXml}</colItems>
   <pageFields count="1"><pageField fld="6" item="4294967294" hier="-1"/></pageFields>
   <dataFields count="2">
-    <dataField name="Suma de Story Points" fld="8" baseField="0" baseItem="0"/>
-    <dataField name="Cuenta de Clave" fld="1" subtotal="count" baseField="0" baseItem="0"/>
+    <dataField name="Suma de Story Points" fld="8" subtotal="sum"/>
+    <dataField name="Cuenta de Clave" fld="1" subtotal="count"/>
   </dataFields>
 </pivotTableDefinition>`;
 }
@@ -921,8 +927,7 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
             const sprintIdx  = Object.fromEntries(uSprints.map((v, i) => [v, i]));
             const personaIdx = Object.fromEntries(uPersonas.map((v, i) => [v, i]));
             const estadoIdx  = Object.fromEntries(uEstados.map((v, i) => [v, i]));
-            const maxSP   = Math.max(0, ...rowsRaw.map(r => Number(r["Story Points"]) || 0));
-            const spCount = rowsRaw.filter(r => r["Story Points"] !== "" && r["Story Points"] != null).length;
+            const maxSP = Math.max(0, ...rowsRaw.map(r => Number(r["Story Points"]) || 0));
 
             const xlsxBuf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
             const zip = await JSZip.loadAsync(xlsxBuf);
@@ -953,7 +958,7 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
             // Modificar xl/workbook.xml — agregar hoja + pivotCaches
             let wbXml = await zip.file("xl/workbook.xml").async("string");
             wbXml = wbXml.replace("</sheets>",
-                `<sheet name="Tabla Dinámica" sheetId="4" r:id="${sheet4RId}"/></sheets>`);
+                `<sheet name="Tabla Din&#225;mica" sheetId="4" r:id="${sheet4RId}"/></sheets>`);
             if (!wbXml.includes("<pivotCaches>")) {
                 wbXml = wbXml.replace("</workbook>",
                     `<pivotCaches><pivotCache cacheId="0" r:id="${cacheRId}"/></pivotCaches></workbook>`);
@@ -964,7 +969,7 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
             zip.file("xl/worksheets/sheet4.xml", _SHEET4_XML);
             zip.file("xl/worksheets/_rels/sheet4.xml.rels", _SHEET4_RELS);
             zip.file("xl/pivotCache/pivotCacheDefinition1.xml",
-                _buildCacheDef(rowsRaw, uSprints, uPersonas, uEstados, maxSP, spCount));
+                _buildCacheDef(rowsRaw, uSprints, uPersonas, uEstados, maxSP));
             zip.file("xl/pivotCache/_rels/pivotCacheDefinition1.xml.rels", _CACHE_DEF_RELS);
             zip.file("xl/pivotCache/pivotCacheRecords1.xml",
                 _buildCacheRecords(rowsRaw, sprintIdx, personaIdx, estadoIdx));
