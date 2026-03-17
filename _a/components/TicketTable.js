@@ -457,6 +457,15 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
         <table className="w-full text-sm" style={{ minWidth: "1200px" }}>
           <thead className="text-xs uppercase bg-gray-50/80 text-gray-500 font-semibold sticky top-0 z-10 font-[family-name:var(--font-heading)] backdrop-blur-sm">
             <tr>
+              {mode === "errores" && (
+                <th
+                  onClick={() => toggleSort("jira_key")}
+                  className="px-4 py-3 cursor-pointer hover:bg-gray-100 transition-colors whitespace-nowrap"
+                  style={{ minWidth: "100px" }}
+                >
+                  Código <SortIcon field="jira_key" />
+                </th>
+              )}
               {mode !== "errores" && (
                 <th
                   onClick={() => toggleSort("issue_type")}
@@ -550,6 +559,17 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
 
             {/* Filter row */}
             <tr className="border-b border-gray-100 bg-gray-50/30">
+              {mode === "errores" && (
+                <th className="px-4 py-2">
+                  <input
+                    type="text"
+                    value={filterKey}
+                    onChange={(e) => { setFilterKey(e.target.value); setCurrentPage(1); }}
+                    placeholder="Buscar..."
+                    className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[80px]"
+                  />
+                </th>
+              )}
               {mode !== "errores" && (
                 <th className="px-4 py-2">
                   <FilterSelect value={filterType} onChange={setFilterType} options={uniqueTypes} placeholder="Todos" />
@@ -660,6 +680,18 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
                 return (
                   <>
                     <tr key={ticket.id || ticket.jira_key} className="ticket-row border-b border-gray-200">
+                      {mode === "errores" && (
+                        <td className="px-4 py-3">
+                          <a
+                            href={`https://supervisorservicio2020.atlassian.net/browse/${ticket.jira_key}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-mono text-xs font-semibold text-orange-600 bg-orange-50 px-2 py-1 rounded-md whitespace-nowrap hover:underline hover:text-orange-800"
+                          >
+                            {ticket.jira_key}
+                          </a>
+                        </td>
+                      )}
                       {mode !== "errores" && (
                         <td className="px-4 py-3">
                           <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium ${typeStyle.bg} ${typeStyle.text}`}>
