@@ -39,24 +39,33 @@ const navItems = [
     roles: ["admin", "developer", "qa", "viewer"],
   },
   {
-    label: "Errores Certificación",
-    href: "/dashboard/errores-certificacion",
-    icon: (
-      <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-      </svg>
-    ),
-    roles: ["admin", "developer", "qa", "viewer"],
-  },
-  {
-    label: "Errores Desarrollo",
-    href: "/dashboard/errores-desarrollo",
+    label: "Errores",
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
       </svg>
     ),
     roles: ["admin", "developer", "qa", "viewer"],
+    subItems: [
+      {
+        label: "Errores Certificación",
+        href: "/dashboard/errores-certificacion",
+        icon: (
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+          </svg>
+        ),
+      },
+      {
+        label: "Errores Desarrollo",
+        href: "/dashboard/errores-desarrollo",
+        icon: (
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.736 3h4.018a2 2 0 011.789 1.106l1.5 3a2 2 0 01-1.789 2.894zM16 17v5m-4-2.5h8" />
+          </svg>
+        ),
+      }
+    ]
   },
   {
     label: "Observ. del Supervisor",
@@ -80,24 +89,33 @@ const navItems = [
     roles: ["admin", "developer", "qa", "viewer"],
   },
   {
-    label: "Equipo de Desarrollo",
-    href: "/dashboard/equipo",
+    label: "Información",
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
     ),
     roles: ["admin", "developer", "qa", "viewer"],
-  },
-  {
-    label: "Información GSM",
-    href: "/dashboard/gsm",
-    icon: (
-      <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-      </svg>
-    ),
-    roles: ["admin", "developer", "qa", "viewer"],
+    subItems: [
+      {
+        label: "Equipo de Desarrollo",
+        href: "/dashboard/equipo",
+        icon: (
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+          </svg>
+        ),
+      },
+      {
+        label: "Información GSM",
+        href: "/dashboard/gsm",
+        icon: (
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+          </svg>
+        ),
+      },
+    ]
   },
   {
     label: "Incidencias",
@@ -126,12 +144,27 @@ export default function DashboardNav({ user, role }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
+  
+  // By default expand drops if child path is active
+  const [openDropdowns, setOpenDropdowns] = useState(() => {
+    const drops = {};
+    navItems.forEach(item => {
+      if (item.subItems && item.subItems.some(sub => sub.href === pathname)) {
+        drops[item.label] = true;
+      }
+    });
+    return drops;
+  });
 
   const [counts, setCounts] = useState({
     certificacion: 0,
     desarrollo: 0,
     observaciones: 0
   });
+
+  const toggleDropdown = (label) => {
+    setOpenDropdowns(prev => ({ ...prev, [label]: !prev[label] }));
+  };
 
   useEffect(() => {
     async function fetchCounts() {
@@ -256,13 +289,127 @@ export default function DashboardNav({ user, role }) {
             Navegación
           </p>
           {visibleItems.map((item, index) => {
-            const isActive = pathname === item.href;
-            
+            const hasSubmenu = !!item.subItems;
+            const isChildActive = hasSubmenu && item.subItems.some(sub => sub.href === pathname);
+            const isActive = pathname === item.href || isChildActive;
+
             let badgeCount = null;
             if (item.label === "Errores Certificación") badgeCount = counts.certificacion;
             if (item.label === "Errores Desarrollo") badgeCount = counts.desarrollo;
             if (item.label === "Observ. del Supervisor") badgeCount = counts.observaciones;
 
+            // Render Subitem Parent Toggle Structure
+            if (hasSubmenu) {
+              const isOpen = openDropdowns[item.label];
+              
+              // Custom parent badges for Errores
+              let parentBadges = null;
+              if (item.label === "Errores") {
+                const hasCert = counts.certificacion > 0;
+                const hasDes = counts.desarrollo > 0;
+                
+                if (hasCert || hasDes) {
+                  parentBadges = (
+                    <div className="flex gap-1.5">
+                      {hasCert && (
+                        <span className={`px-1.5 py-0.5 text-[9px] font-bold uppercase rounded border ${
+                          isActive ? "bg-red-100 text-red-700 border-red-200" : "bg-red-50 text-red-600 border-red-100"
+                        }`}>
+                          Cert {counts.certificacion}
+                        </span>
+                      )}
+                      {hasDes && (
+                        <span className={`px-1.5 py-0.5 text-[9px] font-bold uppercase rounded border ${
+                          isActive ? "bg-amber-100 text-amber-700 border-amber-200" : "bg-amber-50 text-amber-600 border-amber-100"
+                        }`}>
+                          Desa {counts.desarrollo}
+                        </span>
+                      )}
+                    </div>
+                  );
+                }
+              }
+
+              return (
+                <div key={item.label} className={`group animate-slide-left stagger-${index + 1}`}>
+                  <button
+                    onClick={() => toggleDropdown(item.label)}
+                    className={`
+                      w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-sm font-medium
+                      transition-all duration-200
+                      ${isActive 
+                        ? "bg-orange-50 text-orange-600 shadow-sm"
+                        : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                      }
+                    `}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className={`${isActive ? "text-orange-500" : "text-gray-400 group-hover:text-gray-600"} transition-colors`}>
+                        {item.icon}
+                      </span>
+                      {item.label}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {parentBadges}
+                      <svg xmlns="http://www.w3.org/2000/svg" className={`w-4 h-4 text-gray-400 transition-transform duration-200 shrink-0 ${isOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                  </button>
+                  
+                  {/* Dropdown Content */}
+                  {isOpen && (
+                    <div className="pl-9 mt-1 space-y-1">
+                      {item.subItems.map((sub, childIndex) => {
+                        const isSubActive = pathname === sub.href;
+                        
+                        let subBadgeCount = null;
+                        if (sub.label === "Errores Certificación") subBadgeCount = counts.certificacion;
+                        if (sub.label === "Errores Desarrollo") subBadgeCount = counts.desarrollo;
+
+                        return (
+                          <a
+                            key={sub.href}
+                            href={sub.href}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              router.push(sub.href);
+                              setMobileOpen(false);
+                            }}
+                            className={`
+                              flex items-center justify-between gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors
+                              ${isSubActive 
+                                ? "text-orange-600 bg-orange-50" 
+                                : "text-gray-500 hover:text-gray-900 hover:bg-gray-50/80"
+                              }
+                            `}
+                          >
+                            <div className="flex items-center gap-2.5">
+                              <span className={`${isSubActive ? "text-orange-500" : "text-gray-400"} transition-colors`}>
+                                {sub.icon}
+                              </span>
+                              {sub.label}
+                            </div>
+                            
+                            {subBadgeCount !== null && subBadgeCount > 0 && (
+                              <span className={`px-2 py-0.5 text-xs font-bold rounded-md border ${
+                                isSubActive 
+                                  ? (sub.label === "Errores Certificación" ? "bg-red-100 text-red-700 border-red-200" : "bg-amber-100 text-amber-700 border-amber-200")
+                                  : (sub.label === "Errores Certificación" ? "bg-red-50 text-red-600 border-red-100" : "bg-amber-50 text-amber-600 border-amber-100")
+                              }`}>
+                                {subBadgeCount}
+                              </span>
+                            )}
+                          </a>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+
+            // Normal Item Render
             return (
               <a
                 key={item.href}
