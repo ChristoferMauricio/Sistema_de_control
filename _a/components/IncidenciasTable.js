@@ -4,10 +4,20 @@ import { useState, useMemo } from "react";
 import { Search, Filter, AlertCircle, Calendar } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { getCurrentSprint } from "@/lib/cronogramaData";
 
 export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterIteracion, setFilterIteracion] = useState("Todas");
+  
+  const [filterIteracion, setFilterIteracion] = useState(() => {
+    const currentIter = getCurrentSprint(new Date())?.iteracion;
+    if (currentIter) {
+      // Maps "Iteración F3.06" to "Iteración 6"
+      const match = currentIter.match(/F3\.0?(\d+)/);
+      if (match) return `Iteración ${match[1]}`;
+    }
+    return "Todas";
+  });
   const [selectedProfile, setSelectedProfile] = useState(null);
 
   // Derive unique iterations from the data
