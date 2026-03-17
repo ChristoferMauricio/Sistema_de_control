@@ -225,9 +225,9 @@ export default function DashboardNav({ user, role }) {
 
             links.forEach(linkKey => {
               const sprintStr = linkedStoriesMap[linkKey] || "";
-              if (sprintStr.includes("Sprint 1") || sprintStr.includes("Sprint 2")) {
+              if (sprintStr.includes("F3.01") || sprintStr.includes("F3.02")) {
                 isCert = true;
-              } else if (sprintStr.includes("Sprint 3") || sprintStr.includes("Sprint 4") || sprintStr.includes("Sprint 5")) {
+              } else if (sprintStr.includes("F3.03") || sprintStr.includes("F3.4") || sprintStr.includes("F3.5")) {
                 isDes = true;
               }
             });

@@ -41,12 +41,12 @@ export default function ErroresCertificacionPage() {
           }
         }
 
-        // 3. Filter out bugs that Map to Certificación (Sprints 1 and 2)
+        // 3. Filter out bugs that Map to Certificación (Iteración F3.01 and F3.02)
         const certBugs = bugsQA.filter(bug => {
           const links = Array.isArray(bug.linked_keys) ? bug.linked_keys : [];
           return links.some(linkKey => {
             const sprintStr = linkedStoriesMap[linkKey] || "";
-            return sprintStr.includes("Sprint 1") || sprintStr.includes("Sprint 2");
+            return sprintStr.includes("F3.01") || sprintStr.includes("F3.02");
           });
         });
 

@@ -39,12 +39,12 @@ export default function ErroresDesarrolloPage() {
           }
         }
 
-        // 3. Filter out bugs that Map to Desarrollo (Sprints 3, 4, and 5)
+        // 3. Filter out bugs that Map to Desarrollo (Iteración F3.03, F3.4, and F3.5)
         const desBugs = bugsQA.filter(bug => {
           const links = Array.isArray(bug.linked_keys) ? bug.linked_keys : [];
           return links.some(linkKey => {
             const sprintStr = linkedStoriesMap[linkKey] || "";
-            return sprintStr.includes("Sprint 3") || sprintStr.includes("Sprint 4") || sprintStr.includes("Sprint 5");
+            return sprintStr.includes("F3.03") || sprintStr.includes("F3.4") || sprintStr.includes("F3.5");
           });
         });
 
