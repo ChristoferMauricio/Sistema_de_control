@@ -4,6 +4,7 @@ import { useState, useMemo, useCallback, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import * as XLSX from "xlsx-js-style";
 import { Download } from "lucide-react";
+import { getCurrentSprint } from "@/lib/cronogramaData";
 
 // Mapeo de estados internos de Jira → nombres de columna para el reporte
 const STATUS_COLUMNS = [
@@ -398,7 +399,7 @@ function SubtasksModal({ assigneeName, subtasks, onClose }) {
 
 // ─── Main Table ─────────────────────────────────────────────
 export default function ReportesTable({ tickets = [], nombres = [] }) {
-    const [selectedSprint, setSelectedSprint] = useState("");
+    const [selectedSprint, setSelectedSprint] = useState(() => getCurrentSprint(new Date())?.iteracion || "");
     const [traceModal, setTraceModal] = useState(null); // { assigneeName, stories }
     const [subtasksModal, setSubtasksModal] = useState(null); // { assigneeName, subtasks }
 

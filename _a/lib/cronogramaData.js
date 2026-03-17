@@ -41,8 +41,16 @@ export function getCurrentSprint(today = new Date()) {
     const [sy, sm, sd] = row.fechaInicio.split("-").map(Number);
     const startDate = new Date(sy, sm - 1, sd);
 
-    const [ey, em, ed] = row.fechaFin.split("-").map(Number);
-    const endDate = new Date(ey, em - 1, ed, 23, 59, 59, 999);
+    // Use fechaMaxima if available, otherwise fechaFin + 5 days
+    let endDate;
+    if (row.fechaMaxima) {
+      const [ey, em, ed] = row.fechaMaxima.split("-").map(Number);
+      endDate = new Date(ey, em - 1, ed, 23, 59, 59, 999);
+    } else {
+      const [ey, em, ed] = row.fechaFin.split("-").map(Number);
+      endDate = new Date(ey, em - 1, ed, 23, 59, 59, 999);
+      endDate.setDate(endDate.getDate() + 5);
+    }
 
     if (checkDate >= startDate && checkDate <= endDate) {
       return row;

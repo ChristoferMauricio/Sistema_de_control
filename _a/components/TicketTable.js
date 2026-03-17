@@ -10,7 +10,7 @@ import { useRole } from "@/app/dashboard/RoleContext";
 
 const PAGE_SIZE = 15;
 
-export default function TicketTable({ tickets = [], title, showAssignee = true, statusHistory = {}, mode = "default", externalFilterType = "" }) {
+export default function TicketTable({ tickets = [], title, showAssignee = true, statusHistory = {}, mode = "default", externalFilterType = "", defaultFilterSprint = "" }) {
   const role = useRole();
   const [search, setSearch] = useState("");
   const [sortField, setSortField] = useState("updated_at");
@@ -21,7 +21,7 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
 
   // Column filters
   const [filterType, setFilterType] = useState("");
-  const [filterSprint, setFilterSprint] = useState("");
+  const [filterSprint, setFilterSprint] = useState(defaultFilterSprint);
   const [filterStatus, setFilterStatus] = useState("");
   const [filterAssignee, setFilterAssignee] = useState("");
   const [filterReporter, setFilterReporter] = useState("");
@@ -50,6 +50,14 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
       setCurrentPage(1);
     }
   }, [externalFilterType]);
+
+  const hasAppliedDefaultSprint = useRef(false);
+  useEffect(() => {
+    if (defaultFilterSprint && !hasAppliedDefaultSprint.current) {
+      setFilterSprint(defaultFilterSprint);
+      hasAppliedDefaultSprint.current = true;
+    }
+  }, [defaultFilterSprint]);
 
   // Sync top ↔ bottom scroll
   const handleTopScroll = useCallback(() => {
