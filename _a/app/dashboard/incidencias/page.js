@@ -32,8 +32,8 @@ export default function IncidenciasPage() {
       const iterationMap = {};
       parentStories.forEach((s) => {
         // e.g. "APRE. Acompañamiento y atención de incidencias en uso del sistema (iteración 6)"
-        const match = s.summary.match(/\((Iteraci[oó]n \d+)\)/i);
-        iterationMap[s.jira_key] = match ? match[1] : "Iteración Desconocida";
+        const match = s.summary.match(/\(Iteraci[oó]n (\d+)\)/i);
+        iterationMap[s.jira_key] = match ? `Iteración ${Number(match[1])}` : "Iteración Desconocida";
       });
 
       // 2. Fetch subtasks belonging to these stories
