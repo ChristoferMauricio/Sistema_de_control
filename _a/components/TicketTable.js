@@ -677,12 +677,14 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
                               </a>
                             ))}
                           </div>
+                        ) : !isStory(ticket.issue_type) && ['Bug', 'Error', 'Error Desarrollo', 'Error Certificación'].includes(ticket.issue_type) ? (
+                            <span className="text-gray-400 text-xs italic">N/A</span>
                         ) : (
                           <span className="text-gray-300 text-xs">—</span>
                         )}
                       </td>
 
-                      {/* Principal — solo para Subtarea o Historia */}
+                      {/* Principal — solo para Subtarea o Historia, o "Actividades vinculadas" para Errores  */}
                       <td className="px-4 py-3">
                         {(isSubtask(ticket.issue_type) || isStory(ticket.issue_type)) && ticket.parent_key ? (
                           <a
@@ -693,6 +695,20 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
                           >
                             {ticket.parent_key}
                           </a>
+                        ) : ['Bug', 'Error', 'Error Desarrollo', 'Error Certificación'].includes(ticket.issue_type) && ticket.linked_keys && ticket.linked_keys.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {ticket.linked_keys.map((lk) => (
+                              <a
+                                key={lk}
+                                href={`https://supervisorservicio2020.atlassian.net/browse/${lk}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="font-mono text-xs text-purple-600 bg-purple-50 px-2 py-1 rounded-md hover:underline hover:text-purple-800"
+                              >
+                                {lk}
+                              </a>
+                            ))}
+                          </div>
                         ) : (
                           <span className="text-gray-300 text-xs">—</span>
                         )}

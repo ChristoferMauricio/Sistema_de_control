@@ -170,20 +170,18 @@ export default function DashboardNav({ user, role }) {
     async function fetchCounts() {
       try {
         const [
-          { count: countCert },
-          { count: countDes },
+          { data: bugsQA },
           { data: obsData }
         ] = await Promise.all([
+          // 1. Fetch PF3QA bugs from active Sprint 2
           supabase
             .from("jira_tickets")
-            .select("*", { count: "exact", head: true })
-            .in("issue_type", ["Historia", "Story"])
-            .eq("parent_key", "PF3QA-49"),
-          supabase
-            .from("jira_tickets")
-            .select("*", { count: "exact", head: true })
-            .in("issue_type", ["Historia", "Story"])
-            .eq("parent_key", "PF3QA-50"),
+            .select("jira_key, linked_keys")
+            .in("issue_type", ["Bug", "Error", "Error Desarrollo", "Error Certificación", "Error en Certificación"])
+            .like("jira_key", "PF3QA-%")
+            .eq("sprint", "Tablero Sprint 2"),
+          
+          // 2. Fetch Supervisor Observations
           supabase
             .from("jira_tickets")
             .select("comentario")
@@ -192,6 +190,53 @@ export default function DashboardNav({ user, role }) {
         ]);
 
         const countObs = (obsData || []).filter(t => t.comentario && t.comentario.trim().length > 0).length;
+
+        // 3. Process Errores logic
+        let countCert = 0;
+        let countDes = 0;
+
+        if (bugsQA && bugsQA.length > 0) {
+          // Extract all unique linked keys to query their sprints in one go
+          const allLinkedKeys = Array.from(new Set(
+            bugsQA.flatMap(bug => (Array.isArray(bug.linked_keys) ? bug.linked_keys : []))
+          ));
+
+          let linkedStoriesMap = {};
+          
+          if (allLinkedKeys.length > 0) {
+            // Fetch the linked stories from Supabase to check their Sprint
+            const { data: linkedStories } = await supabase
+              .from("jira_tickets")
+              .select("jira_key, sprint")
+              .in("jira_key", allLinkedKeys);
+              
+            if (linkedStories) {
+              linkedStories.forEach(st => {
+                linkedStoriesMap[st.jira_key] = st.sprint;
+              });
+            }
+          }
+
+          // Distribute bugs based on linked PF3 story sprints
+          bugsQA.forEach(bug => {
+            const links = Array.isArray(bug.linked_keys) ? bug.linked_keys : [];
+            let isCert = false;
+            let isDes = false;
+
+            links.forEach(linkKey => {
+              const sprintStr = linkedStoriesMap[linkKey] || "";
+              if (sprintStr.includes("Sprint 1") || sprintStr.includes("Sprint 2")) {
+                isCert = true;
+              } else if (sprintStr.includes("Sprint 3") || sprintStr.includes("Sprint 4") || sprintStr.includes("Sprint 5")) {
+                isDes = true;
+              }
+            });
+
+            // If a bug somehow maps to both, we log it to both to be safe, or just one if priority is needed.
+            if (isCert) countCert++;
+            if (isDes) countDes++;
+          });
+        }
 
         setCounts({
           certificacion: countCert || 0,

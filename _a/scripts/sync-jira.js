@@ -306,13 +306,23 @@ async function main() {
 
     let jql = "ORDER BY updated DESC";
     if (JIRA_PROJECT_KEY) {
-      jql = `project = ${JIRA_PROJECT_KEY} ORDER BY updated DESC`;
+      if (JIRA_PROJECT_KEY.includes(",")) {
+        jql = `project IN (${JIRA_PROJECT_KEY}) ORDER BY updated DESC`;
+      } else {
+        jql = `project = ${JIRA_PROJECT_KEY} ORDER BY updated DESC`;
+      }
     }
 
     if (isRecent) {
-      jql = JIRA_PROJECT_KEY
-        ? `project = ${JIRA_PROJECT_KEY} AND updated >= -1h ORDER BY updated DESC`
-        : "updated >= -1h ORDER BY updated DESC";
+      if (JIRA_PROJECT_KEY) {
+        if (JIRA_PROJECT_KEY.includes(",")) {
+          jql = `project IN (${JIRA_PROJECT_KEY}) AND updated >= -1h ORDER BY updated DESC`;
+        } else {
+          jql = `project = ${JIRA_PROJECT_KEY} AND updated >= -1h ORDER BY updated DESC`;
+        }
+      } else {
+        jql = "updated >= -1h ORDER BY updated DESC";
+      }
       console.log("📌 Modo incremental: solo tickets de la última hora\n");
     } else {
       console.log("📌 Modo completo: sincronizando TODOS los tickets\n");

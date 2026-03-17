@@ -34,7 +34,7 @@ async function searchJira(jql) {
   let nextPageToken = null;
 
   while (true) {
-    const fields = "key,summary,status,assignee,priority,issuetype,created,updated,reporter,parent,subtasks,customfield_10036,customfield_10020,description";
+    const fields = "key,summary,status,assignee,priority,issuetype,created,updated,reporter,parent,subtasks,customfield_10036,customfield_10020,description,issuelinks";
     const params = new URLSearchParams({
       jql,
       maxResults: String(maxResults),
@@ -104,6 +104,9 @@ function transformIssue(issue) {
     subtask_keys: fields.subtasks && fields.subtasks.length > 0
       ? fields.subtasks.map(s => s.key)
       : null,
+    linked_keys: fields.issuelinks && fields.issuelinks.length > 0
+      ? fields.issuelinks.map(l => l.inwardIssue?.key || l.outwardIssue?.key).filter(Boolean)
+      : [],
     created_at: fields.created || null,
     updated_at: fields.updated || null,
     synced_at: new Date().toISOString(),

@@ -10,15 +10,50 @@ export default function ErroresDesarrolloPage() {
 
   useEffect(() => {
     async function fetchTickets() {
-      const { data, error } = await supabase
+      // 1. Fetch PF3QA bugs from active Sprint 2
+      const { data: bugsQA, error } = await supabase
         .from("jira_tickets")
         .select("*")
-        .in("issue_type", ["Historia", "Story"])
-        .eq("parent_key", "PF3QA-50")
+        .in("issue_type", ["Bug", "Error", "Error Desarrollo", "Error Certificación", "Error en Certificación"])
+        .like("jira_key", "PF3QA-%")
+        .eq("sprint", "Tablero Sprint 2")
         .order("updated_at", { ascending: false });
 
-      if (!error && data) {
-        setTickets(data);
+      if (!error && bugsQA && bugsQA.length > 0) {
+        // 2. Extract unique linked keys
+        const allLinkedKeys = Array.from(new Set(
+          bugsQA.flatMap(bug => (Array.isArray(bug.linked_keys) ? bug.linked_keys : []))
+        ));
+
+        let linkedStoriesMap = {};
+        if (allLinkedKeys.length > 0) {
+          const { data: linkedStories } = await supabase
+            .from("jira_tickets")
+            .select("jira_key, sprint")
+            .in("jira_key", allLinkedKeys);
+            
+          if (linkedStories) {
+            linkedStories.forEach(st => {
+              linkedStoriesMap[st.jira_key] = st.sprint || "";
+            });
+          }
+        }
+
+        // 3. Filter out bugs that Map to Desarrollo (Sprints 3, 4, and 5)
+        const desBugs = bugsQA.filter(bug => {
+          const links = Array.isArray(bug.linked_keys) ? bug.linked_keys : [];
+          return links.some(linkKey => {
+            const sprintStr = linkedStoriesMap[linkKey] || "";
+            return sprintStr.includes("Sprint 3") || sprintStr.includes("Sprint 4") || sprintStr.includes("Sprint 5");
+          });
+        });
+
+        // 4. Transform rendering structure
+        const updatedTickets = desBugs.map(b => ({
+          ...b,
+        }));
+
+        setTickets(updatedTickets);
       }
       setLoading(false);
     }
@@ -59,7 +94,7 @@ export default function ErroresDesarrolloPage() {
           </h1>
         </div>
         <p className="text-gray-500 mt-2">
-          Historias asociadas a la épica PF3QA-50
+          Errores Sprint 2 cuyas historias vinculadas pertenecen a Sprint 3, 4 o 5
         </p>
       </div>
 

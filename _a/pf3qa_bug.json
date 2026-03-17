@@ -1,0 +1,403 @@
+[
+  {
+    "expand": "renderedFields,names,schema,operations,editmeta,changelog,versionedRepresentations",
+    "id": "21095",
+    "self": "https://supervisorservicio2020.atlassian.net/rest/api/2/issue/21095",
+    "key": "PF3QA-60",
+    "fields": {
+      "issuetype": {
+        "self": "https://supervisorservicio2020.atlassian.net/rest/api/2/issuetype/10059",
+        "id": "10059",
+        "description": "Un problema o error.",
+        "iconUrl": "https://supervisorservicio2020.atlassian.net/rest/api/2/universal_avatar/view/type/issuetype/avatar/10303?size=medium",
+        "name": "Error",
+        "subtask": false,
+        "avatarId": 10303,
+        "hierarchyLevel": 0
+      },
+      "customfield_10020": [
+        {
+          "id": 373,
+          "name": "Tablero Sprint 2",
+          "state": "active",
+          "boardId": 67,
+          "goal": "",
+          "startDate": "2026-03-12T16:27:27.604Z",
+          "endDate": "2026-05-01T05:00:00.000Z"
+        }
+      ],
+      "issuelinks": [
+        {
+          "id": "10994",
+          "self": "https://supervisorservicio2020.atlassian.net/rest/api/2/issueLink/10994",
+          "type": {
+            "id": "10003",
+            "name": "Relates",
+            "inward": "relates to",
+            "outward": "relates to",
+            "self": "https://supervisorservicio2020.atlassian.net/rest/api/2/issueLinkType/10003"
+          },
+          "inwardIssue": {
+            "id": "12442",
+            "key": "PF3-1154",
+            "self": "https://supervisorservicio2020.atlassian.net/rest/api/2/issue/12442",
+            "fields": {
+              "summary": "Retrotraer flujo de fiscalización",
+              "status": {
+                "self": "https://supervisorservicio2020.atlassian.net/rest/api/2/status/10055",
+                "description": "",
+                "iconUrl": "https://supervisorservicio2020.atlassian.net/",
+                "name": "Finalizada",
+                "id": "10055",
+                "statusCategory": {
+                  "self": "https://supervisorservicio2020.atlassian.net/rest/api/2/statuscategory/3",
+                  "id": 3,
+                  "key": "done",
+                  "colorName": "green",
+                  "name": "Listo"
+                }
+              },
+              "priority": {
+                "self": "https://supervisorservicio2020.atlassian.net/rest/api/2/priority/3",
+                "iconUrl": "https://supervisorservicio2020.atlassian.net/images/icons/priorities/medium_new.svg",
+                "name": "Medium",
+                "id": "3"
+              },
+              "issuetype": {
+                "self": "https://supervisorservicio2020.atlassian.net/rest/api/2/issuetype/10006",
+                "id": "10006",
+                "description": "Una función o funcionalidad expresada como objetivo del usuario.",
+                "iconUrl": "https://supervisorservicio2020.atlassian.net/rest/api/2/universal_avatar/view/type/issuetype/avatar/10300?size=medium",
+                "name": "Historia",
+                "subtask": false,
+                "avatarId": 10300,
+                "hierarchyLevel": 0
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "expand": "renderedFields,names,schema,operations,editmeta,changelog,versionedRepresentations",
+    "id": "21094",
+    "self": "https://supervisorservicio2020.atlassian.net/rest/api/2/issue/21094",
+    "key": "PF3QA-59",
+    "fields": {
+      "issuetype": {
+        "self": "https://supervisorservicio2020.atlassian.net/rest/api/2/issuetype/10059",
+        "id": "10059",
+        "description": "Un problema o error.",
+        "iconUrl": "https://supervisorservicio2020.atlassian.net/rest/api/2/universal_avatar/view/type/issuetype/avatar/10303?size=medium",
+        "name": "Error",
+        "subtask": false,
+        "avatarId": 10303,
+        "hierarchyLevel": 0
+      },
+      "customfield_10020": [
+        {
+          "id": 373,
+          "name": "Tablero Sprint 2",
+          "state": "active",
+          "boardId": 67,
+          "goal": "",
+          "startDate": "2026-03-12T16:27:27.604Z",
+          "endDate": "2026-05-01T05:00:00.000Z"
+        }
+      ],
+      "issuelinks": [
+        {
+          "id": "10993",
+          "self": "https://supervisorservicio2020.atlassian.net/rest/api/2/issueLink/10993",
+          "type": {
+            "id": "10003",
+            "name": "Relates",
+            "inward": "relates to",
+            "outward": "relates to",
+            "self": "https://supervisorservicio2020.atlassian.net/rest/api/2/issueLinkType/10003"
+          },
+          "inwardIssue": {
+            "id": "12443",
+            "key": "PF3-1155",
+            "self": "https://supervisorservicio2020.atlassian.net/rest/api/2/issue/12443",
+            "fields": {
+              "summary": "Retrotraer flujo de liquidación",
+              "status": {
+                "self": "https://supervisorservicio2020.atlassian.net/rest/api/2/status/10055",
+                "description": "",
+                "iconUrl": "https://supervisorservicio2020.atlassian.net/",
+                "name": "Finalizada",
+                "id": "10055",
+                "statusCategory": {
+                  "self": "https://supervisorservicio2020.atlassian.net/rest/api/2/statuscategory/3",
+                  "id": 3,
+                  "key": "done",
+                  "colorName": "green",
+                  "name": "Listo"
+                }
+              },
+              "priority": {
+                "self": "https://supervisorservicio2020.atlassian.net/rest/api/2/priority/3",
+                "iconUrl": "https://supervisorservicio2020.atlassian.net/images/icons/priorities/medium_new.svg",
+                "name": "Medium",
+                "id": "3"
+              },
+              "issuetype": {
+                "self": "https://supervisorservicio2020.atlassian.net/rest/api/2/issuetype/10006",
+                "id": "10006",
+                "description": "Una función o funcionalidad expresada como objetivo del usuario.",
+                "iconUrl": "https://supervisorservicio2020.atlassian.net/rest/api/2/universal_avatar/view/type/issuetype/avatar/10300?size=medium",
+                "name": "Historia",
+                "subtask": false,
+                "avatarId": 10300,
+                "hierarchyLevel": 0
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "expand": "renderedFields,names,schema,operations,editmeta,changelog,versionedRepresentations",
+    "id": "21093",
+    "self": "https://supervisorservicio2020.atlassian.net/rest/api/2/issue/21093",
+    "key": "PF3QA-58",
+    "fields": {
+      "issuetype": {
+        "self": "https://supervisorservicio2020.atlassian.net/rest/api/2/issuetype/10059",
+        "id": "10059",
+        "description": "Un problema o error.",
+        "iconUrl": "https://supervisorservicio2020.atlassian.net/rest/api/2/universal_avatar/view/type/issuetype/avatar/10303?size=medium",
+        "name": "Error",
+        "subtask": false,
+        "avatarId": 10303,
+        "hierarchyLevel": 0
+      },
+      "customfield_10020": [
+        {
+          "id": 373,
+          "name": "Tablero Sprint 2",
+          "state": "active",
+          "boardId": 67,
+          "goal": "",
+          "startDate": "2026-03-12T16:27:27.604Z",
+          "endDate": "2026-05-01T05:00:00.000Z"
+        }
+      ],
+      "issuelinks": [
+        {
+          "id": "10991",
+          "self": "https://supervisorservicio2020.atlassian.net/rest/api/2/issueLink/10991",
+          "type": {
+            "id": "10003",
+            "name": "Relates",
+            "inward": "relates to",
+            "outward": "relates to",
+            "self": "https://supervisorservicio2020.atlassian.net/rest/api/2/issueLinkType/10003"
+          },
+          "inwardIssue": {
+            "id": "11889",
+            "key": "PF3-949",
+            "self": "https://supervisorservicio2020.atlassian.net/rest/api/2/issue/11889",
+            "fields": {
+              "summary": "Implementar un nuevo reporte de personas naturales en el módulo REPORTES/Maestros",
+              "status": {
+                "self": "https://supervisorservicio2020.atlassian.net/rest/api/2/status/10055",
+                "description": "",
+                "iconUrl": "https://supervisorservicio2020.atlassian.net/",
+                "name": "Finalizada",
+                "id": "10055",
+                "statusCategory": {
+                  "self": "https://supervisorservicio2020.atlassian.net/rest/api/2/statuscategory/3",
+                  "id": 3,
+                  "key": "done",
+                  "colorName": "green",
+                  "name": "Listo"
+                }
+              },
+              "priority": {
+                "self": "https://supervisorservicio2020.atlassian.net/rest/api/2/priority/3",
+                "iconUrl": "https://supervisorservicio2020.atlassian.net/images/icons/priorities/medium_new.svg",
+                "name": "Medium",
+                "id": "3"
+              },
+              "issuetype": {
+                "self": "https://supervisorservicio2020.atlassian.net/rest/api/2/issuetype/10006",
+                "id": "10006",
+                "description": "Una función o funcionalidad expresada como objetivo del usuario.",
+                "iconUrl": "https://supervisorservicio2020.atlassian.net/rest/api/2/universal_avatar/view/type/issuetype/avatar/10300?size=medium",
+                "name": "Historia",
+                "subtask": false,
+                "avatarId": 10300,
+                "hierarchyLevel": 0
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "expand": "renderedFields,names,schema,operations,editmeta,changelog,versionedRepresentations",
+    "id": "20902",
+    "self": "https://supervisorservicio2020.atlassian.net/rest/api/2/issue/20902",
+    "key": "PF3QA-52",
+    "fields": {
+      "issuetype": {
+        "self": "https://supervisorservicio2020.atlassian.net/rest/api/2/issuetype/10059",
+        "id": "10059",
+        "description": "Un problema o error.",
+        "iconUrl": "https://supervisorservicio2020.atlassian.net/rest/api/2/universal_avatar/view/type/issuetype/avatar/10303?size=medium",
+        "name": "Error",
+        "subtask": false,
+        "avatarId": 10303,
+        "hierarchyLevel": 0
+      },
+      "customfield_10020": [
+        {
+          "id": 373,
+          "name": "Tablero Sprint 2",
+          "state": "active",
+          "boardId": 67,
+          "goal": "",
+          "startDate": "2026-03-12T16:27:27.604Z",
+          "endDate": "2026-05-01T05:00:00.000Z"
+        }
+      ],
+      "issuelinks": [
+        {
+          "id": "10958",
+          "self": "https://supervisorservicio2020.atlassian.net/rest/api/2/issueLink/10958",
+          "type": {
+            "id": "10000",
+            "name": "Blocks",
+            "inward": "is blocked by",
+            "outward": "blocks",
+            "self": "https://supervisorservicio2020.atlassian.net/rest/api/2/issueLinkType/10000"
+          },
+          "inwardIssue": {
+            "id": "20042",
+            "key": "PF3-3074",
+            "self": "https://supervisorservicio2020.atlassian.net/rest/api/2/issue/20042",
+            "fields": {
+              "summary": "Visualización de procesos actuales en el modulo de diagramación de Procesos (N1)",
+              "status": {
+                "self": "https://supervisorservicio2020.atlassian.net/rest/api/2/status/10054",
+                "description": "",
+                "iconUrl": "https://supervisorservicio2020.atlassian.net/",
+                "name": "Tareas por hacer",
+                "id": "10054",
+                "statusCategory": {
+                  "self": "https://supervisorservicio2020.atlassian.net/rest/api/2/statuscategory/2",
+                  "id": 2,
+                  "key": "new",
+                  "colorName": "blue-gray",
+                  "name": "Por hacer"
+                }
+              },
+              "priority": {
+                "self": "https://supervisorservicio2020.atlassian.net/rest/api/2/priority/3",
+                "iconUrl": "https://supervisorservicio2020.atlassian.net/images/icons/priorities/medium_new.svg",
+                "name": "Medium",
+                "id": "3"
+              },
+              "issuetype": {
+                "self": "https://supervisorservicio2020.atlassian.net/rest/api/2/issuetype/10006",
+                "id": "10006",
+                "description": "Una función o funcionalidad expresada como objetivo del usuario.",
+                "iconUrl": "https://supervisorservicio2020.atlassian.net/rest/api/2/universal_avatar/view/type/issuetype/avatar/10300?size=medium",
+                "name": "Historia",
+                "subtask": false,
+                "avatarId": 10300,
+                "hierarchyLevel": 0
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "expand": "renderedFields,names,schema,operations,editmeta,changelog,versionedRepresentations",
+    "id": "13145",
+    "self": "https://supervisorservicio2020.atlassian.net/rest/api/2/issue/13145",
+    "key": "PF3QA-41",
+    "fields": {
+      "issuetype": {
+        "self": "https://supervisorservicio2020.atlassian.net/rest/api/2/issuetype/10006",
+        "id": "10006",
+        "description": "Una función o funcionalidad expresada como objetivo del usuario.",
+        "iconUrl": "https://supervisorservicio2020.atlassian.net/rest/api/2/universal_avatar/view/type/issuetype/avatar/10300?size=medium",
+        "name": "Historia",
+        "subtask": false,
+        "avatarId": 10300,
+        "hierarchyLevel": 0
+      },
+      "customfield_10020": [
+        {
+          "id": 109,
+          "name": "Tablero Sprint 1",
+          "state": "closed",
+          "boardId": 67,
+          "goal": "",
+          "startDate": "2025-08-01T14:55:15.559Z",
+          "endDate": "2025-08-15T14:55:00.000Z",
+          "completeDate": "2026-03-12T16:26:41.286Z"
+        }
+      ],
+      "issuelinks": [
+        {
+          "id": "10726",
+          "self": "https://supervisorservicio2020.atlassian.net/rest/api/2/issueLink/10726",
+          "type": {
+            "id": "10001",
+            "name": "Cloners",
+            "inward": "is cloned by",
+            "outward": "clones",
+            "self": "https://supervisorservicio2020.atlassian.net/rest/api/2/issueLinkType/10001"
+          },
+          "outwardIssue": {
+            "id": "11646",
+            "key": "PF3-847",
+            "self": "https://supervisorservicio2020.atlassian.net/rest/api/2/issue/11646",
+            "fields": {
+              "summary": "(Rec 05/06/2025) Recuperar expedientes",
+              "status": {
+                "self": "https://supervisorservicio2020.atlassian.net/rest/api/2/status/10055",
+                "description": "",
+                "iconUrl": "https://supervisorservicio2020.atlassian.net/",
+                "name": "Finalizada",
+                "id": "10055",
+                "statusCategory": {
+                  "self": "https://supervisorservicio2020.atlassian.net/rest/api/2/statuscategory/3",
+                  "id": 3,
+                  "key": "done",
+                  "colorName": "green",
+                  "name": "Listo"
+                }
+              },
+              "priority": {
+                "self": "https://supervisorservicio2020.atlassian.net/rest/api/2/priority/3",
+                "iconUrl": "https://supervisorservicio2020.atlassian.net/images/icons/priorities/medium_new.svg",
+                "name": "Medium",
+                "id": "3"
+              },
+              "issuetype": {
+                "self": "https://supervisorservicio2020.atlassian.net/rest/api/2/issuetype/10006",
+                "id": "10006",
+                "description": "Una función o funcionalidad expresada como objetivo del usuario.",
+                "iconUrl": "https://supervisorservicio2020.atlassian.net/rest/api/2/universal_avatar/view/type/issuetype/avatar/10300?size=medium",
+                "name": "Historia",
+                "subtask": false,
+                "avatarId": 10300,
+                "hierarchyLevel": 0
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+]
