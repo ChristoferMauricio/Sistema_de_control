@@ -10,7 +10,7 @@ import { useRole } from "@/app/dashboard/RoleContext";
 
 const PAGE_SIZE = 15;
 
-export default function TicketTable({ tickets = [], title, showAssignee = true, statusHistory = {}, mode = "default" }) {
+export default function TicketTable({ tickets = [], title, showAssignee = true, statusHistory = {}, mode = "default", externalFilterType = "" }) {
   const role = useRole();
   const [search, setSearch] = useState("");
   const [sortField, setSortField] = useState("updated_at");
@@ -42,6 +42,14 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
   const bottomScrollRef = useRef(null);
   const [scrollWidth, setScrollWidth] = useState(0);
   const isSyncing = useRef(false);
+
+  // Sync with external filters
+  useEffect(() => {
+    if (externalFilterType !== undefined && externalFilterType !== null) {
+      setFilterType(externalFilterType === "Todos" ? "" : externalFilterType);
+      setCurrentPage(1);
+    }
+  }, [externalFilterType]);
 
   // Sync top ↔ bottom scroll
   const handleTopScroll = useCallback(() => {

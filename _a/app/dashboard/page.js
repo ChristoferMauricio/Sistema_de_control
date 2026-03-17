@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import TicketTable from "@/components/TicketTable";
 import Card from "@/components/ui/Card";
 import { getCurrentSprint, formatCronogramaDate } from "@/lib/cronogramaData";
+import { useRole } from "@/app/dashboard/RoleContext";
 
 export default function DashboardPage() {
   const [tickets, setTickets] = useState([]);
@@ -14,8 +15,14 @@ export default function DashboardPage() {
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState(null);
   const router = useRouter();
+  const role = useRole();
+  const [userEmail, setUserEmail] = useState("");
+  const [externalFilter, setExternalFilter] = useState("");
   const [stats, setStats] = useState({
     total: 0,
+    historias: 0,
+    subtareas: 0,
+    epicas: 0,
     pendientes: 0,
     certificacion: { porHacer: 0, enCurso: 0, finalizada: 0 },
     desarrollo: { porHacer: 0, enCurso: 0, finalizada: 0 },
@@ -49,6 +56,11 @@ export default function DashboardPage() {
   }, []);
 
   const fetchData = useCallback(async () => {
+    // Session context needed for pending tickets if dev/qa
+    const { data: { session } } = await supabase.auth.getSession();
+    const email = session?.user?.email || "";
+    setUserEmail(email);
+
     // Supabase limita a 1000 filas por query — paginar para traer todo
     let allData = [];
     const pageSize = 1000;
@@ -116,11 +128,22 @@ export default function DashboardPage() {
         return { porHacer, enCurso, finalizada };
       };
 
+      const isDevOrQA = role === "developer" || role === "qa";
+      let misPendientesCount = 0;
+      if (isDevOrQA) {
+        misPendientesCount = allData.filter(t => t.assignee_email === email).length;
+      } else {
+        misPendientesCount = allData.filter(
+          (t) => !["Done", "Cerrado", "Terminada"].some((s) => (t.status || "").includes(s))
+        ).length;
+      }
+
       setStats({
         total: allData.length,
-        pendientes: allData.filter(
-          (t) => !["Done", "Cerrado", "Terminada"].some((s) => (t.status || "").includes(s))
-        ).length,
+        historias: allData.filter(t => t.issue_type === "Historia" || t.issue_type === "Story").length,
+        subtareas: allData.filter(t => t.issue_type === "Sub-task" || t.issue_type === "Subtarea").length,
+        epicas: allData.filter(t => t.issue_type === "Epic" || t.issue_type === "Épica").length,
+        pendientes: misPendientesCount,
         certificacion: countStatuses(certBugs),
         desarrollo: countStatuses(desBugs),
       });
@@ -198,10 +221,51 @@ export default function DashboardPage() {
     </div>
   );
 
+  const TypeCounters = ({ historias, subtareas, epicas }) => (
+    <div className="flex items-center gap-1.5 mt-2.5 w-full justify-between -mx-1">
+      <div 
+        onClick={() => setExternalFilter("Historia")} 
+        className="flex flex-col items-center flex-1 cursor-pointer hover:bg-gray-100/80 rounded py-1 transition-all active:scale-95 group"
+      >
+        <span className="text-[1.15rem] font-bold text-gray-700 leading-none group-hover:text-blue-600 transition-colors">{historias}</span>
+        <span className="text-[8.5px] font-bold text-gray-400 uppercase tracking-wider mt-1 text-center">Historias</span>
+      </div>
+      <div className="w-px h-6 bg-gray-200 shrink-0"></div>
+      <div 
+        onClick={() => setExternalFilter("Subtarea")} 
+        className="flex flex-col items-center flex-1 cursor-pointer hover:bg-gray-100/80 rounded py-1 transition-all active:scale-95 group"
+      >
+        <span className="text-[1.15rem] font-bold text-gray-700 leading-none group-hover:text-blue-600 transition-colors">{subtareas}</span>
+        <span className="text-[8.5px] font-bold text-gray-400 uppercase tracking-wider mt-1 text-center">Subt.</span>
+      </div>
+      <div className="w-px h-6 bg-gray-200 shrink-0"></div>
+      <div 
+        onClick={() => setExternalFilter("Epic")} 
+        className="flex flex-col items-center flex-1 cursor-pointer hover:bg-gray-100/80 rounded py-1 transition-all active:scale-95 group"
+      >
+        <span className="text-[1.15rem] font-bold text-gray-700 leading-none group-hover:text-blue-600 transition-colors">{epicas}</span>
+        <span className="text-[8.5px] font-bold text-gray-400 uppercase tracking-wider mt-1 text-center">Épicas</span>
+      </div>
+    </div>
+  );
+
   const kpiCards = [
     {
       label: "Total Tickets",
-      value: stats.total,
+      value: (
+        <div className="w-full">
+          <div className="flex items-center gap-2">
+            <span className="text-3xl font-bold font-[family-name:var(--font-heading)] text-gray-900">{stats.total}</span>
+            {externalFilter && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 text-blue-600 text-xs font-semibold cursor-pointer hover:bg-blue-100" onClick={() => setExternalFilter("")} title="Limpiar filtro">
+                {externalFilter}
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
+              </span>
+            )}
+          </div>
+          <TypeCounters historias={stats.historias} subtareas={stats.subtareas} epicas={stats.epicas} />
+        </div>
+      ),
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
@@ -211,7 +275,7 @@ export default function DashboardPage() {
       bg: "bg-blue-50",
     },
     {
-      label: "Pendientes",
+      label: (role === "admin" || role === "viewer") ? "Pendientes" : "Mis pendientes",
       value: stats.pendientes,
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -409,7 +473,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Tickets Table */}
-      <TicketTable tickets={tickets} title="Todos los Tickets" statusHistory={statusHistory} />
+      <TicketTable tickets={tickets} title="Todos los Tickets" statusHistory={statusHistory} externalFilterType={externalFilter} />
     </div>
   );
 }
