@@ -979,7 +979,117 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
             };
         }
 
+        // ── Drill-down: hojas de detalle + hipervínculos ─────────────────────────
+        const STATUS_SHORT = ["TPH", "EC", "LPD", "CC", "FIN"];
+        const usedDetNames = new Set(["Historias", "Story Points", "Detalle (Raw)", "Tabla Dinámica"]);
+
+        function makeDetName(parts) {
+            const raw = "D_" + parts.map(p => String(p).replace(/[\\\/\?\*\[\]:]/g, "")).join("_");
+            let name = raw.substring(0, 31);
+            if (!usedDetNames.has(name)) { usedDetNames.add(name); return name; }
+            let i = 2;
+            while (usedDetNames.has(raw.substring(0, 28) + "_" + i)) i++;
+            const n = raw.substring(0, 28) + "_" + i;
+            usedDetNames.add(n); return n;
+        }
+
+        function buildDetSheet(rows) {
+            const hdr = ["Clave", "Resumen", "Sprint", "Persona asignada", "Story Points", "Estado"];
+            const data = rows.map(r => ({
+                "Clave": r["Clave"], "Resumen": r["Resumen"],
+                "Sprint": r["Sprint"], "Persona asignada": r["Persona asignada"],
+                "Story Points": r["Story Points"], "Estado": r["Estado"],
+            }));
+            const ws = XLSX.utils.json_to_sheet(data, { header: hdr });
+            ws["!cols"] = [{ wch: 14 }, { wch: 50 }, { wch: 20 }, { wch: 22 }, { wch: 13 }, { wch: 22 }];
+            if (ws["!ref"]) {
+                const rng = XLSX.utils.decode_range(ws["!ref"]);
+                for (let R = rng.s.r; R <= rng.e.r; R++) {
+                    for (let C = rng.s.c; C <= rng.e.c; C++) {
+                        const a = XLSX.utils.encode_cell({ r: R, c: C });
+                        if (!ws[a]) continue;
+                        const h = R === 0;
+                        ws[a].s = {
+                            font: { name: "Arial", sz: 10, bold: h, color: h ? { rgb: "FFFFFFFF" } : undefined },
+                            fill: h ? { fgColor: { rgb: "FF4B5563" } } : undefined,
+                            alignment: { horizontal: C === 1 ? "left" : "center", vertical: "center" },
+                            border: { top: BDR, bottom: BDR, left: BDR, right: BDR },
+                        };
+                    }
+                }
+            }
+            return ws;
+        }
+
+        // Precomputar sheets por (persona×estado), (persona total) y (estado total)
+        const cellDetSheet = [];    // [pi][si] = sheet name
+        const personaTotName = [];  // [pi] = sheet name para total fila
+        const statusTotName  = [];  // [si] = sheet name para total columna
+        const detailSheets   = [];  // [{ name, ws }]
+
+        for (let pi = 0; pi < pivotData.length; pi++) {
+            const persona = pivotData[pi].assignee;
+            const personaRows = rowsRaw.filter(r => r["Persona asignada"] === persona);
+            cellDetSheet[pi] = [];
+
+            for (let si = 0; si < STATUS_COLUMNS.length; si++) {
+                const sc = STATUS_COLUMNS[si];
+                const cellRows = personaRows.filter(r => sc.jiraStatuses.includes(r["Estado"]));
+                if (cellRows.length > 0) {
+                    const name = makeDetName([persona.substring(0, 14), STATUS_SHORT[si]]);
+                    cellDetSheet[pi][si] = name;
+                    detailSheets.push({ name, ws: buildDetSheet(cellRows) });
+                }
+            }
+
+            if (personaRows.length > 0) {
+                const name = makeDetName([persona.substring(0, 20), "TOT"]);
+                personaTotName[pi] = name;
+                detailSheets.push({ name, ws: buildDetSheet(personaRows) });
+            }
+        }
+
+        for (let si = 0; si < STATUS_COLUMNS.length; si++) {
+            const sc = STATUS_COLUMNS[si];
+            const stRows = rowsRaw.filter(r => sc.jiraStatuses.includes(r["Estado"]));
+            if (stRows.length > 0) {
+                const name = makeDetName(["TOT", STATUS_SHORT[si]]);
+                statusTotName[si] = name;
+                detailSheets.push({ name, ws: buildDetSheet(stRows) });
+            }
+        }
+
+        // Agregar hipervínculos en celdas de wsTD
+        function addLink(c, r, sheetName) {
+            if (!sheetName) return;
+            const addr = XLSX.utils.encode_cell({ c, r });
+            if (!wsTD[addr]) return;
+            wsTD[addr].l = { Target: `#'${sheetName}'!A1` };
+        }
+
+        // Filas de datos: ri = 5 + pi (0-indexed)
+        for (let pi = 0; pi < pivotData.length; pi++) {
+            const ri = 5 + pi;
+            for (let si = 0; si < STATUS_COLUMNS.length; si++) {
+                addLink(1 + si, ri, cellDetSheet[pi][si]);   // tabla izq
+                addLink(9 + si, ri, cellDetSheet[pi][si]);   // tabla der (mismo detalle)
+            }
+            addLink(6,  ri, personaTotName[pi]);  // total izq
+            addLink(14, ri, personaTotName[pi]);  // total der
+        }
+
+        // Fila "Total general"
+        for (let si = 0; si < STATUS_COLUMNS.length; si++) {
+            addLink(1 + si, totIdx, statusTotName[si]);
+            addLink(9 + si, totIdx, statusTotName[si]);
+        }
+        addLink(6,  totIdx, "Detalle (Raw)");
+        addLink(14, totIdx, "Detalle (Raw)");
+
         XLSX.utils.book_append_sheet(wb, wsTD, "Tabla Dinámica");
+        for (const { name, ws } of detailSheets) {
+            XLSX.utils.book_append_sheet(wb, ws, name);
+        }
 
         XLSX.writeFile(wb, `Reporte_Jira_${selectedSprint ? selectedSprint.replace(/\s+/g, '_') : 'Todos'}_${dateStr}.xlsx`);
     };
