@@ -3,6 +3,7 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import * as XLSX from "xlsx-js-style";
+import JSZip from "jszip";
 import { Download } from "lucide-react";
 import { getCurrentSprint } from "@/lib/cronogramaData";
 
@@ -628,470 +629,76 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
         setSubtasksModal({ assigneeName, subtasks: assigneeSubtasks });
     }
 
-    const exportToExcel = () => {
-        const now = new Date();
-        const dateStr = now.toLocaleDateString("es-PE").replace(/\//g, "-");
+    const exportToExcel = async () => {
+        try {
+            const now = new Date();
+            const dateStr = now.toLocaleDateString("es-PE").replace(/\//g, "-");
 
-        // --- Hoja 1: Historias por integrante ---
-        const headers1 = ["Integrante", ...STATUS_COLUMNS.map(c => c.label), "Historias", "Soporte e Incidencias", "TOTAL"];
-        const rows1 = pivotData.map(row => {
-            const data = { Integrante: row.assignee };
-            STATUS_COLUMNS.forEach(col => { data[col.label] = row[col.key]; });
-            data["Historias"] = row.total;
-            data["Soporte e Incidencias"] = row.subtareasCount;
-            data["TOTAL"] = row.puntajeTotal;
-            return data;
-        });
-
-        // Totales row 1
-        const tRow1 = { Integrante: "TOTAL" };
-        STATUS_COLUMNS.forEach(col => { tRow1[col.label] = totals[col.key]; });
-        tRow1["Historias"] = totals.total;
-        tRow1["Soporte e Incidencias"] = totals.subtareasCount;
-        tRow1["TOTAL"] = totals.puntajeTotal;
-        rows1.push(tRow1);
-
-        const ws1 = XLSX.utils.json_to_sheet(rows1, { header: headers1 });
-
-        // --- Hoja 2: Story Points por integrante ---
-        const headersSP = ["Integrante", ...STATUS_COLUMNS.map(c => c.label), "Total SP", "Soporte e Incidencias", "TOTAL"];
-        const rowsSP = pivotDataSP.map(row => {
-            const data = { Integrante: row.assignee };
-            STATUS_COLUMNS.forEach(col => { data[col.label] = row[col.key]; });
-            data["Total SP"] = row.total;
-            data["Soporte e Incidencias"] = row.subtareasCount;
-            data["TOTAL"] = row.puntajeTotal;
-            return data;
-        });
-
-        const tRowSP = { Integrante: "TOTAL" };
-        STATUS_COLUMNS.forEach(col => { tRowSP[col.label] = totalsSP[col.key]; });
-        tRowSP["Total SP"] = totalsSP.total;
-        tRowSP["Soporte e Incidencias"] = totalsSP.subtareasCount;
-        tRowSP["TOTAL"] = totalsSP.puntajeTotal;
-        rowsSP.push(tRowSP);
-
-        const wsSP = XLSX.utils.json_to_sheet(rowsSP, { header: headersSP });
-
-        // --- Hoja 3: Historias filtradas (detalle) ---
-        const headersRaw = ["Tipo", "Clave", "Resumen", "Subtareas", "Principal", "Épica", "Sprint", "Persona asignada", "Story Points", "Estado", "Informador", "Creada"];
-        const rowsRaw = filtered.map(t => ({
-            "Tipo": t.issue_type || "",
-            "Clave": t.jira_key || "",
-            "Resumen": t.summary || "",
-            "Subtareas": t.subtask_keys?.join(", ") || "",
-            "Principal": t.parent_key || "",
-            "Épica": resolveEpic(t)?.summary || "",
-            "Sprint": t.sprint || "",
-            "Persona asignada": resolveName(t.assignee_name),
-            "Story Points": t.story_points ?? "",
-            "Estado": t.status || "",
-            "Informador": resolveName(t.reporter_name),
-            "Creada": t.created_at ? formatDate(t.created_at) : "",
-        }));
-        const wsRaw = XLSX.utils.json_to_sheet(rowsRaw, { header: headersRaw });
-
-        // --- Aplicar Estilos a las Hojas ---
-        const applyTableStyles = (ws, isRaw = false) => {
-            if (!ws['!ref']) return;
-            const range = XLSX.utils.decode_range(ws['!ref']);
-            
-            // Configurar anchos de columna
-            if (!isRaw) {
-                ws['!cols'] = [
-                    { wch: 18 }, // Integrante
-                    ...STATUS_COLUMNS.map(() => ({ wch: 16 })), // Statuses
-                    { wch: 12 }, // Historias / Total SP
-                    { wch: 20 }, // Soporte e Incidencias
-                    { wch: 12 }  // TOTAL
-                ];
-            } else {
-                ws['!cols'] = [
-                    { wch: 10 }, // Tipo
-                    { wch: 14 }, // Clave
-                    { wch: 45 }, // Resumen
-                    { wch: 20 }, // Subtareas
-                    { wch: 12 }, // Principal
-                    { wch: 30 }, // Épica
-                    { wch: 14 }, // Sprint
-                    { wch: 18 }, // Persona asignada
-                    { wch: 12 }, // Story Points
-                    { wch: 16 }, // Estado
-                    { wch: 18 }, // Informador
-                    { wch: 16 }  // Creada
-                ];
-            }
-
-            for (let R = range.s.r; R <= range.e.r; ++R) {
-                for (let C = range.s.c; C <= range.e.c; ++C) {
-                    const cellRef = XLSX.utils.encode_cell({ c: C, r: R });
-                    if (!ws[cellRef]) continue;
-
-                    const isHeader = (R === 0);
-                    const isLastRow = (!isRaw && R === range.e.r);
-                    const isLastCol = (!isRaw && C === range.e.c);
-
-                    let font = { name: "Arial", sz: 10 };
-                    let fill = null;
-                    let alignment = { vertical: "center", horizontal: "center" };
-                    
-                    // Alinear primer columna a la izquierda
-                    if (C === 0) alignment.horizontal = "left"; 
-                    if (isRaw && C === 1) alignment.horizontal = "left"; // Resumen left align
-                    
-                    if (isHeader) {
-                        font.bold = true;
-                        font.color = { rgb: "FFFFFFFF" };
-                        fill = { fgColor: { rgb: "FF4B5563" } }; // Gray-600
-                        alignment.horizontal = "center";
-                    } else if (isLastRow) {
-                        font.bold = true;
-                        fill = { fgColor: { rgb: "FFF3F4F6" } }; // Gray-100
-                    } else if (isLastCol) {
-                        font.bold = true;
-                        fill = { fgColor: { rgb: "FFFFF7ED" } }; // Orange-50
-                    }
-
-                    ws[cellRef].s = {
-                        font,
-                        alignment,
-                        fill,
-                        border: {
-                            top: { style: "thin", color: { rgb: "FFD1D5DB" } },
-                            bottom: { style: "thin", color: { rgb: "FFD1D5DB" } },
-                            left: { style: "thin", color: { rgb: "FFD1D5DB" } },
-                            right: { style: "thin", color: { rgb: "FFD1D5DB" } }
-                        }
-                    };
-                }
-            }
-        };
-
-        applyTableStyles(ws1, false);
-        applyTableStyles(wsSP, false);
-        applyTableStyles(wsRaw, true);
-
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws1, "Historias");
-        XLSX.utils.book_append_sheet(wb, wsSP, "Story Points");
-        XLSX.utils.book_append_sheet(wb, wsRaw, "Detalle (Raw)");
-
-        // ── Hoja "Tabla Dinámica" — layout igual al archivo de referencia ─────────
-        const BDR = { style: "thin", color: { rgb: "FFD1D5DB" } };
-        const BORDERS = { top: BDR, bottom: BDR, left: BDR, right: BDR };
-
-        // Colores por estado (bg AARRGGBB, fg AARRGGBB)
-        const STATUS_XL_COLORS = [
-            { bg: "FFF3F4F6", fg: "FF374151" },  // Tareas por hacer: gray
-            { bg: "FFDBEAFE", fg: "FF1D4ED8" },  // En curso: blue
-            { bg: "FFCFFAFE", fg: "FF0E7490" },  // Listo para dev: cyan
-            { bg: "FFFEF3C7", fg: "FFB45309" },  // Control de calidad: amber
-            { bg: "FFD1FAE5", fg: "FF065F46" },  // Finalizada: green
-        ];
-
-        const statusJiraLabels = STATUS_COLUMNS.map(c => c.jiraStatuses[0]);
-        const nPersonas = pivotData.length;
-        const totalRowNum  = 6 + nPersonas;  // fila Excel (1-indexed) con "Total general"
-        const percentRowNum = 8 + nPersonas; // fila Excel con "Total en %"
-        const sprintLabel = selectedSprint || "Todos los sprints";
-
-        // Columnas: A-G = tabla izq (7 cols), H = separador, I-O = tabla der (7 cols)
-        // A=0 B=1 C=2 D=3 E=4 F=5 G=6 H=7 I=8 J=9 K=10 L=11 M=12 N=13 O=14
-        const aoa = [
-            // Fila 1: filtro Tipo
-            ["Tipo", "Historia", "", "", "", "", "", "", "Tipo", "Historia", "", "", "", "", ""],
-            // Fila 2: filtro Sprint
-            ["Sprint", sprintLabel, "", "", "", "", "", "", "Sprint", sprintLabel, "", "", "", "", ""],
-            // Fila 3: vacía
-            Array(15).fill(""),
-            // Fila 4: títulos de tabla
-            ["Cuenta de Clave", "Etiquetas de columna", "", "", "", "", "", "", "Suma de Story Points", "Etiquetas de columna", "", "", "", "", ""],
-            // Fila 5: cabeceras de columna
-            ["Etiquetas de fila", ...statusJiraLabels, "Total general", "", "Etiquetas de fila", ...statusJiraLabels, "Total general"],
-        ];
-
-        // Filas de datos
-        for (const row of pivotData) {
-            const spRow = pivotDataSP.find(r => r.assignee === row.assignee) || {};
-            aoa.push([
-                row.assignee,
-                ...STATUS_COLUMNS.map(c => (row[c.key] > 0 ? row[c.key] : "")),
-                row.total > 0 ? row.total : 0,
-                "",
-                row.assignee,
-                ...STATUS_COLUMNS.map(c => (spRow[c.key] > 0 ? spRow[c.key] : "")),
-                spRow.total > 0 ? spRow.total : 0,
-            ]);
-        }
-
-        // Fila Total general
-        aoa.push([
-            "Total general",
-            ...STATUS_COLUMNS.map(c => totals[c.key] || 0),
-            totals.total || 0,
-            "",
-            "Total general",
-            ...STATUS_COLUMNS.map(c => totalsSP[c.key] || 0),
-            totalsSP.total || 0,
-        ]);
-
-        // Fila vacía
-        aoa.push(Array(15).fill(""));
-
-        // Fila "Total en %" (placeholder — las fórmulas se asignan abajo)
-        aoa.push(["Total en %", "", "", "", "", "", "", "", "Total en %", "", "", "", "", "", ""]);
-
-        const wsTD = XLSX.utils.aoa_to_sheet(aoa);
-
-        // Anchos de columna
-        wsTD["!cols"] = [
-            { wch: 24 }, // A
-            { wch: 17 }, // B: Tareas por hacer
-            { wch: 12 }, // C: En curso
-            { wch: 17 }, // D: LISTO PARA DEV
-            { wch: 19 }, // E: Control de calidad
-            { wch: 12 }, // F: Finalizada
-            { wch: 14 }, // G: Total general
-            { wch:  2 }, // H: separador
-            { wch: 24 }, // I
-            { wch: 17 }, // J
-            { wch: 12 }, // K
-            { wch: 17 }, // L
-            { wch: 19 }, // M
-            { wch: 12 }, // N
-            { wch: 14 }, // O
-        ];
-
-        // Actualizar rango
-        wsTD["!ref"] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: percentRowNum - 1, c: 14 } });
-
-        // ── Estilos ────────────────────────────────────────────────────────────
-        const styleCell = (r, c, style) => {
-            const addr = XLSX.utils.encode_cell({ c, r });
-            if (!wsTD[addr]) wsTD[addr] = { t: "s", v: "" };
-            wsTD[addr].s = { ...style, border: BORDERS };
-        };
-
-        // Fila 5 cabeceras (r=4)
-        // A5 / I5: encabezado "Etiquetas de fila"
-        for (const col of [0, 8]) {
-            styleCell(4, col, {
-                font: { name: "Arial", sz: 10, bold: true, color: { rgb: "FFFFFFFF" } },
-                fill: { fgColor: { rgb: "FF4B5563" } },
-                alignment: { horizontal: "left", vertical: "center" },
-            });
-        }
-        // B5-F5 / J5-N5: cabeceras de estado con color propio
-        for (let si = 0; si < STATUS_COLUMNS.length; si++) {
-            const { bg, fg } = STATUS_XL_COLORS[si];
-            for (const base of [1, 9]) {
-                styleCell(4, base + si, {
-                    font: { name: "Arial", sz: 10, bold: true, color: { rgb: fg } },
-                    fill: { fgColor: { rgb: bg } },
-                    alignment: { horizontal: "center", vertical: "center" },
-                });
-            }
-        }
-        // G5 / O5: "Total general" cabecera
-        for (const col of [6, 14]) {
-            styleCell(4, col, {
-                font: { name: "Arial", sz: 10, bold: true, color: { rgb: "FFFFFFFF" } },
-                fill: { fgColor: { rgb: "FFEA580C" } },
-                alignment: { horizontal: "center", vertical: "center" },
-            });
-        }
-
-        // Filas de datos (r = 5 a 4+nPersonas)
-        for (let ri = 5; ri < 5 + nPersonas; ri++) {
-            // A / I: nombre persona
-            for (const col of [0, 8]) {
-                styleCell(ri, col, {
-                    font: { name: "Arial", sz: 10 },
-                    alignment: { horizontal: "left", vertical: "center" },
-                });
-            }
-            // B-F / J-N: datos de estado
-            for (let si = 0; si < STATUS_COLUMNS.length; si++) {
-                for (const base of [1, 9]) {
-                    styleCell(ri, base + si, {
-                        font: { name: "Arial", sz: 10 },
-                        alignment: { horizontal: "center", vertical: "center" },
-                    });
-                }
-            }
-            // G / O: total persona
-            for (const col of [6, 14]) {
-                styleCell(ri, col, {
-                    font: { name: "Arial", sz: 10, bold: true },
-                    fill: { fgColor: { rgb: "FFFFF7ED" } },
-                    alignment: { horizontal: "center", vertical: "center" },
-                });
-            }
-        }
-
-        // Fila "Total general" (r = totalRowNum - 1)
-        const totIdx = totalRowNum - 1;
-        for (let col = 0; col < 15; col++) {
-            if (col === 7) continue;
-            styleCell(totIdx, col, {
-                font: { name: "Arial", sz: 10, bold: true },
-                fill: { fgColor: { rgb: "FFF3F4F6" } },
-                alignment: { horizontal: col === 0 || col === 8 ? "left" : "center", vertical: "center" },
-            });
-        }
-
-        // Fila "Total en %" (r = percentRowNum - 1) — fórmulas + estilo amarillo
-        const pctIdx = percentRowNum - 1;
-        const pctStyle = {
-            font: { name: "Arial", sz: 10, bold: true },
-            fill: { fgColor: { rgb: "FFFFFF00" } },
-            numFmt: "0.0%",
-            alignment: { horizontal: "center", vertical: "center" },
-            border: BORDERS,
-        };
-        const pctLabelStyle = {
-            font: { name: "Arial", sz: 10, bold: true },
-            fill: { fgColor: { rgb: "FFFFFF00" } },
-            alignment: { horizontal: "left", vertical: "center" },
-            border: BORDERS,
-        };
-
-        // Etiquetas "Total en %"
-        wsTD[XLSX.utils.encode_cell({ c: 0, r: pctIdx })] = { t: "s", v: "Total en %", s: pctLabelStyle };
-        wsTD[XLSX.utils.encode_cell({ c: 8, r: pctIdx })] = { t: "s", v: "Total en %", s: pctLabelStyle };
-
-        // Fórmulas tabla izquierda: B-G / columnas 1-6
-        for (let col = 1; col <= 6; col++) {
-            const letter = String.fromCharCode(65 + col);
-            wsTD[XLSX.utils.encode_cell({ c: col, r: pctIdx })] = {
-                t: "n", v: 0,
-                f: `${letter}${totalRowNum}/$G$${totalRowNum}`,
-                s: pctStyle,
-            };
-        }
-        // Fórmulas tabla derecha: J-O / columnas 9-14
-        for (let col = 9; col <= 14; col++) {
-            const letter = String.fromCharCode(65 + col);
-            wsTD[XLSX.utils.encode_cell({ c: col, r: pctIdx })] = {
-                t: "n", v: 0,
-                f: `${letter}${totalRowNum}/$O$${totalRowNum}`,
-                s: pctStyle,
-            };
-        }
-
-        // ── Drill-down: hojas de detalle + hipervínculos ─────────────────────────
-        const STATUS_SHORT = ["TPH", "EC", "LPD", "CC", "FIN"];
-        const usedDetNames = new Set(["Historias", "Story Points", "Detalle (Raw)", "Tabla Dinámica"]);
-
-        function makeDetName(parts) {
-            const raw = "D_" + parts.map(p => String(p).replace(/[\\\/\?\*\[\]:]/g, "")).join("_");
-            let name = raw.substring(0, 31);
-            if (!usedDetNames.has(name)) { usedDetNames.add(name); return name; }
-            let i = 2;
-            while (usedDetNames.has(raw.substring(0, 28) + "_" + i)) i++;
-            const n = raw.substring(0, 28) + "_" + i;
-            usedDetNames.add(n); return n;
-        }
-
-        function buildDetSheet(rows) {
-            const hdr = ["Clave", "Resumen", "Sprint", "Persona asignada", "Story Points", "Estado"];
-            const data = rows.map(r => ({
-                "Clave": r["Clave"], "Resumen": r["Resumen"],
-                "Sprint": r["Sprint"], "Persona asignada": r["Persona asignada"],
-                "Story Points": r["Story Points"], "Estado": r["Estado"],
+            // ── Hoja "Osi": todos los tickets (sin filtrar) para que los filtros del pivot funcionen
+            const headersOsi = ["Tipo", "Clave", "Resumen", "Subtareas", "Principal", "Épica", "Sprint", "Persona asignada", "Story Points", "Estado", "Informador", "Creada"];
+            const rowsOsi = tickets.map(t => ({
+                "Tipo": t.issue_type || "",
+                "Clave": t.jira_key || "",
+                "Resumen": t.summary || "",
+                "Subtareas": t.subtask_keys?.join(", ") || "",
+                "Principal": t.parent_key || "",
+                "Épica": resolveEpic(t)?.summary || "",
+                "Sprint": t.sprint || "",
+                "Persona asignada": resolveName(t.assignee_name),
+                "Story Points": t.story_points ?? "",
+                "Estado": t.status || "",
+                "Informador": resolveName(t.reporter_name),
+                "Creada": t.created_at ? formatDate(t.created_at) : "",
             }));
-            const ws = XLSX.utils.json_to_sheet(data, { header: hdr });
-            ws["!cols"] = [{ wch: 14 }, { wch: 50 }, { wch: 20 }, { wch: 22 }, { wch: 13 }, { wch: 22 }];
-            if (ws["!ref"]) {
-                const rng = XLSX.utils.decode_range(ws["!ref"]);
-                for (let R = rng.s.r; R <= rng.e.r; R++) {
-                    for (let C = rng.s.c; C <= rng.e.c; C++) {
-                        const a = XLSX.utils.encode_cell({ r: R, c: C });
-                        if (!ws[a]) continue;
-                        const h = R === 0;
-                        ws[a].s = {
-                            font: { name: "Arial", sz: 10, bold: h, color: h ? { rgb: "FFFFFFFF" } : undefined },
-                            fill: h ? { fgColor: { rgb: "FF4B5563" } } : undefined,
-                            alignment: { horizontal: C === 1 ? "left" : "center", vertical: "center" },
-                            border: { top: BDR, bottom: BDR, left: BDR, right: BDR },
-                        };
-                    }
-                }
-            }
-            return ws;
-        }
 
-        // Precomputar sheets por (persona×estado), (persona total) y (estado total)
-        const cellDetSheet = [];    // [pi][si] = sheet name
-        const personaTotName = [];  // [pi] = sheet name para total fila
-        const statusTotName  = [];  // [si] = sheet name para total columna
-        const detailSheets   = [];  // [{ name, ws }]
+            // 1. Generar mini-xlsx con solo la hoja Osi para extraer el XML
+            const wsOsi = XLSX.utils.json_to_sheet(rowsOsi, { header: headersOsi });
+            const wbOsi = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wbOsi, wsOsi, "Osi");
+            const osiBuf = XLSX.write(wbOsi, { bookType: "xlsx", type: "array" });
+            const osiZip = await JSZip.loadAsync(osiBuf);
+            const osiSheetXml = await osiZip.file("xl/worksheets/sheet1.xml").async("string");
+            const osiSharedStr = osiZip.file("xl/sharedStrings.xml");
+            const osiSharedStrXml = osiSharedStr ? await osiSharedStr.async("string") : null;
 
-        for (let pi = 0; pi < pivotData.length; pi++) {
-            const persona = pivotData[pi].assignee;
-            const personaRows = rowsRaw.filter(r => r["Persona asignada"] === persona);
-            cellDetSheet[pi] = [];
+            // 2. Cargar template
+            const templateRes = await fetch("/templates/reporte_template.xlsx");
+            const templateBuf = await templateRes.arrayBuffer();
+            const zip = await JSZip.loadAsync(templateBuf);
 
-            for (let si = 0; si < STATUS_COLUMNS.length; si++) {
-                const sc = STATUS_COLUMNS[si];
-                const cellRows = personaRows.filter(r => sc.jiraStatuses.includes(r["Estado"]));
-                if (cellRows.length > 0) {
-                    const name = makeDetName([persona.substring(0, 14), STATUS_SHORT[si]]);
-                    cellDetSheet[pi][si] = name;
-                    detailSheets.push({ name, ws: buildDetSheet(cellRows) });
-                }
+            // 3. Reemplazar hoja "Osi" (sheet2.xml) y sharedStrings
+            zip.file("xl/worksheets/sheet2.xml", osiSheetXml);
+            if (osiSharedStrXml) {
+                zip.file("xl/sharedStrings.xml", osiSharedStrXml);
             }
 
-            if (personaRows.length > 0) {
-                const name = makeDetName([persona.substring(0, 20), "TOT"]);
-                personaTotName[pi] = name;
-                detailSheets.push({ name, ws: buildDetSheet(personaRows) });
+            // 4. Parchear pivotCacheDefinition: refreshOnLoad="1" y actualizar recordCount
+            let cacheDef = await zip.file("xl/pivotCache/pivotCacheDefinition1.xml").async("string");
+            if (!cacheDef.includes("refreshOnLoad")) {
+                cacheDef = cacheDef.replace("<pivotCacheDefinition ", '<pivotCacheDefinition refreshOnLoad="1" ');
             }
-        }
+            cacheDef = cacheDef.replace(/recordCount="\d+"/, `recordCount="${rowsOsi.length}"`);
+            zip.file("xl/pivotCache/pivotCacheDefinition1.xml", cacheDef);
 
-        for (let si = 0; si < STATUS_COLUMNS.length; si++) {
-            const sc = STATUS_COLUMNS[si];
-            const stRows = rowsRaw.filter(r => sc.jiraStatuses.includes(r["Estado"]));
-            if (stRows.length > 0) {
-                const name = makeDetName(["TOT", STATUS_SHORT[si]]);
-                statusTotName[si] = name;
-                detailSheets.push({ name, ws: buildDetSheet(stRows) });
-            }
-        }
+            // 5. Vaciar cache records (Excel los reconstruye al abrir con refreshOnLoad=1)
+            zip.file("xl/pivotCache/pivotCacheRecords1.xml",
+                '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+                '<pivotCacheRecords xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="0"/>');
 
-        // Agregar hipervínculos en celdas de wsTD
-        function addLink(c, r, sheetName) {
-            if (!sheetName) return;
-            const addr = XLSX.utils.encode_cell({ c, r });
-            if (!wsTD[addr]) return;
-            wsTD[addr].l = { Target: `#'${sheetName}'!A1` };
+            // 6. Descargar
+            const blob = await zip.generateAsync({ type: "blob" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `Reporte_Jira_${selectedSprint ? selectedSprint.replace(/\s+/g, "_") : "Todos"}_${dateStr}.xlsx`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error("Error al exportar Excel:", err);
+            alert("Error al generar el Excel. Ver consola para detalles.");
         }
-
-        // Filas de datos: ri = 5 + pi (0-indexed)
-        for (let pi = 0; pi < pivotData.length; pi++) {
-            const ri = 5 + pi;
-            for (let si = 0; si < STATUS_COLUMNS.length; si++) {
-                addLink(1 + si, ri, cellDetSheet[pi][si]);   // tabla izq
-                addLink(9 + si, ri, cellDetSheet[pi][si]);   // tabla der (mismo detalle)
-            }
-            addLink(6,  ri, personaTotName[pi]);  // total izq
-            addLink(14, ri, personaTotName[pi]);  // total der
-        }
-
-        // Fila "Total general"
-        for (let si = 0; si < STATUS_COLUMNS.length; si++) {
-            addLink(1 + si, totIdx, statusTotName[si]);
-            addLink(9 + si, totIdx, statusTotName[si]);
-        }
-        addLink(6,  totIdx, "Detalle (Raw)");
-        addLink(14, totIdx, "Detalle (Raw)");
-
-        XLSX.utils.book_append_sheet(wb, wsTD, "Tabla Dinámica");
-        for (const { name, ws } of detailSheets) {
-            XLSX.utils.book_append_sheet(wb, ws, name);
-        }
-
-        XLSX.writeFile(wb, `Reporte_Jira_${selectedSprint ? selectedSprint.replace(/\s+/g, '_') : 'Todos'}_${dateStr}.xlsx`);
     };
 
     return (
