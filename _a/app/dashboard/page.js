@@ -70,7 +70,7 @@ export default function DashboardPage() {
     while (hasMore) {
       const { data, error } = await supabase
         .from("jira_tickets")
-        .select("jira_key, summary, status, issue_type, sprint, story_points, assignee_name, assignee_email, reporter_name, reporter_email, parent_key, subtask_keys, linked_keys, created_at, updated_at, synced_at, comentario, priority")
+        .select("jira_key, summary, status, issue_type, sprint, story_points, assignee_email, reporter_email, parent_key, created_at, updated_at, synced_at, comentario, priority")
         .order("updated_at", { ascending: false })
         .range(from, from + pageSize - 1);
 
@@ -87,36 +87,44 @@ export default function DashboardPage() {
     if (allData.length > 0) {
       setTickets(allData);
 
-      const pf3Tickets = allData.filter(t => t.jira_key?.startsWith("PF3-"));
+      const pf3TicketMap = {};
+      allData.filter(t => t.jira_key?.startsWith("PF3-")).forEach(t => {
+        pf3TicketMap[t.jira_key] = t.sprint || "";
+      });
 
-      // --- Errores classification via linked_keys ---
+      // --- Errores classification via jira_ticket_links (tabla normalizada) ---
       const bugsQA = allData.filter(t =>
         ["Bug", "Error", "Error Desarrollo", "Error Certificación", "Error en Certificación"].includes(t.issue_type) &&
         t.jira_key?.startsWith("PF3QA-") &&
         t.sprint === "Tablero Sprint 2"
       );
 
-      // Build a map of linked PF3 story sprints
-      const linkedStoriesMap = {};
-      const allLinkedKeys = Array.from(new Set(
-        bugsQA.flatMap(bug => (Array.isArray(bug.linked_keys) ? bug.linked_keys : []))
-      ));
-      pf3Tickets
-        .filter(t => allLinkedKeys.includes(t.jira_key))
-        .forEach(t => { linkedStoriesMap[t.jira_key] = t.sprint || ""; });
+      // Obtener links de los bugs desde la tabla relacional
+      const bugKeys = bugsQA.map(b => b.jira_key);
+      const linksMap = {};
+      if (bugKeys.length > 0) {
+        const { data: linkRows } = await supabase
+          .from("jira_ticket_links")
+          .select("source_key, target_key")
+          .in("source_key", bugKeys);
+        for (const row of linkRows || []) {
+          if (!linksMap[row.source_key]) linksMap[row.source_key] = [];
+          linksMap[row.source_key].push(row.target_key);
+        }
+      }
 
       const certBugs = bugsQA.filter(bug => {
-        const links = Array.isArray(bug.linked_keys) ? bug.linked_keys : [];
-        return links.some(lk => {
-          const s = linkedStoriesMap[lk] || "";
+        const targets = linksMap[bug.jira_key] || [];
+        return targets.some(tk => {
+          const s = pf3TicketMap[tk] || "";
           return s.includes("F3.01") || s.includes("F3.02");
         });
       });
 
       const desBugs = bugsQA.filter(bug => {
-        const links = Array.isArray(bug.linked_keys) ? bug.linked_keys : [];
-        return links.some(lk => {
-          const s = linkedStoriesMap[lk] || "";
+        const targets = linksMap[bug.jira_key] || [];
+        return targets.some(tk => {
+          const s = pf3TicketMap[tk] || "";
           return s.includes("F3.03") || s.includes("F3.4") || s.includes("F3.5");
         });
       });

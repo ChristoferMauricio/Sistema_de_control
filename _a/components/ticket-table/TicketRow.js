@@ -210,7 +210,7 @@ export default function TicketRow({
         {/* ── Asignado ── */}
         {showAssignee && (
           <td className="px-4 py-3">
-            <span className="text-gray-600 text-xs">{resolveName(ticket.assignee_name)}</span>
+            <span className="text-gray-600 text-xs">{resolveName(ticket.assignee_email)}</span>
           </td>
         )}
 
@@ -240,7 +240,7 @@ export default function TicketRow({
 
         {/* ── Informador ── */}
         <td className="px-4 py-3">
-          <span className="text-gray-600 text-xs">{resolveName(ticket.reporter_name)}</span>
+          <span className="text-gray-600 text-xs">{resolveName(ticket.reporter_email)}</span>
         </td>
 
         {/* ── Creada ── */}

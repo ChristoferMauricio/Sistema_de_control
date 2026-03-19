@@ -13,49 +13,55 @@ export default function ErroresDesarrolloPage() {
       // 1. Fetch PF3QA bugs from active Sprint 2
       const { data: bugsQA, error } = await supabase
         .from("jira_tickets")
-        .select("jira_key, summary, status, issue_type, sprint, story_points, assignee_name, assignee_email, reporter_name, reporter_email, parent_key, linked_keys, created_at, updated_at, comentario, priority")
+        .select("jira_key, summary, status, issue_type, sprint, story_points, assignee_email, reporter_email, parent_key, created_at, updated_at, comentario, priority")
         .in("issue_type", ["Bug", "Error", "Error Desarrollo", "Error Certificación", "Error en Certificación"])
         .like("jira_key", "PF3QA-%")
         .eq("sprint", "Tablero Sprint 2")
         .order("updated_at", { ascending: false });
 
       if (!error && bugsQA && bugsQA.length > 0) {
-        // 2. Extract unique linked keys
-        const allLinkedKeys = Array.from(new Set(
-          bugsQA.flatMap(bug => (Array.isArray(bug.linked_keys) ? bug.linked_keys : []))
-        ));
+        const bugKeys = bugsQA.map(b => b.jira_key);
 
-        let linkedStoriesMap = {};
-        if (allLinkedKeys.length > 0) {
+        // 2. Obtener links desde jira_ticket_links (tabla normalizada)
+        const { data: linkRows } = await supabase
+          .from("jira_ticket_links")
+          .select("source_key, target_key")
+          .in("source_key", bugKeys);
+
+        // Mapa: bugKey → [targetKeys]
+        const linksMap = {};
+        for (const row of linkRows || []) {
+          if (!linksMap[row.source_key]) linksMap[row.source_key] = [];
+          linksMap[row.source_key].push(row.target_key);
+        }
+
+        // 3. Obtener sprints de los tickets vinculados
+        const allTargetKeys = Array.from(new Set(Object.values(linksMap).flat()));
+        const linkedStoriesMap = {};
+        if (allTargetKeys.length > 0) {
           const { data: linkedStories } = await supabase
             .from("jira_tickets")
             .select("jira_key, sprint")
-            .in("jira_key", allLinkedKeys);
-            
-          if (linkedStories) {
-            linkedStories.forEach(st => {
-              linkedStoriesMap[st.jira_key] = st.sprint || "";
-            });
-          }
+            .in("jira_key", allTargetKeys);
+          (linkedStories || []).forEach(st => {
+            linkedStoriesMap[st.jira_key] = st.sprint || "";
+          });
         }
 
-        // 3. Filter out bugs that Map to Desarrollo (Iteración F3.03, F3.4, and F3.5)
+        // 4. Filtrar bugs que apuntan a Desarrollo (F3.03, F3.4, F3.5)
         const desBugs = bugsQA.filter(bug => {
-          const links = Array.isArray(bug.linked_keys) ? bug.linked_keys : [];
-          return links.some(linkKey => {
-            const sprintStr = linkedStoriesMap[linkKey] || "";
-            return sprintStr.includes("F3.03") || sprintStr.includes("F3.4") || sprintStr.includes("F3.5");
+          const targets = linksMap[bug.jira_key] || [];
+          return targets.some(tk => {
+            const sprint = linkedStoriesMap[tk] || "";
+            return sprint.includes("F3.03") || sprint.includes("F3.4") || sprint.includes("F3.5");
           });
         });
 
-        // 4. Transform rendering structure
+        // 5. Adjuntar storySprint para la tabla
         const updatedTickets = desBugs.map(b => {
-          const links = Array.isArray(b.linked_keys) ? b.linked_keys : [];
-          const sprints = [...new Set(links.map(lk => linkedStoriesMap[lk]).filter(Boolean))];
-          return {
-            ...b,
-            storySprint: sprints.join(', ') || '—'
-          };
+          const targets = linksMap[b.jira_key] || [];
+          const sprints = [...new Set(targets.map(tk => linkedStoriesMap[tk]).filter(Boolean))];
+          return { ...b, storySprint: sprints.join(", ") || "—" };
         });
 
         setTickets(updatedTickets);

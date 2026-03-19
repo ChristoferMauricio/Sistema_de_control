@@ -401,6 +401,14 @@ function SubtasksModal({ assigneeName, subtasks, onClose }) {
 // ─── Main Table ─────────────────────────────────────────────
 export default function ReportesTable({ tickets = [], nombres = [] }) {
     const [selectedSprint, setSelectedSprint] = useState(() => getCurrentSprint(new Date())?.iteracion || "");
+    const [persons, setPersons] = useState([]);
+
+    // Cargar jira_persons para resolver email → displayName
+    useEffect(() => {
+        supabase.from("jira_persons").select("email, display_name").then(({ data }) => {
+            if (data) setPersons(data);
+        });
+    }, []);
     const [traceModal, setTraceModal] = useState(null); // { assigneeName, stories }
     const [subtasksModal, setSubtasksModal] = useState(null); // { assigneeName, subtasks }
 
@@ -504,6 +512,7 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
     }, [tickets, selectedSprint, filtered]);
 
     // Crear mapa de Programador → Nombre (case-insensitive)
+    // nameMap: jiraDisplayName.lower → alias personalizado (tabla Nombres)
     const nameMap = useMemo(() => {
         const map = {};
         nombres.forEach((n) => {
@@ -512,9 +521,18 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
         return map;
     }, [nombres]);
 
-    function resolveName(assigneeName) {
-        if (!assigneeName || assigneeName.trim() === "") return "Sin asignar";
-        return nameMap[assigneeName.toLowerCase()] || assigneeName;
+    // personsMap: email → jira displayName
+    const personsMap = useMemo(() => {
+        const map = {};
+        persons.forEach((p) => { if (p.email) map[p.email] = p.display_name; });
+        return map;
+    }, [persons]);
+
+    // Recibe email → displayName (jira_persons) → alias (Nombres) → fallback email
+    function resolveName(email) {
+        if (!email || email.trim() === "") return "Sin asignar";
+        const displayName = personsMap[email] || email;
+        return nameMap[displayName.toLowerCase()] || displayName;
     }
 
     // Crear mapa inverso: Nombre → lista de Programador keys
@@ -534,7 +552,7 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
         const map = {};
 
         filtered.forEach((t) => {
-            const realName = resolveName(t.assignee_name);
+            const realName = resolveName(t.assignee_email);
             if (!map[realName]) {
                 map[realName] = { assignee: realName, total: 0, subtareasCount: 0 };
                 STATUS_COLUMNS.forEach((col) => { map[realName][col.key] = 0; });
@@ -552,7 +570,7 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
 
         // Contar subtareas
         filteredSubtasks.forEach((t) => {
-            const realName = resolveName(t.assignee_name);
+            const realName = resolveName(t.assignee_email);
             if (!map[realName]) {
                 map[realName] = { assignee: realName, total: 0, subtareasCount: 0 };
                 STATUS_COLUMNS.forEach((col) => { map[realName][col.key] = 0; });
@@ -584,7 +602,7 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
         const map = {};
 
         filtered.forEach((t) => {
-            const realName = resolveName(t.assignee_name);
+            const realName = resolveName(t.assignee_email);
             const sp = parseFloat(t.story_points) || 0;
             if (!map[realName]) {
                 map[realName] = { assignee: realName, total: 0, subtareasCount: 0 };
@@ -603,7 +621,7 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
 
         // Contar subtareas para la tabla de SP (cada subtarea = 1)
         filteredSubtasks.forEach((t) => {
-            const realName = resolveName(t.assignee_name);
+            const realName = resolveName(t.assignee_email);
             if (!map[realName]) {
                 map[realName] = { assignee: realName, total: 0, subtareasCount: 0 };
                 STATUS_COLUMNS.forEach((col) => { map[realName][col.key] = 0; });
@@ -633,7 +651,7 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
     function openTrace(assigneeName) {
         // Find all stories for this assignee
         const storiesForAssignee = filtered.filter((t) => {
-            const resolved = resolveName(t.assignee_name);
+            const resolved = resolveName(t.assignee_email);
             return resolved === assigneeName;
         });
         setTraceModal({ assigneeName, stories: storiesForAssignee });
@@ -642,7 +660,7 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
     // Open subtasks modal for a given assignee
     function openSubtasks(assigneeName) {
         const assigneeSubtasks = filteredSubtasks.filter((t) => {
-            const resolved = resolveName(t.assignee_name);
+            const resolved = resolveName(t.assignee_email);
             return resolved === assigneeName;
         });
         setSubtasksModal({ assigneeName, subtasks: assigneeSubtasks });
@@ -663,10 +681,10 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                 "Principal": t.parent_key || "",
                 "Épica": resolveEpic(t)?.summary || "",
                 "Sprint": t.sprint || "",
-                "Persona asignada": resolveName(t.assignee_name),
+                "Persona asignada": resolveName(t.assignee_email),
                 "Story Points": t.story_points ?? "",
                 "Estado": t.status || "",
-                "Informador": resolveName(t.reporter_name),
+                "Informador": resolveName(t.reporter_email),
                 "Creada": t.created_at ? formatDate(t.created_at) : "",
             }));
 

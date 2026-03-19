@@ -166,7 +166,7 @@ export default function ObservacionesSupervisorTable({ tickets, nombresData }) {
       ...t,
       resolved_epic: resolveEpic(t),
       iteration_name: resolveIteration(t),
-      assignee_full: getAssigneeFullName(t.assignee_name),
+      assignee_full: getAssigneeFullName(t.assignee_email),
       // Use optimistic comment if it exists, otherwise use DB comment
       display_comment: localComments.hasOwnProperty(t.jira_key) ? localComments[t.jira_key] : (t.comentario || ""),
     }));

@@ -138,14 +138,14 @@ export default function TicketTable({
       "Observaciones":   localComments[t.jira_key] !== undefined ? localComments[t.jira_key] : (t.comentario || ""),
       "Clave":            t.jira_key || "",
       "Resumen":          t.summary || "",
-      "Subtareas":        t.subtask_keys?.join(", ") || "",
+      "Subtareas":        "",
       "Principal":        t.parent_key || "",
       "Épica":            resolveEpic(t)?.summary || "",
       "Sprint":           t.sprint || "",
-      "Persona asignada": resolveName(t.assignee_name),
+      "Persona asignada": resolveName(t.assignee_email),
       "Story Points":     t.story_points ?? "",
       "Estado":           t.status || "",
-      "Informador":       resolveName(t.reporter_name),
+      "Informador":       resolveName(t.reporter_email),
       "Creada":           t.created_at ? formatDate(t.created_at) : "",
     }));
 

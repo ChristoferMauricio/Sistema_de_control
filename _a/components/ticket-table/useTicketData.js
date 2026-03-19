@@ -38,7 +38,8 @@ export function useTicketData({ tickets = [], externalFilterType = "", defaultFi
   const [filterEpic, setFilterEpic]             = useState("");
   const [filterComentario, setFilterComentario] = useState("");
 
-  const [nombres, setNombres] = useState([]);
+  const [nombres, setNombres]   = useState([]);
+  const [persons, setPersons]   = useState([]); // jira_persons: { email, display_name }
 
   // ── Sync con filtros externos (props) ──────────────────────────────────────
   useEffect(() => {
@@ -82,15 +83,20 @@ export function useTicketData({ tickets = [], externalFilterType = "", defaultFi
     window.history.replaceState({}, "", newUrl);
   }, [filterSprint, filterType, filterStatus]);
 
-  // ── Fetch Nombres ──────────────────────────────────────────────────────────
+  // ── Fetch Nombres + jira_persons ──────────────────────────────────────────
   useEffect(() => {
-    async function fetchNombres() {
-      const { data } = await supabase.from("Nombres").select("Nombre, Programador");
-      if (data) setNombres(data);
+    async function fetchPersonData() {
+      const [nombresRes, personsRes] = await Promise.all([
+        supabase.from("Nombres").select("Nombre, Programador"),
+        supabase.from("jira_persons").select("email, display_name"),
+      ]);
+      if (nombresRes.data)  setNombres(nombresRes.data);
+      if (personsRes.data)  setPersons(personsRes.data);
     }
-    fetchNombres();
+    fetchPersonData();
   }, []);
 
+  // nameMap: jiraDisplayName.lower → Nombres.Nombre (alias personalizado)
   const nameMap = useMemo(() => {
     const map = {};
     nombres.forEach((n) => {
@@ -99,12 +105,24 @@ export function useTicketData({ tickets = [], externalFilterType = "", defaultFi
     return map;
   }, [nombres]);
 
+  // personsMap: email → jira displayName
+  const personsMap = useMemo(() => {
+    const map = {};
+    persons.forEach((p) => { if (p.email) map[p.email] = p.display_name; });
+    return map;
+  }, [persons]);
+
+  /**
+   * Recibe un email → devuelve nombre personalizado (Nombres) o displayName de Jira
+   * Cadena: email → personsMap → nameMap → fallback email
+   */
   const resolveName = useCallback(
-    (rawName) => {
-      if (!rawName || rawName.trim() === "") return "—";
-      return nameMap[rawName.toLowerCase()] || rawName;
+    (email) => {
+      if (!email || email.trim() === "") return "—";
+      const displayName = personsMap[email] || email;
+      return nameMap[displayName.toLowerCase()] || displayName;
     },
-    [nameMap]
+    [nameMap, personsMap]
   );
 
   // ── Mapa de tickets y resolución de épica ──────────────────────────────────
@@ -151,11 +169,11 @@ export function useTicketData({ tickets = [], externalFilterType = "", defaultFi
     [tickets]
   );
   const uniqueAssignees = useMemo(() => {
-    const resolved = tickets.map((t) => resolveName(t.assignee_name)).filter((v) => v && v !== "—");
+    const resolved = tickets.map((t) => resolveName(t.assignee_email)).filter((v) => v && v !== "—");
     return [...new Set(resolved)].sort();
   }, [tickets, resolveName]);
   const uniqueReporters = useMemo(() => {
-    const resolved = tickets.map((t) => resolveName(t.reporter_name)).filter((v) => v && v !== "—");
+    const resolved = tickets.map((t) => resolveName(t.reporter_email)).filter((v) => v && v !== "—");
     return [...new Set(resolved)].sort();
   }, [tickets, resolveName]);
 
@@ -178,7 +196,7 @@ export function useTicketData({ tickets = [], externalFilterType = "", defaultFi
         (t) =>
           t.jira_key?.toLowerCase().includes(q) ||
           t.summary?.toLowerCase().includes(q) ||
-          resolveName(t.assignee_name)?.toLowerCase().includes(q) ||
+          resolveName(t.assignee_email)?.toLowerCase().includes(q) ||
           t.status?.toLowerCase().includes(q) ||
           t.issue_type?.toLowerCase().includes(q) ||
           t.sprint?.toLowerCase().includes(q)
@@ -208,16 +226,16 @@ export function useTicketData({ tickets = [], externalFilterType = "", defaultFi
       });
     }
 
-    if (filterAssignee) result = result.filter((t) => resolveName(t.assignee_name) === filterAssignee);
-    if (filterReporter) result = result.filter((t) => resolveName(t.reporter_name) === filterReporter);
+    if (filterAssignee) result = result.filter((t) => resolveName(t.assignee_email) === filterAssignee);
+    if (filterReporter) result = result.filter((t) => resolveName(t.reporter_email) === filterReporter);
 
     result.sort((a, b) => {
       let aVal = a[sortField] || "";
       let bVal = b[sortField] || "";
 
       if (sortField === "assignee_name") {
-        aVal = resolveName(a.assignee_name);
-        bVal = resolveName(b.assignee_name);
+        aVal = resolveName(a.assignee_email);
+        bVal = resolveName(b.assignee_email);
       } else if (sortField === "epic") {
         const epicA = resolveEpic(a);
         const epicB = resolveEpic(b);
