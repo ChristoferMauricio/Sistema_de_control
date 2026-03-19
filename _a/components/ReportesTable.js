@@ -68,7 +68,7 @@ function TraceModal({ assigneeName, stories, onClose }) {
             const batch = keys.slice(i, i + batchSize);
             const { data } = await supabase
                 .from("jira_ticket_status_history")
-                .select("*")
+                .select("jira_key, old_status, new_status, changed_at")
                 .in("jira_key", batch)
                 .order("changed_at", { ascending: true });
             if (data) allHistory = [...allHistory, ...data];

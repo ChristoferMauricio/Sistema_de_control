@@ -47,7 +47,7 @@ export default function IncidenciasPage() {
       // Fetch GSM for description matching
       const { data: gsm, error: gsmError } = await supabase
         .from("gsm")
-        .select("*");
+        .select("id, nombre, modalidad, cargo, correo");
 
       if (gsm && !gsmError) {
         setGsmData(gsm);

@@ -13,7 +13,7 @@ export default function ErroresCertificacionPage() {
       // 1. Fetch PF3QA bugs from active Sprint 2
       const { data: bugsQA, error } = await supabase
         .from("jira_tickets")
-        .select("*")
+        .select("jira_key, summary, status, issue_type, sprint, story_points, assignee_name, assignee_email, reporter_name, reporter_email, parent_key, linked_keys, created_at, updated_at, comentario, priority")
         .in("issue_type", ["Bug", "Error", "Error Desarrollo", "Error Certificación", "Error en Certificación"])
         .like("jira_key", "PF3QA-%")
         .eq("sprint", "Tablero Sprint 2")

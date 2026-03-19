@@ -70,7 +70,7 @@ export default function DashboardPage() {
     while (hasMore) {
       const { data, error } = await supabase
         .from("jira_tickets")
-        .select("*")
+        .select("jira_key, summary, status, issue_type, sprint, story_points, assignee_name, assignee_email, reporter_name, reporter_email, parent_key, subtask_keys, linked_keys, created_at, updated_at, synced_at, comentario, priority")
         .order("updated_at", { ascending: false })
         .range(from, from + pageSize - 1);
 
@@ -152,7 +152,7 @@ export default function DashboardPage() {
     // Fetch status history for all tickets
     const { data: historyData } = await supabase
       .from("jira_ticket_status_history")
-      .select("*")
+      .select("jira_key, old_status, new_status, changed_at")
       .order("changed_at", { ascending: true });
 
     if (historyData) {

@@ -85,7 +85,7 @@ export function useTicketData({ tickets = [], externalFilterType = "", defaultFi
   // ── Fetch Nombres ──────────────────────────────────────────────────────────
   useEffect(() => {
     async function fetchNombres() {
-      const { data } = await supabase.from("Nombres").select("*");
+      const { data } = await supabase.from("Nombres").select("Nombre, Programador");
       if (data) setNombres(data);
     }
     fetchNombres();

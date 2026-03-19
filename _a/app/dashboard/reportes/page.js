@@ -22,7 +22,7 @@ export default function ReportesPage() {
         while (hasMore) {
             const { data, error } = await supabase
                 .from("jira_tickets")
-                .select("*")
+                .select("jira_key, summary, status, issue_type, sprint, story_points, assignee_name, assignee_email, reporter_name, reporter_email, parent_key, subtask_keys, linked_keys, created_at, updated_at, synced_at, comentario, priority")
                 .order("updated_at", { ascending: false })
                 .range(from, from + pageSize - 1);
 
@@ -37,7 +37,7 @@ export default function ReportesPage() {
         // Fetch Nombres
         const { data: nombresData } = await supabase
             .from("Nombres")
-            .select("*");
+            .select("Nombre, Programador");
         if (nombresData) setNombres(nombresData);
 
         setLoading(false);

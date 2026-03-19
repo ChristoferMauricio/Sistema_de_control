@@ -18,12 +18,12 @@ export default function ObservacionesSupervisorPage() {
         const [ticketsRes, nombresRes] = await Promise.all([
           supabase
             .from("jira_tickets")
-            .select("*")
+            .select("jira_key, summary, status, issue_type, sprint, story_points, assignee_name, reporter_name, parent_key, created_at, updated_at, comentario")
             .not("comentario", "is", null)
             .neq("comentario", ""),
           supabase
             .from("Nombres")
-            .select("*")
+            .select("Nombre, Programador")
         ]);
 
         if (ticketsRes.error) throw ticketsRes.error;
