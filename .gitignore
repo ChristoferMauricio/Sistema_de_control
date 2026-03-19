@@ -1,0 +1,4 @@
+# vercel artifacts
+.vercel
+*.pem
+.env*
