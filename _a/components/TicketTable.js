@@ -1,111 +1,88 @@
 "use client";
 
-import { useState, useMemo, useRef, useEffect, useCallback } from "react";
-import { formatDate, timeAgo, getStatusColor, getIssueTypeStyle, truncate } from "@/lib/utils";
-import { supabase } from "@/lib/supabase";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { formatDate } from "@/lib/utils";
 import * as XLSX from "xlsx";
-import ReactMarkdown from "react-markdown";
-import MarkdownEditor from "@/components/MarkdownEditor";
-import { useRole } from "@/app/dashboard/RoleContext";
+
+import { useTicketData } from "./ticket-table/useTicketData";
+import TicketRow    from "./ticket-table/TicketRow";
+import CommentModal from "./ticket-table/CommentModal";
 
 const PAGE_SIZE = 15;
 
-export default function TicketTable({ tickets = [], title, showAssignee = true, statusHistory = {}, mode = "default", externalFilterType = "", defaultFilterSprint = "" }) {
-  const role = useRole();
-  const [search, setSearch] = useState("");
-  const [sortField, setSortField] = useState("updated_at");
-  const [sortDir, setSortDir] = useState("desc");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [expandedRow, setExpandedRow] = useState(null);
+// ─── Sub-componentes de UI (solo se usan en este archivo) ───────────────────
+
+function SortIcon({ field, sortField, sortDir }) {
+  if (sortField !== field) return null;
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 ml-1 inline text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d={sortDir === "asc" ? "M5 15l7-7 7 7" : "M19 9l-7 7-7-7"} />
+    </svg>
+  );
+}
+
+function FilterSelect({ value, onChange, options, placeholder }) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className={`
+        w-full mt-1 px-1.5 py-1 rounded-md text-[11px] border
+        focus:outline-none focus:ring-1 focus:ring-orange-400 transition-colors cursor-pointer
+        ${value
+          ? "bg-orange-50 border-orange-300 text-orange-700 font-medium"
+          : "bg-white border-gray-200 text-gray-500"
+        }
+      `}
+    >
+      <option value="">{placeholder}</option>
+      {options.map((opt) => (
+        <option key={opt} value={opt}>{opt}</option>
+      ))}
+    </select>
+  );
+}
+
+// ─── Componente principal ────────────────────────────────────────────────────
+
+export default function TicketTable({
+  tickets = [],
+  title,
+  showAssignee = true,
+  statusHistory = {},
+  mode = "default",
+  externalFilterType = "",
+  defaultFilterSprint = "",
+}) {
+  // ── Estado de UI local ─────────────────────────────────────────────────────
+  const [expandedRow,    setExpandedRow]    = useState(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [editingComment, setEditingComment] = useState(null);
+  const [savingComment,  setSavingComment]  = useState(false);
+  const [localComments,  setLocalComments]  = useState({});
 
-  // Column filters
-  const [filterType, setFilterType] = useState("");
-  const [filterSprint, setFilterSprint] = useState(defaultFilterSprint);
-  const [filterStatus, setFilterStatus] = useState("");
-  const [filterAssignee, setFilterAssignee] = useState("");
-  const [filterReporter, setFilterReporter] = useState("");
-  const [filterKey, setFilterKey] = useState("");
-  const [filterSummary, setFilterSummary] = useState("");
-  const [filterPrincipal, setFilterPrincipal] = useState("");
-  const [filterEpic, setFilterEpic] = useState("");
-  const [filterComentario, setFilterComentario] = useState("");
-  const [nombres, setNombres] = useState([]);
-
-  // Comentario state
-  const [editingComment, setEditingComment] = useState(null); // { key: string, currentText: string }
-  const [savingComment, setSavingComment] = useState(false);
-  const [localComments, setLocalComments] = useState({}); // Optimistic UI state { jira_key: string }
-
-  // Dual scrollbar refs
-  const topScrollRef = useRef(null);
+  // ── Scrollbar dual ─────────────────────────────────────────────────────────
+  const topScrollRef    = useRef(null);
   const bottomScrollRef = useRef(null);
   const [scrollWidth, setScrollWidth] = useState(0);
   const isSyncing = useRef(false);
 
-  // Sync with external filters
-  useEffect(() => {
-    if (externalFilterType !== undefined && externalFilterType !== null) {
-      setFilterType(externalFilterType === "Todos" ? "" : externalFilterType);
-      setCurrentPage(1);
-    }
-  }, [externalFilterType]);
-
-  const hasAppliedDefaultSprint = useRef(false);
-  useEffect(() => {
-    if (defaultFilterSprint && !hasAppliedDefaultSprint.current) {
-      setFilterSprint(defaultFilterSprint);
-      hasAppliedDefaultSprint.current = true;
-    }
-  }, [defaultFilterSprint]);
-
-  // Leer filtros desde URL al montar (solo si no hay props externas que los sobreescriban)
-  const hasReadUrl = useRef(false);
-  useEffect(() => {
-    if (hasReadUrl.current || typeof window === "undefined") return;
-    hasReadUrl.current = true;
-    const params = new URLSearchParams(window.location.search);
-    const sprintParam = params.get("sprint");
-    const typeParam = params.get("tipo");
-    const statusParam = params.get("estado");
-    if (sprintParam !== null && !defaultFilterSprint) setFilterSprint(sprintParam);
-    if (typeParam !== null && !externalFilterType) setFilterType(typeParam);
-    if (statusParam !== null) setFilterStatus(statusParam);
-  }, [defaultFilterSprint, externalFilterType]);
-
-  // Guardar filtros en URL cuando cambian
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    if (filterSprint) params.set("sprint", filterSprint); else params.delete("sprint");
-    if (filterType) params.set("tipo", filterType); else params.delete("tipo");
-    if (filterStatus) params.set("estado", filterStatus); else params.delete("estado");
-    const newUrl = params.toString()
-      ? `${window.location.pathname}?${params.toString()}`
-      : window.location.pathname;
-    window.history.replaceState({}, "", newUrl);
-  }, [filterSprint, filterType, filterStatus]);
-
-  // Sync top ↔ bottom scroll
   const handleTopScroll = useCallback(() => {
     if (isSyncing.current) return;
     isSyncing.current = true;
-    if (bottomScrollRef.current && topScrollRef.current) {
+    if (bottomScrollRef.current && topScrollRef.current)
       bottomScrollRef.current.scrollLeft = topScrollRef.current.scrollLeft;
-    }
     isSyncing.current = false;
   }, []);
 
   const handleBottomScroll = useCallback(() => {
     if (isSyncing.current) return;
     isSyncing.current = true;
-    if (topScrollRef.current && bottomScrollRef.current) {
+    if (topScrollRef.current && bottomScrollRef.current)
       topScrollRef.current.scrollLeft = bottomScrollRef.current.scrollLeft;
-    }
     isSyncing.current = false;
   }, []);
 
-  // Measure table width for the top scrollbar
   useEffect(() => {
     const el = bottomScrollRef.current;
     if (!el) return;
@@ -116,180 +93,23 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
     return () => observer.disconnect();
   }, []);
 
-  // Fetch Nombres table for reporter resolution
-  useEffect(() => {
-    async function fetchNombres() {
-      const { data } = await supabase.from("Nombres").select("*");
-      if (data) setNombres(data);
-    }
-    fetchNombres();
-  }, []);
+  // ── Hook de datos / filtros ────────────────────────────────────────────────
+  const data = useTicketData({ tickets, externalFilterType, defaultFilterSprint, localComments });
+  const {
+    search, setSearch,
+    filterType, setFilterType, filterSprint, setFilterSprint,
+    filterStatus, setFilterStatus, filterAssignee, setFilterAssignee,
+    filterReporter, setFilterReporter, filterKey, setFilterKey,
+    filterSummary, setFilterSummary, filterPrincipal, setFilterPrincipal,
+    filterEpic, setFilterEpic, filterComentario, setFilterComentario,
+    sortField, sortDir, toggleSort,
+    currentPage, setCurrentPage, totalPages, paginated, filtered,
+    activeFilterCount, clearAllFilters,
+    resolveName, resolveEpic,
+    uniqueTypes, uniqueSprints, uniqueStatuses, uniqueAssignees, uniqueReporters,
+  } = data;
 
-  // Build Programador → Nombre map
-  const nameMap = useMemo(() => {
-    const map = {};
-    nombres.forEach((n) => {
-      if (n.Programador) map[n.Programador.toLowerCase()] = n.Nombre;
-    });
-    return map;
-  }, [nombres]);
-
-  function resolveName(rawName) {
-    if (!rawName || rawName.trim() === "") return "—";
-    return nameMap[rawName.toLowerCase()] || rawName;
-  }
-
-  // Build Ticket Map for fast O(1) lookups
-  const ticketMap = useMemo(() => {
-    const map = {};
-    tickets.forEach((t) => {
-      map[t.jira_key] = t;
-    });
-    return map;
-  }, [tickets]);
-
-  // Helpers
-  const isStory = (type) => (type || "").toLowerCase().includes("histori") || (type || "").toLowerCase() === "story";
-  const isSubtask = (type) => (type || "").toLowerCase().includes("subtare") || (type || "").toLowerCase().includes("sub-task") || (type || "").toLowerCase() === "subtask";
-  const isEpic = (type) => (type || "").toLowerCase().includes("epic") || (type || "").toLowerCase().includes("épica");
-  const hasStatusHistory = (type) => !isSubtask(type) && !isEpic(type);
-
-  // Resolve Epic Summary using transitivity (Returns object { key, summary })
-  const resolveEpic = useCallback(
-    (ticket) => {
-      if (isEpic(ticket.issue_type)) return { key: ticket.jira_key, summary: ticket.summary };
-
-      if (isStory(ticket.issue_type) && ticket.parent_key) {
-        const parent = ticketMap[ticket.parent_key];
-        if (parent && isEpic(parent.issue_type)) return { key: parent.jira_key, summary: parent.summary };
-      }
-
-      if (isSubtask(ticket.issue_type) && ticket.parent_key) {
-        const parentStory = ticketMap[ticket.parent_key];
-        if (parentStory && isStory(parentStory.issue_type) && parentStory.parent_key) {
-          const grandParentEpic = ticketMap[parentStory.parent_key];
-          if (grandParentEpic && isEpic(grandParentEpic.issue_type)) return { key: grandParentEpic.jira_key, summary: grandParentEpic.summary };
-        }
-      }
-
-      return null;
-    },
-    [ticketMap]
-  );
-
-  // Get unique values for filter dropdowns
-  const uniqueTypes = useMemo(() => [...new Set(tickets.map(t => t.issue_type).filter(Boolean))].sort(), [tickets]);
-  const uniqueSprints = useMemo(() => [...new Set(tickets.map(t => t.sprint).filter(Boolean))].sort(), [tickets]);
-  const uniqueStatuses = useMemo(() => [...new Set(tickets.map(t => t.status).filter(Boolean))].sort(), [tickets]);
-  const uniqueAssignees = useMemo(() => {
-    const resolved = tickets.map(t => resolveName(t.assignee_name)).filter(v => v && v !== "—");
-    return [...new Set(resolved)].sort();
-  }, [tickets, nameMap]);
-  const uniqueReporters = useMemo(() => {
-    const resolved = tickets.map(t => resolveName(t.reporter_name)).filter(v => v && v !== "—");
-    return [...new Set(resolved)].sort();
-  }, [tickets, nameMap]);
-
-  const activeFilterCount = [filterType, filterSprint, filterStatus, filterAssignee, filterReporter, filterKey.length >= 3 ? filterKey : "", filterSummary.length >= 3 ? filterSummary : "", filterPrincipal.length >= 3 ? filterPrincipal : "", filterEpic.length >= 3 ? filterEpic : "", filterComentario.length >= 3 ? filterComentario : ""].filter(Boolean).length;
-
-  // Filter + Sort
-  const filtered = useMemo(() => {
-    let result = tickets;
-
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      result = result.filter(
-        (t) =>
-          t.jira_key?.toLowerCase().includes(q) ||
-          t.summary?.toLowerCase().includes(q) ||
-          resolveName(t.assignee_name)?.toLowerCase().includes(q) ||
-          t.status?.toLowerCase().includes(q) ||
-          t.issue_type?.toLowerCase().includes(q) ||
-          t.sprint?.toLowerCase().includes(q)
-      );
-    }
-
-    // Apply column filters
-    if (filterType) result = result.filter(t => t.issue_type === filterType);
-    if (filterKey.length >= 3) result = result.filter(t => t.jira_key?.toLowerCase().includes(filterKey.toLowerCase()));
-    if (filterSummary.length >= 3) result = result.filter(t => t.summary?.toLowerCase().includes(filterSummary.toLowerCase()));
-    if (filterSprint) result = result.filter(t => t.sprint === filterSprint);
-    if (filterStatus) result = result.filter(t => t.status === filterStatus);
-    if (filterPrincipal.length >= 3) result = result.filter(t => t.parent_key?.toLowerCase().includes(filterPrincipal.toLowerCase()));
-    if (filterEpic.length >= 3) {
-      const qs = filterEpic.toLowerCase();
-      result = result.filter(t => {
-        const epicObj = resolveEpic(t);
-        return epicObj && epicObj.summary.toLowerCase().includes(qs);
-      });
-    }
-    if (filterComentario.length >= 3) {
-      const qc = filterComentario.toLowerCase();
-      result = result.filter(t => {
-        const c = localComments[t.jira_key] !== undefined ? localComments[t.jira_key] : t.comentario;
-        return c?.toLowerCase().includes(qc);
-      });
-    }
-    if (filterAssignee) result = result.filter(t => resolveName(t.assignee_name) === filterAssignee);
-    if (filterReporter) result = result.filter(t => resolveName(t.reporter_name) === filterReporter);
-
-    result.sort((a, b) => {
-      let aVal = a[sortField] || "";
-      let bVal = b[sortField] || "";
-      
-      if (sortField === "assignee_name") {
-        aVal = resolveName(a.assignee_name);
-        bVal = resolveName(b.assignee_name);
-      } else if (sortField === "epic") {
-        const epicA = resolveEpic(a);
-        const epicB = resolveEpic(b);
-        aVal = epicA ? epicA.summary : "";
-        bVal = epicB ? epicB.summary : "";
-      } else if (sortField === "comentario") {
-        aVal = localComments[a.jira_key] !== undefined ? localComments[a.jira_key] : (a.comentario || "");
-        bVal = localComments[b.jira_key] !== undefined ? localComments[b.jira_key] : (b.comentario || "");
-      }
-
-      if (sortDir === "asc") return aVal > bVal ? 1 : -1;
-      return aVal < bVal ? 1 : -1;
-    });
-
-    return result;
-  }, [tickets, search, sortField, sortDir, filterType, filterKey, filterSummary, filterPrincipal, filterEpic, filterComentario, filterSprint, filterStatus, filterAssignee, filterReporter, nameMap, resolveEpic, localComments]);
-
-  // Pagination
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paginated = filtered.slice(
-    (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE
-  );
-
-  function toggleSort(field) {
-    if (sortField === field) {
-      setSortDir(sortDir === "asc" ? "desc" : "asc");
-    } else {
-      setSortField(field);
-      setSortDir("desc");
-    }
-    setCurrentPage(1);
-  }
-
-  function clearAllFilters() {
-    setFilterType("");
-    setFilterKey("");
-    setFilterSummary("");
-    setFilterPrincipal("");
-    setFilterEpic("");
-    setFilterSprint("");
-    setFilterStatus("");
-    setFilterAssignee("");
-    setFilterReporter("");
-    setFilterComentario("");
-    setSearch("");
-    setCurrentPage(1);
-  }
-
-  // Save comment to Supabase via API route (bypasses RLS)
+  // ── Guardar comentario ─────────────────────────────────────────────────────
   const handleSaveComment = async () => {
     if (!editingComment) return;
     setSavingComment(true);
@@ -297,17 +117,11 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
       const res = await fetch("/api/save-comment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jira_key: editingComment.key,
-          comentario: editingComment.currentText,
-        }),
+        body: JSON.stringify({ jira_key: editingComment.key, comentario: editingComment.currentText }),
       });
-
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || "Error al guardar");
-
-      // Update local state for optimistic UI
-      setLocalComments(prev => ({ ...prev, [editingComment.key]: editingComment.currentText }));
+      setLocalComments((prev) => ({ ...prev, [editingComment.key]: editingComment.currentText }));
       setEditingComment(null);
     } catch (err) {
       console.error("Error saving comment:", err);
@@ -317,34 +131,28 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
     }
   };
 
-  // ─── Excel export ─────────────────────────────────────
+  // ── Exportar a Excel ───────────────────────────────────────────────────────
   function exportToExcel(dataSet, fileName) {
     const rows = dataSet.map((t) => ({
-      "Tipo": t.issue_type || "",
-      "Observaciones": localComments[t.jira_key] !== undefined ? localComments[t.jira_key] : (t.comentario || ""),
-      "Clave": t.jira_key || "",
-      "Resumen": t.summary || "",
-      "Subtareas": t.subtask_keys?.join(", ") || "",
-      "Principal": t.parent_key || "",
-      "Épica": resolveEpic(t)?.summary || "",
-      "Sprint": t.sprint || "",
+      "Tipo":             t.issue_type || "",
+      "Observaciones":   localComments[t.jira_key] !== undefined ? localComments[t.jira_key] : (t.comentario || ""),
+      "Clave":            t.jira_key || "",
+      "Resumen":          t.summary || "",
+      "Subtareas":        t.subtask_keys?.join(", ") || "",
+      "Principal":        t.parent_key || "",
+      "Épica":            resolveEpic(t)?.summary || "",
+      "Sprint":           t.sprint || "",
       "Persona asignada": resolveName(t.assignee_name),
-      "Story Points": t.story_points ?? "",
-      "Estado": t.status || "",
-      "Informador": resolveName(t.reporter_name),
-      "Creada": t.created_at ? formatDate(t.created_at) : "",
+      "Story Points":     t.story_points ?? "",
+      "Estado":           t.status || "",
+      "Informador":       resolveName(t.reporter_name),
+      "Creada":           t.created_at ? formatDate(t.created_at) : "",
     }));
 
     const ws = XLSX.utils.json_to_sheet(rows);
-
-    // Auto-size columns
-    const colWidths = Object.keys(rows[0] || {}).map((key) => {
-      const maxLen = Math.max(
-        key.length,
-        ...rows.map((r) => String(r[key] || "").length)
-      );
-      return { wch: Math.min(maxLen + 2, 50) };
-    });
+    const colWidths = Object.keys(rows[0] || {}).map((key) => ({
+      wch: Math.min(Math.max(key.length, ...rows.map((r) => String(r[key] || "").length)) + 2, 50),
+    }));
     ws["!cols"] = colWidths;
 
     const wb = XLSX.utils.book_new();
@@ -353,40 +161,11 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
     setShowExportMenu(false);
   }
 
-  function SortIcon({ field }) {
-    if (sortField !== field) return null;
-    return (
-      <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 ml-1 inline text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d={sortDir === "asc" ? "M5 15l7-7 7 7" : "M19 9l-7 7-7-7"} />
-      </svg>
-    );
-  }
-
-  function FilterSelect({ value, onChange, options, placeholder }) {
-    return (
-      <select
-        value={value}
-        onChange={(e) => { onChange(e.target.value); setCurrentPage(1); }}
-        className={`
-          w-full mt-1 px-1.5 py-1 rounded-md text-[11px] border
-          focus:outline-none focus:ring-1 focus:ring-orange-400 transition-colors cursor-pointer
-          ${value
-            ? "bg-orange-50 border-orange-300 text-orange-700 font-medium"
-            : "bg-white border-gray-200 text-gray-500"
-          }
-        `}
-      >
-        <option value="">{placeholder}</option>
-        {options.map((opt) => (
-          <option key={opt} value={opt}>{opt}</option>
-        ))}
-      </select>
-    );
-  }
-
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden animate-fade-in">
-      {/* Header */}
+
+      {/* ── Header ── */}
       <div className="px-6 py-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h3 className="text-lg font-semibold font-[family-name:var(--font-heading)] text-gray-900">
@@ -403,7 +182,7 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Export dropdown */}
+          {/* Exportar */}
           <div className="relative">
             <button
               onClick={() => setShowExportMenu(!showExportMenu)}
@@ -449,7 +228,8 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
               </>
             )}
           </div>
-          {/* Clear filters button */}
+
+          {/* Limpiar filtros */}
           {activeFilterCount > 0 && (
             <button
               onClick={clearAllFilters}
@@ -462,7 +242,7 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
             </button>
           )}
 
-          {/* Search */}
+          {/* Búsqueda global */}
           <div className="relative">
             <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -470,10 +250,7 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
             <input
               type="text"
               value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setCurrentPage(1);
-              }}
+              onChange={(e) => setSearch(e.target.value)}
               placeholder="Buscar tickets..."
               className="pl-9 pr-4 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500/40 focus:border-orange-500/40 transition-all w-full sm:w-64"
             />
@@ -481,7 +258,7 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
         </div>
       </div>
 
-      {/* Top scrollbar (mirrors the bottom one) */}
+      {/* ── Scrollbar superior ── */}
       <div
         ref={topScrollRef}
         onScroll={handleTopScroll}
@@ -491,135 +268,83 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
         <div style={{ width: scrollWidth, height: "1px" }} />
       </div>
 
-      {/* Table with bottom scrollbar */}
-      <div
-        ref={bottomScrollRef}
-        onScroll={handleBottomScroll}
-        className="overflow-x-auto"
-      >
+      {/* ── Tabla ── */}
+      <div ref={bottomScrollRef} onScroll={handleBottomScroll} className="overflow-x-auto">
         <table className="w-full text-sm" style={{ minWidth: "1200px" }}>
+
+          {/* ── Thead: cabeceras + fila de filtros ── */}
           <thead className="text-xs uppercase bg-gray-50/80 text-gray-500 font-semibold sticky top-0 z-10 font-[family-name:var(--font-heading)] backdrop-blur-sm">
             <tr>
               {mode === "errores" && (
-                <th
-                  onClick={() => toggleSort("jira_key")}
-                  className="px-4 py-3 cursor-pointer hover:bg-gray-100 transition-colors whitespace-nowrap"
-                  style={{ minWidth: "100px" }}
-                >
-                  Código <SortIcon field="jira_key" />
+                <th onClick={() => toggleSort("jira_key")} className="px-4 py-3 cursor-pointer hover:bg-gray-100 transition-colors whitespace-nowrap" style={{ minWidth: "100px" }}>
+                  Código <SortIcon field="jira_key" sortField={sortField} sortDir={sortDir} />
                 </th>
               )}
               {mode !== "errores" && (
-                <th
-                  onClick={() => toggleSort("issue_type")}
-                  className="px-4 py-3 cursor-pointer hover:bg-gray-100 transition-colors whitespace-nowrap"
-                  style={{ minWidth: "120px" }}
-                >
-                  Tipo <SortIcon field="issue_type" />
+                <th onClick={() => toggleSort("issue_type")} className="px-4 py-3 cursor-pointer hover:bg-gray-100 transition-colors whitespace-nowrap" style={{ minWidth: "120px" }}>
+                  Tipo <SortIcon field="issue_type" sortField={sortField} sortDir={sortDir} />
                 </th>
               )}
               {mode !== "errores" && (
                 <th onClick={() => toggleSort("comentario")} className="px-4 py-3 cursor-pointer hover:bg-gray-100 transition-colors whitespace-nowrap" style={{ minWidth: "250px" }}>
-                  Observaciones <SortIcon field="comentario" />
+                  Observaciones <SortIcon field="comentario" sortField={sortField} sortDir={sortDir} />
                 </th>
               )}
               {mode !== "errores" && (
-                <th
-                  onClick={() => toggleSort("jira_key")}
-                  className="px-4 py-3 cursor-pointer hover:bg-gray-100 transition-colors whitespace-nowrap"
-                  style={{ minWidth: "90px" }}
-                >
-                  Clave <SortIcon field="jira_key" />
+                <th onClick={() => toggleSort("jira_key")} className="px-4 py-3 cursor-pointer hover:bg-gray-100 transition-colors whitespace-nowrap" style={{ minWidth: "90px" }}>
+                  Clave <SortIcon field="jira_key" sortField={sortField} sortDir={sortDir} />
                 </th>
               )}
               {mode !== "errores" && (
-                <th
-                  onClick={() => toggleSort("summary")}
-                  className="px-4 py-3 cursor-pointer hover:bg-gray-100 transition-colors min-w-[200px]"
-                >
-                  Resumen <SortIcon field="summary" />
+                <th onClick={() => toggleSort("summary")} className="px-4 py-3 cursor-pointer hover:bg-gray-100 transition-colors min-w-[200px]">
+                  Resumen <SortIcon field="summary" sortField={sortField} sortDir={sortDir} />
                 </th>
               )}
-              {mode !== "errores" && (
-                <th className="px-4 py-3 font-medium min-w-[120px]">Subtareas</th>
-              )}
+              {mode !== "errores" && <th className="px-4 py-3 font-medium min-w-[120px]">Subtareas</th>}
               <th className="px-4 py-3 font-medium min-w-[120px]">
                 {mode === "errores" ? "Actividades vinculadas" : "Principal"}
               </th>
               {mode === "errores" && (
-                <th
-                  onClick={() => toggleSort("storySprint")}
-                  className="px-4 py-3 cursor-pointer hover:bg-gray-100 transition-colors whitespace-nowrap"
-                  style={{ minWidth: "120px" }}
-                >
-                  Sprint Historia <SortIcon field="storySprint" />
+                <th onClick={() => toggleSort("storySprint")} className="px-4 py-3 cursor-pointer hover:bg-gray-100 transition-colors whitespace-nowrap" style={{ minWidth: "120px" }}>
+                  Sprint Historia <SortIcon field="storySprint" sortField={sortField} sortDir={sortDir} />
                 </th>
               )}
               {mode !== "errores" && (
                 <th onClick={() => toggleSort("epic")} className="px-4 py-3 font-medium cursor-pointer hover:bg-gray-100 transition-colors whitespace-nowrap" style={{ minWidth: "160px" }}>
-                  Épica <SortIcon field="epic" />
+                  Épica <SortIcon field="epic" sortField={sortField} sortDir={sortDir} />
                 </th>
               )}
               {mode !== "errores" && (
-                <th
-                  onClick={() => toggleSort("sprint")}
-                  className="px-4 py-3 cursor-pointer hover:bg-gray-100 transition-colors whitespace-nowrap"
-                  style={{ minWidth: "90px" }}
-                >
-                  Sprint <SortIcon field="sprint" />
+                <th onClick={() => toggleSort("sprint")} className="px-4 py-3 cursor-pointer hover:bg-gray-100 transition-colors whitespace-nowrap" style={{ minWidth: "90px" }}>
+                  Sprint <SortIcon field="sprint" sortField={sortField} sortDir={sortDir} />
                 </th>
               )}
               {showAssignee && (
-                <th
-                  onClick={() => toggleSort("assignee_name")}
-                  className="px-4 py-3 cursor-pointer hover:bg-gray-100 transition-colors whitespace-nowrap"
-                  style={{ minWidth: "140px" }}
-                >
-                  Persona asignada <SortIcon field="assignee_name" />
+                <th onClick={() => toggleSort("assignee_name")} className="px-4 py-3 cursor-pointer hover:bg-gray-100 transition-colors whitespace-nowrap" style={{ minWidth: "140px" }}>
+                  Persona asignada <SortIcon field="assignee_name" sortField={sortField} sortDir={sortDir} />
                 </th>
               )}
-              {mode !== "errores" && (
-                <th className="px-4 py-3 font-medium text-center whitespace-nowrap" style={{ minWidth: "70px" }}>SP</th>
-              )}
-              <th
-                onClick={() => toggleSort("status")}
-                className="px-4 py-3 cursor-pointer hover:bg-gray-100 transition-colors whitespace-nowrap"
-                style={{ minWidth: "100px" }}
-              >
-                Estado <SortIcon field="status" />
+              {mode !== "errores" && <th className="px-4 py-3 font-medium text-center whitespace-nowrap" style={{ minWidth: "70px" }}>SP</th>}
+              <th onClick={() => toggleSort("status")} className="px-4 py-3 cursor-pointer hover:bg-gray-100 transition-colors whitespace-nowrap" style={{ minWidth: "100px" }}>
+                Estado <SortIcon field="status" sortField={sortField} sortDir={sortDir} />
               </th>
-              <th
-                onClick={() => toggleSort("reporter_name")}
-                className="px-4 py-3 cursor-pointer hover:bg-gray-100 transition-colors whitespace-nowrap"
-                style={{ minWidth: "140px" }}
-              >
-                Informador <SortIcon field="reporter_name" />
+              <th onClick={() => toggleSort("reporter_name")} className="px-4 py-3 cursor-pointer hover:bg-gray-100 transition-colors whitespace-nowrap" style={{ minWidth: "140px" }}>
+                Informador <SortIcon field="reporter_name" sortField={sortField} sortDir={sortDir} />
               </th>
-              <th
-                onClick={() => toggleSort("created_at")}
-                className="px-4 py-3 cursor-pointer hover:bg-gray-100 transition-colors whitespace-nowrap"
-                style={{ minWidth: "90px" }}
-              >
-                {mode === "errores" ? "Fecha de Creación" : "Creada"} <SortIcon field="created_at" />
+              <th onClick={() => toggleSort("created_at")} className="px-4 py-3 cursor-pointer hover:bg-gray-100 transition-colors whitespace-nowrap" style={{ minWidth: "90px" }}>
+                {mode === "errores" ? "Fecha de Creación" : "Creada"} <SortIcon field="created_at" sortField={sortField} sortDir={sortDir} />
               </th>
               {mode !== "errores" && (
-                <th className="text-center px-4 py-3 font-medium whitespace-nowrap" style={{ minWidth: "70px" }}>
-                  Historial
-                </th>
+                <th className="text-center px-4 py-3 font-medium whitespace-nowrap" style={{ minWidth: "70px" }}>Historial</th>
               )}
             </tr>
 
-            {/* Filter row */}
+            {/* Fila de filtros */}
             <tr className="border-b border-gray-100 bg-gray-50/30">
               {mode === "errores" && (
                 <th className="px-4 py-2">
-                  <input
-                    type="text"
-                    value={filterKey}
-                    onChange={(e) => { setFilterKey(e.target.value); setCurrentPage(1); }}
-                    placeholder="Buscar..."
-                    className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[80px]"
-                  />
+                  <input type="text" value={filterKey} onChange={(e) => setFilterKey(e.target.value)} placeholder="Buscar..."
+                    className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[80px]" />
                 </th>
               )}
               {mode !== "errores" && (
@@ -629,69 +354,37 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
               )}
               {mode !== "errores" && (
                 <th className="px-4 py-2">
-                  <input
-                    type="text"
-                    value={filterComentario}
-                    onChange={(e) => { setFilterComentario(e.target.value); setCurrentPage(1); }}
-                    placeholder="Buscar observación..."
-                    className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[150px]"
-                  />
+                  <input type="text" value={filterComentario} onChange={(e) => setFilterComentario(e.target.value)} placeholder="Buscar observación..."
+                    className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[150px]" />
                 </th>
               )}
               {mode !== "errores" && (
                 <th className="px-4 py-2">
-                  <input
-                    type="text"
-                    value={filterKey}
-                    onChange={(e) => { setFilterKey(e.target.value); setCurrentPage(1); }}
-                    placeholder="Buscar..."
-                    className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[80px]"
-                  />
+                  <input type="text" value={filterKey} onChange={(e) => setFilterKey(e.target.value)} placeholder="Buscar..."
+                    className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[80px]" />
                 </th>
               )}
               {mode !== "errores" && (
                 <th className="px-4 py-2">
-                  <input
-                    type="text"
-                    value={filterSummary}
-                    onChange={(e) => { setFilterSummary(e.target.value); setCurrentPage(1); }}
-                    placeholder="Buscar..."
-                    className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[120px]"
-                  />
+                  <input type="text" value={filterSummary} onChange={(e) => setFilterSummary(e.target.value)} placeholder="Buscar..."
+                    className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[120px]" />
                 </th>
               )}
-              {mode !== "errores" && <th className="px-4 py-2" />} {/* Subtareas */}
-              
+              {mode !== "errores" && <th className="px-4 py-2" />}
               <th className="px-4 py-2">
-                <input
-                  type="text"
-                  value={filterPrincipal}
-                  onChange={(e) => { setFilterPrincipal(e.target.value); setCurrentPage(1); }}
-                  placeholder="Buscar..."
-                  className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[80px]"
-                />
+                <input type="text" value={filterPrincipal} onChange={(e) => setFilterPrincipal(e.target.value)} placeholder="Buscar..."
+                  className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[80px]" />
               </th>
               {mode === "errores" && (
                 <th className="px-4 py-2">
-                  <input
-                    type="text"
-                    value={filterSprint}
-                    onChange={(e) => { setFilterSprint(e.target.value); setCurrentPage(1); }}
-                    placeholder="Filtrar sprint..."
-                    className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[80px]"
-                  />
+                  <input type="text" value={filterSprint} onChange={(e) => setFilterSprint(e.target.value)} placeholder="Filtrar sprint..."
+                    className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[80px]" />
                 </th>
               )}
-              
               {mode !== "errores" && (
                 <th className="px-4 py-2">
-                  <input
-                    type="text"
-                    value={filterEpic}
-                    onChange={(e) => { setFilterEpic(e.target.value); setCurrentPage(1); }}
-                    placeholder="Buscar..."
-                    className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[120px]"
-                  />
+                  <input type="text" value={filterEpic} onChange={(e) => setFilterEpic(e.target.value)} placeholder="Buscar..."
+                    className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[120px]" />
                 </th>
               )}
               {mode !== "errores" && (
@@ -699,23 +392,24 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
                   <FilterSelect value={filterSprint} onChange={setFilterSprint} options={uniqueSprints} placeholder="Todos" />
                 </th>
               )}
-              
               {showAssignee && (
                 <th className="px-4 py-2">
                   <FilterSelect value={filterAssignee} onChange={setFilterAssignee} options={uniqueAssignees} placeholder="Todos" />
                 </th>
               )}
-              {mode !== "errores" && <th className="px-4 py-2" />} {/* SP */}
+              {mode !== "errores" && <th className="px-4 py-2" />}
               <th className="px-4 py-2">
                 <FilterSelect value={filterStatus} onChange={setFilterStatus} options={uniqueStatuses} placeholder="Todos" />
               </th>
               <th className="px-4 py-2">
                 <FilterSelect value={filterReporter} onChange={setFilterReporter} options={uniqueReporters} placeholder="Todos" />
               </th>
-              <th className="px-4 py-2" /> {/* Creada */}
-              {mode !== "errores" && <th className="px-4 py-2" />} {/* Historial */}
+              <th className="px-4 py-2" />
+              {mode !== "errores" && <th className="px-4 py-2" />}
             </tr>
           </thead>
+
+          {/* ── Tbody ── */}
           <tbody>
             {paginated.length === 0 ? (
               <tr>
@@ -734,310 +428,27 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
                 </td>
               </tr>
             ) : (
-              paginated.map((ticket) => {
-                const statusColor = getStatusColor(ticket.status);
-                const typeStyle = getIssueTypeStyle(ticket.issue_type);
-                const history = statusHistory[ticket.jira_key] || [];
-                const isExpanded = expandedRow === ticket.jira_key;
-
-                return (
-                  <>
-                    <tr key={ticket.id || ticket.jira_key} className="ticket-row border-b border-gray-200">
-                      {mode === "errores" && (
-                        <td className="px-4 py-3">
-                          <a
-                            href={`https://supervisorservicio2020.atlassian.net/browse/${ticket.jira_key}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="font-mono text-xs font-semibold text-orange-600 bg-orange-50 px-2 py-1 rounded-md whitespace-nowrap hover:underline hover:text-orange-800"
-                          >
-                            {ticket.jira_key}
-                          </a>
-                        </td>
-                      )}
-                      {mode !== "errores" && (
-                        <td className="px-4 py-3">
-                          <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium ${typeStyle.bg} ${typeStyle.text}`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${typeStyle.dot}`} />
-                            {ticket.issue_type || "—"}
-                          </span>
-                        </td>
-                      )}
-
-                      {/* Observaciones (Comentario) */}
-                      {mode !== "errores" && (
-                        <td className="px-4 py-3 align-top min-w-[250px]">
-                          {(() => {
-                            const currentVal = localComments[ticket.jira_key] !== undefined ? localComments[ticket.jira_key] : ticket.comentario;
-                            return (
-                              <div className="group relative flex flex-col gap-1">
-                                <div className="flex items-start justify-between gap-2">
-                                  <div className="text-xs text-gray-700 max-h-[100px] overflow-y-auto prose prose-sm leading-relaxed whitespace-pre-wrap max-w-full break-words">
-                                    {currentVal ? (
-                                      <ReactMarkdown>{currentVal}</ReactMarkdown>
-                                    ) : (
-                                      <span className="text-gray-400 italic">Sin observaciones...</span>
-                                    )}
-                                  </div>
-                                  {role !== "viewer" && (
-                                    <button
-                                      onClick={() => setEditingComment({ 
-                                        key: ticket.jira_key, 
-                                        summary: ticket.summary,
-                                        story_points: ticket.story_points,
-                                        currentText: currentVal || "" 
-                                      })}
-                                      className="shrink-0 p-1.5 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded opacity-0 group-hover:opacity-100 transition-all focus:opacity-100"
-                                      title="Editar observación"
-                                    >
-                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                                      </svg>
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })()}
-                        </td>
-                      )}
-
-                      {/* Clave */}
-                      {mode !== "errores" && (
-                        <td className="px-4 py-3">
-                          <a
-                            href={`https://supervisorservicio2020.atlassian.net/browse/${ticket.jira_key}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="font-mono text-xs font-semibold text-orange-600 bg-orange-50 px-2 py-1 rounded-md whitespace-nowrap hover:underline hover:text-orange-800"
-                          >
-                            {ticket.jira_key}
-                          </a>
-                        </td>
-                      )}
-
-                      {/* Resumen */}
-                      {mode !== "errores" && (
-                        <td className="px-4 py-3 text-gray-800 max-w-xs">
-                          <span title={ticket.summary}>{truncate(ticket.summary, 45)}</span>
-                        </td>
-                      )}
-
-                      {/* Subtareas — solo para Historia */}
-                      {mode !== "errores" && (
-                        <td className="px-4 py-3">
-                          {isStory(ticket.issue_type) && ticket.subtask_keys?.length > 0 ? (
-                            <div className="flex flex-wrap gap-1">
-                              {ticket.subtask_keys.map((sk) => (
-                                <a
-                                  key={sk}
-                                  href={`https://supervisorservicio2020.atlassian.net/browse/${sk}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-[10px] font-mono bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded hover:underline hover:text-blue-600 hover:bg-blue-50"
-                                >
-                                  {sk}
-                                </a>
-                              ))}
-                            </div>
-                          ) : !isStory(ticket.issue_type) && ['Bug', 'Error', 'Error Desarrollo', 'Error Certificación'].includes(ticket.issue_type) ? (
-                              <span className="text-gray-400 text-xs italic">N/A</span>
-                          ) : (
-                            <span className="text-gray-300 text-xs">—</span>
-                          )}
-                        </td>
-                      )}
-
-                      {/* Principal — solo para Subtarea o Historia, o "Actividades vinculadas" para Errores  */}
-                      <td className="px-4 py-3">
-                        {(isSubtask(ticket.issue_type) || isStory(ticket.issue_type)) && ticket.parent_key ? (
-                          <a
-                            href={`https://supervisorservicio2020.atlassian.net/browse/${ticket.parent_key}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="font-mono text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded-md hover:underline hover:text-blue-800"
-                          >
-                            {ticket.parent_key}
-                          </a>
-                        ) : ['Bug', 'Error', 'Error Desarrollo', 'Error Certificación'].includes(ticket.issue_type) && ticket.linked_keys && ticket.linked_keys.length > 0 ? (
-                          <div className="flex flex-wrap gap-1">
-                            {ticket.linked_keys.map((lk) => (
-                              <a
-                                key={lk}
-                                href={`https://supervisorservicio2020.atlassian.net/browse/${lk}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="font-mono text-xs text-purple-600 bg-purple-50 px-2 py-1 rounded-md hover:underline hover:text-purple-800"
-                              >
-                                {lk}
-                              </a>
-                            ))}
-                          </div>
-                        ) : (
-                          <span className="text-gray-300 text-xs">—</span>
-                        )}
-                      </td>
-
-                      {/* Sprint de la Historia - solo para Errores */}
-                      {mode === "errores" && (
-                        <td className="px-4 py-3">
-                          {ticket.storySprint && ticket.storySprint !== "—" ? (
-                            <span className="text-xs text-gray-700 bg-gray-100 border border-gray-200 px-2 py-1 rounded-md whitespace-nowrap">
-                              {ticket.storySprint}
-                            </span>
-                          ) : (
-                            <span className="text-gray-300 text-xs">—</span>
-                          )}
-                        </td>
-                      )}
-
-                      {/* Épica */}
-                      {mode !== "errores" && (
-                        <td className="px-4 py-3 text-gray-800 max-w-[160px]">
-                          {(() => {
-                            const epic = resolveEpic(ticket);
-                            if (!epic) return <span className="text-gray-300 text-xs">—</span>;
-                            return (
-                              <div className="flex flex-col gap-0.5" title={epic.summary}>
-                                <a
-                                  href={`https://supervisorservicio2020.atlassian.net/browse/${epic.key}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="font-mono text-[10px] text-blue-600 hover:text-blue-800 hover:underline inline-block w-max"
-                                >
-                                  {epic.key}
-                                </a>
-                                <span className="text-xs truncate block text-gray-700">
-                                  {epic.summary}
-                                </span>
-                              </div>
-                            );
-                          })()}
-                        </td>
-                      )}
-
-                      {/* Sprint */}
-                      {mode !== "errores" && (
-                        <td className="px-4 py-3">
-                          {ticket.sprint ? (
-                            <span className="text-xs text-gray-700 bg-gray-100 px-2 py-1 rounded-md whitespace-nowrap">
-                              {ticket.sprint}
-                            </span>
-                          ) : (
-                            <span className="text-gray-300 text-xs">—</span>
-                          )}
-                        </td>
-                      )}
-
-                      {/* Asignado */}
-                      {showAssignee && (
-                        <td className="px-4 py-3">
-                          <span className="text-gray-600 text-xs">{resolveName(ticket.assignee_name)}</span>
-                        </td>
-                      )}
-
-                      {/* Story Points — solo para Historia */}
-                      {mode !== "errores" && (
-                        <td className="px-4 py-3 text-center">
-                          {isStory(ticket.issue_type) && ticket.story_points != null ? (
-                            <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-amber-50 text-amber-700 text-xs font-bold">
-                              {ticket.story_points}
-                            </span>
-                          ) : (
-                            <span className="text-gray-300 text-xs">—</span>
-                          )}
-                        </td>
-                      )}
-
-                      {/* Estado — solo para Historia */}
-                      <td className="px-4 py-3">
-                        {isStory(ticket.issue_type) || mode === "errores" ? (
-                          <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ${statusColor.bg} ${statusColor.text}`}>
-                            {ticket.status}
-                          </span>
-                        ) : (
-                          <span className="text-gray-300 text-xs">—</span>
-                        )}
-                      </td>
-
-                      {/* Informador */}
-                      <td className="px-4 py-3">
-                        <span className="text-gray-600 text-xs">{resolveName(ticket.reporter_name)}</span>
-                      </td>
-
-                      {/* Creada */}
-                      <td className="px-4 py-3">
-                        <span className="text-gray-400 text-xs whitespace-nowrap" title={formatDate(ticket.created_at)}>
-                          {mode === "errores" ? formatDate(ticket.created_at) : timeAgo(ticket.created_at)}
-                        </span>
-                      </td>
-
-                      {/* Historial de estados — No aplica para Subtarea ni Épica */}
-                      {mode !== "errores" && (
-                        <td className="text-center px-4 py-3">
-                          {hasStatusHistory(ticket.issue_type) && history.length > 0 ? (
-                            <button
-                              onClick={() => setExpandedRow(isExpanded ? null : ticket.jira_key)}
-                              className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-colors ${isExpanded
-                                ? "bg-orange-50 text-orange-600 border border-orange-200"
-                                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                                }`}
-                            >
-                              <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              </svg>
-                              {history.length}
-                            </button>
-                          ) : hasStatusHistory(ticket.issue_type) ? (
-                            <span className="text-gray-300 text-xs">0</span>
-                          ) : (
-                            <span className="text-gray-300 text-xs">—</span>
-                          )}
-                        </td>
-                      )}
-                    </tr>
-
-                    {/* Expanded: Status History Timeline */}
-                    {isExpanded && history.length > 0 && (
-                      <tr key={`${ticket.jira_key}-history`} className="bg-gray-50/50">
-                        <td colSpan={12} className="px-6 py-4">
-                          <div className="max-w-2xl">
-                            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-                              Historial de estados — {ticket.jira_key}
-                            </p>
-                            <div className="space-y-2">
-                              {history.map((h, i) => (
-                                <div key={i} className="flex items-center gap-3 text-xs">
-                                  <span className="text-gray-400 w-28 shrink-0">{formatDate(h.changed_at)}</span>
-                                  <div className="flex items-center gap-2">
-                                    {h.old_status ? (
-                                      <>
-                                        <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-600">{h.old_status}</span>
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                          <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                                        </svg>
-                                      </>
-                                    ) : (
-                                      <span className="text-gray-400 italic">Nuevo</span>
-                                    )}
-                                    <span className="px-2 py-0.5 rounded bg-orange-50 text-orange-700 font-medium">{h.new_status}</span>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                  </>
-                );
-              })
+              paginated.map((ticket) => (
+                <TicketRow
+                  key={ticket.id || ticket.jira_key}
+                  ticket={ticket}
+                  isExpanded={expandedRow === ticket.jira_key}
+                  onToggleExpand={(key) => setExpandedRow(expandedRow === key ? null : key)}
+                  history={statusHistory[ticket.jira_key] || []}
+                  showAssignee={showAssignee}
+                  mode={mode}
+                  resolveEpic={resolveEpic}
+                  resolveName={resolveName}
+                  localComments={localComments}
+                  onEditComment={setEditingComment}
+                />
+              ))
             )}
           </tbody>
         </table>
       </div>
 
-      {/* Pagination */}
+      {/* ── Paginación ── */}
       {totalPages > 1 && (
         <div className="px-6 py-3 border-t border-gray-100 flex items-center justify-between">
           <p className="text-xs text-gray-400">
@@ -1062,76 +473,14 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
         </div>
       )}
 
-      {/* Edit Comment Modal */}
-      {editingComment && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col">
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
-              <h3 className="text-base font-semibold text-gray-800 flex items-center flex-wrap gap-2">
-                Editar Comentario
-                <span className="text-orange-600 font-mono text-xs bg-orange-100 px-2 py-0.5 rounded shrink-0">
-                  {editingComment.key}
-                </span>
-                {editingComment.story_points != null && (
-                  <span className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-amber-50 text-amber-700 text-[10px] font-bold shrink-0" title="Story Points">
-                    {editingComment.story_points}
-                  </span>
-                )}
-                {editingComment.summary && (
-                  <span className="text-sm font-normal text-gray-500 truncate max-w-[300px]" title={editingComment.summary}>
-                    {editingComment.summary}
-                  </span>
-                )}
-              </h3>
-              <button
-                onClick={() => setEditingComment(null)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div className="p-6 flex-1 flex flex-col min-h-[350px]">
-              <label className="text-xs font-medium text-gray-600 uppercase tracking-wider mb-2">Formato Markdown soportado</label>
-              <div className="flex-1 w-full relative">
-                <MarkdownEditor
-                  value={editingComment.currentText}
-                  onChange={(val) => setEditingComment({ ...editingComment, currentText: val })}
-                  rows={10}
-                  placeholder="Escribe un comentario aquí..."
-                />
-              </div>
-            </div>
-            <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex justify-end gap-3">
-              <button
-                onClick={() => setEditingComment(null)}
-                className="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-200 transition-colors"
-                disabled={savingComment}
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleSaveComment}
-                disabled={savingComment}
-                className="px-5 py-2 rounded-lg text-sm font-medium text-white bg-orange-500 hover:bg-orange-600 focus:ring-4 focus:ring-orange-500/20 transition-all shadow-sm shadow-orange-500/20 disabled:opacity-50 flex items-center gap-2"
-              >
-                {savingComment ? (
-                  <>
-                    <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Guardando...
-                  </>
-                ) : (
-                  "Guardar Comentario"
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* ── Modal de edición de comentario ── */}
+      <CommentModal
+        editingComment={editingComment}
+        onClose={() => setEditingComment(null)}
+        onChange={(val) => setEditingComment((prev) => ({ ...prev, currentText: val }))}
+        onSave={handleSaveComment}
+        savingComment={savingComment}
+      />
     </div>
   );
 }
