@@ -1,4 +1,4 @@
-name: Deploy to Vercel Production
+name: Promote Vercel to Production
 
 on:
   push:
@@ -6,18 +6,58 @@ on:
       - main
 
 jobs:
-  deploy:
+  promote:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Vercel CLI
-        run: npm install -g vercel@latest
-
-      - name: Deploy to Vercel (Production)
-        run: vercel --prod --yes
-        working-directory: ./_a
+      - name: Wait and promote deployment to production
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_TEAM_ID: ${{ secrets.VERCEL_ORG_ID }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          echo "Buscando deployment para commit: $COMMIT_SHA"
+
+          for attempt in $(seq 1 20); do
+            RESPONSE=$(curl -sf \
+              "https://api.vercel.com/v6/deployments?projectId=$VERCEL_PROJECT_ID&teamId=$VERCEL_TEAM_ID&limit=10" \
+              -H "Authorization: Bearer $VERCEL_TOKEN")
+
+            DEPLOY_URL=$(python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+sha = '$COMMIT_SHA'
+for d in data.get('deployments', []):
+    meta = d.get('meta', {})
+    if meta.get('githubCommitSha') == sha and d.get('readyState') in ('READY', 'PROMOTED'):
+        print(d['url'])
+        break
+" <<< "$RESPONSE")
+
+            if [ -n "$DEPLOY_URL" ]; then
+              echo "Deployment encontrado: $DEPLOY_URL"
+
+              for ALIAS in \
+                "sistema-de-control-ruddy.vercel.app" \
+                "a-christofermauricios-projects.vercel.app" \
+                "a-git-main-christofermauricios-projects.vercel.app"; do
+
+                RESULT=$(curl -s -X POST \
+                  "https://api.vercel.com/v2/deployments/$DEPLOY_URL/aliases?teamId=$VERCEL_TEAM_ID" \
+                  -H "Authorization: Bearer $VERCEL_TOKEN" \
+                  -H "Content-Type: application/json" \
+                  -d "{\"alias\": \"$ALIAS\"}")
+
+                echo "$ALIAS → $(python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('alias', d.get('error',{}).get('message','?')))" <<< "$RESULT")"
+              done
+
+              echo "Promovido a produccion exitosamente"
+              exit 0
+            fi
+
+            echo "Intento $attempt/20: deployment no listo aun, esperando 30s..."
+            sleep 30
+          done
+
+          echo "Error: deployment no encontrado despues de 10 minutos"
+          exit 1
