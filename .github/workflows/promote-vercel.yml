@@ -24,19 +24,9 @@ jobs:
         run: npm install
         working-directory: ./_a
 
-      - name: Debug Token Presence
-        run: |
-          if [ -z "$VERCEL_TOKEN" ]; then
-            echo "El token esta VACIO en GitHub Secrets!"
-            exit 1
-          else
-            echo "El token tiene una longitud de ${#VERCEL_TOKEN} caracteres."
-          fi
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-
       - name: Pull Vercel Environment Information
         run: vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+        working-directory: ./_a
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
@@ -44,6 +34,7 @@ jobs:
 
       - name: Build Project Artifacts
         run: vercel build --prod --token="$VERCEL_TOKEN"
+        working-directory: ./_a
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
@@ -51,6 +42,7 @@ jobs:
 
       - name: Deploy Project Artifacts to Vercel
         run: vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+        working-directory: ./_a
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
