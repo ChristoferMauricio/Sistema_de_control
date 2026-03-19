@@ -116,8 +116,18 @@ function transformIssue(issue) {
 // Vercel: máximo tiempo de ejecución (60s en plan Hobby)
 export const maxDuration = 60;
 
-export async function POST() {
-  try {
+/**
+ * Verifica que la petición venga de un Cron Job de Vercel.
+ * Vercel envía: Authorization: Bearer <CRON_SECRET>
+ */
+function verifyCronSecret(request) {
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret) return true; // Si no está configurado, permitir (desarrollo local)
+  const authHeader = request.headers.get("authorization");
+  return authHeader === `Bearer ${cronSecret}`;
+}
+
+async function runSync() {
     // Validar configuración
     if (!JIRA_BASE_URL || !JIRA_USER_EMAIL || !JIRA_API_TOKEN) {
       return Response.json(
@@ -228,4 +238,17 @@ export async function POST() {
       { status: 500 }
     );
   }
+}
+
+// GET: usado por Vercel Cron Jobs
+export async function GET(request) {
+  if (!verifyCronSecret(request)) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  return runSync();
+}
+
+// POST: usado por el botón manual en la UI
+export async function POST() {
+  return runSync();
 }

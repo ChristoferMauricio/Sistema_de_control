@@ -159,7 +159,8 @@ export default function DashboardNav({ user, role }) {
   const [counts, setCounts] = useState({
     certificacion: 0,
     desarrollo: 0,
-    observaciones: 0
+    observaciones: 0,
+    misChanges: 0,
   });
 
   const toggleDropdown = (label) => {
@@ -238,10 +239,41 @@ export default function DashboardNav({ user, role }) {
           });
         }
 
+        // --- Cambios de estado en tickets del usuario desde última visita ---
+        let countMisChanges = 0;
+        if (user?.email) {
+          // Obtener timestamp de última visita (por sesión para no resetear en cada navegación)
+          let lastVisit = sessionStorage.getItem("pgim_session_start");
+          if (!lastVisit) {
+            lastVisit = localStorage.getItem("pgim_last_visit")
+              || new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+            sessionStorage.setItem("pgim_session_start", lastVisit);
+            localStorage.setItem("pgim_last_visit", new Date().toISOString());
+          }
+
+          const { data: myTickets } = await supabase
+            .from("jira_tickets")
+            .select("jira_key")
+            .eq("assignee_email", user.email);
+
+          if (myTickets && myTickets.length > 0) {
+            const myKeys = myTickets.map((t) => t.jira_key);
+            // Contar solo cambios reales (old_status no nulo = no son inserciones nuevas)
+            const { count } = await supabase
+              .from("jira_ticket_status_history")
+              .select("*", { count: "exact", head: true })
+              .in("jira_key", myKeys)
+              .not("old_status", "is", null)
+              .gt("changed_at", lastVisit);
+            countMisChanges = count || 0;
+          }
+        }
+
         setCounts({
           certificacion: countCert || 0,
           desarrollo: countDes || 0,
-          observaciones: countObs || 0
+          observaciones: countObs || 0,
+          misChanges: countMisChanges,
         });
       } catch (err) {
         console.error("Error fetching nav counts:", err);
@@ -342,6 +374,7 @@ export default function DashboardNav({ user, role }) {
             if (item.label === "Errores Certificación") badgeCount = counts.certificacion;
             if (item.label === "Errores Desarrollo") badgeCount = counts.desarrollo;
             if (item.label === "Observ. del Supervisor") badgeCount = counts.observaciones;
+            if (item.label === "Mis Pendientes") badgeCount = counts.misChanges;
 
             // Render Subitem Parent Toggle Structure
             if (hasSubmenu) {
@@ -483,9 +516,11 @@ export default function DashboardNav({ user, role }) {
                 
                 {badgeCount !== null && badgeCount > 0 && (
                   <span className={`px-2 py-0.5 text-xs font-bold rounded-full border ${
-                    isActive 
-                      ? "bg-orange-100 text-orange-700 border-orange-200" 
-                      : "bg-gray-100 text-gray-600 border-gray-200"
+                    item.label === "Mis Pendientes"
+                      ? "bg-orange-100 text-orange-700 border-orange-200"
+                      : isActive
+                        ? "bg-orange-100 text-orange-700 border-orange-200"
+                        : "bg-gray-100 text-gray-600 border-gray-200"
                   }`}>
                     {badgeCount}
                   </span>

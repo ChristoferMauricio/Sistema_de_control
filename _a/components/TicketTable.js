@@ -59,6 +59,33 @@ export default function TicketTable({ tickets = [], title, showAssignee = true, 
     }
   }, [defaultFilterSprint]);
 
+  // Leer filtros desde URL al montar (solo si no hay props externas que los sobreescriban)
+  const hasReadUrl = useRef(false);
+  useEffect(() => {
+    if (hasReadUrl.current || typeof window === "undefined") return;
+    hasReadUrl.current = true;
+    const params = new URLSearchParams(window.location.search);
+    const sprintParam = params.get("sprint");
+    const typeParam = params.get("tipo");
+    const statusParam = params.get("estado");
+    if (sprintParam !== null && !defaultFilterSprint) setFilterSprint(sprintParam);
+    if (typeParam !== null && !externalFilterType) setFilterType(typeParam);
+    if (statusParam !== null) setFilterStatus(statusParam);
+  }, [defaultFilterSprint, externalFilterType]);
+
+  // Guardar filtros en URL cuando cambian
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (filterSprint) params.set("sprint", filterSprint); else params.delete("sprint");
+    if (filterType) params.set("tipo", filterType); else params.delete("tipo");
+    if (filterStatus) params.set("estado", filterStatus); else params.delete("estado");
+    const newUrl = params.toString()
+      ? `${window.location.pathname}?${params.toString()}`
+      : window.location.pathname;
+    window.history.replaceState({}, "", newUrl);
+  }, [filterSprint, filterType, filterStatus]);
+
   // Sync top ↔ bottom scroll
   const handleTopScroll = useCallback(() => {
     if (isSyncing.current) return;

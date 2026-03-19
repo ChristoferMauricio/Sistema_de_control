@@ -77,9 +77,20 @@ export default function GSMPage() {
 
   if (loading) {
     return (
-      <div className="flex-1 overflow-auto bg-gray-50/50 p-6 flex flex-col items-center justify-center space-y-4">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
-        <p className="text-gray-500 font-medium">Cargando información GSM...</p>
+      <div className="flex-1 overflow-auto bg-gray-50/50 p-6">
+        <div className="max-w-7xl mx-auto space-y-6">
+          <div>
+            <div className="skeleton h-8 w-56 mb-2" />
+            <div className="skeleton h-5 w-96" />
+          </div>
+          <div className="bg-white rounded-2xl border border-gray-200 p-6">
+            <div className="space-y-3">
+              {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+                <div key={i} className="skeleton h-10 w-full" />
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     );
   }

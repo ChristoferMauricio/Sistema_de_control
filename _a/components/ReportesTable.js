@@ -404,6 +404,25 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
     const [traceModal, setTraceModal] = useState(null); // { assigneeName, stories }
     const [subtasksModal, setSubtasksModal] = useState(null); // { assigneeName, subtasks }
 
+    // Sincronizar selectedSprint con parámetro URL ?sprint=
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        const params = new URLSearchParams(window.location.search);
+        const sprintParam = params.get("sprint");
+        if (sprintParam !== null) setSelectedSprint(sprintParam);
+    }, []);
+
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        const params = new URLSearchParams(window.location.search);
+        if (selectedSprint) params.set("sprint", selectedSprint);
+        else params.delete("sprint");
+        const newUrl = params.toString()
+            ? `${window.location.pathname}?${params.toString()}`
+            : window.location.pathname;
+        window.history.replaceState({}, "", newUrl);
+    }, [selectedSprint]);
+
     // Helpers para tipos de issue
     const isStory = (type) => (type || "").toLowerCase().includes("histori") || (type || "").toLowerCase() === "story";
     const isSubtask = (type) => (type || "").toLowerCase().includes("subtare") || (type || "").toLowerCase().includes("sub-task") || (type || "").toLowerCase() === "subtask";

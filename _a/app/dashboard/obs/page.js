@@ -47,8 +47,20 @@ export default function ObservacionesSupervisorPage() {
 
   if (loading) {
     return (
-      <div className="flex-1 overflow-auto bg-gray-50/50 p-6 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
+      <div className="flex-1 overflow-auto bg-gray-50/50 p-6">
+        <div className="max-w-7xl mx-auto space-y-6">
+          <div>
+            <div className="skeleton h-8 w-64 mb-2" />
+            <div className="skeleton h-5 w-96" />
+          </div>
+          <div className="bg-white rounded-2xl border border-gray-200 p-6">
+            <div className="space-y-3">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="skeleton h-16 w-full" />
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
