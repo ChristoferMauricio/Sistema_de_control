@@ -29,11 +29,39 @@ export const maxDuration = 60;
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 /**
+ * Busca dinámicamente el ID del campo "Epic Link" en la instancia Jira.
+ * Retorna algo como "customfield_10014" o "customfield_10008", según la instancia.
+ * Si no lo encuentra, retorna null.
+ */
+async function getEpicLinkFieldId() {
+  try {
+    const res = await fetch(`${JIRA_BASE_URL}/rest/api/2/field`, {
+      method: "GET",
+      headers: jiraHeaders,
+    });
+    if (!res.ok) return null;
+    const fields = await res.json();
+    const epicField = fields.find(
+      (f) =>
+        f.name?.toLowerCase().includes("epic link") ||
+        f.name?.toLowerCase().includes("enlace de épica") ||
+        f.name?.toLowerCase().includes("enlace épica")
+    );
+    return epicField?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Busca tickets en Jira via API con paginación por cursor
  */
-async function searchJira(jql) {
+async function searchJira(jql, epicLinkFieldId) {
   const allIssues = [];
-  const fields = "key,summary,status,assignee,priority,issuetype,created,updated,reporter,parent,subtasks,customfield_10036,customfield_10020,customfield_10014,description,issuelinks";
+  const baseFields = "key,summary,status,assignee,priority,issuetype,created,updated,reporter,parent,subtasks,customfield_10036,customfield_10020,customfield_10014,description,issuelinks";
+  const fields = epicLinkFieldId && epicLinkFieldId !== "customfield_10014"
+    ? `${baseFields},${epicLinkFieldId}`
+    : baseFields;
   let nextPageToken = null;
 
   while (true) {
@@ -73,13 +101,16 @@ function extractSprintName(sprintField) {
  *   subtasks → filas para jira_ticket_subtasks
  *   links    → filas para jira_ticket_links
  */
-function transformIssue(issue) {
+function transformIssue(issue, epicLinkFieldId) {
   const f = issue.fields || {};
   const now = new Date().toISOString();
 
   // Usar emailAddress si existe, sino accountId como identificador único
   const assigneeId = f.assignee?.emailAddress || f.assignee?.accountId || "";
   const reporterId = f.reporter?.emailAddress  || f.reporter?.accountId  || "";
+
+  // Epic Link dinámico: campo descubierto en tiempo de ejecución
+  const epicLinkKey = epicLinkFieldId ? (f[epicLinkFieldId] ?? null) : null;
 
   const ticket = {
     jira_key:       issue.key,
@@ -94,7 +125,8 @@ function transformIssue(issue) {
     reporter_email: reporterId,
     // f.parent?.key = relación directa (next-gen / subtareas)
     // f.customfield_10014 = Epic Link clásico (proyectos company-managed)
-    parent_key:     f.parent?.key || f.customfield_10014 || null,
+    // epicLinkKey = campo descubierto dinámicamente (varía por instancia Jira)
+    parent_key:     f.parent?.key || f.customfield_10014 || epicLinkKey || null,
     created_at:     f.created       || null,
     updated_at:     f.updated       || null,
     synced_at:      now,
@@ -154,9 +186,10 @@ async function runSync() {
       jql = `project in (${projects}) ORDER BY updated DESC`;
     }
 
-    // 1. Obtener issues de Jira y transformarlos
-    const issues   = await searchJira(jql);
-    const transformed = issues.map(transformIssue);
+    // 1. Descubrir el campo Epic Link dinámicamente y obtener issues de Jira
+    const epicLinkFieldId = await getEpicLinkFieldId();
+    const issues   = await searchJira(jql, epicLinkFieldId);
+    const transformed = issues.map(i => transformIssue(i, epicLinkFieldId));
 
     if (transformed.length === 0) {
       return Response.json({ success: true, message: "No se encontraron tickets", synced: 0, statusChanges: 0 });
