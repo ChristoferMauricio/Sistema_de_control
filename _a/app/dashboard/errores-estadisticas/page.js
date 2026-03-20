@@ -61,7 +61,7 @@ function DetailModal({ title, personName, items, linksMap, ticketMap, onClose })
                         <div className="flex items-center gap-2 mt-1.5">
                           <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${
                             isError
-                              ? "bg-rose-50 text-rose-600 border border-rose-200"
+                              ? "bg-red-50 text-red-600 border border-red-200"
                               : "bg-sky-50 text-sky-600 border border-sky-200"
                           }`}>
                             {ticket.issue_type}
@@ -141,11 +141,15 @@ function BarChart({ title, subtitle, data, maxValue, onBarClick }) {
       {/* Legend */}
       <div className="px-6 pt-4 flex items-center gap-6 text-xs text-gray-500">
         <div className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-sm bg-sky-400" />
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-sky-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+          </svg>
           <span>Historias</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-sm bg-rose-400" />
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
           <span>Errores</span>
         </div>
         <span className="text-gray-300 ml-auto">Click en una barra para ver detalle</span>
@@ -167,6 +171,9 @@ function BarChart({ title, subtitle, data, maxValue, onBarClick }) {
                 onClick={() => row.historias > 0 && onBarClick(row.name, "Historia")}
                 disabled={row.historias === 0}
               >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-sky-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                </svg>
                 <div className="flex-1 bg-gray-100 rounded-full h-6 overflow-hidden">
                   <div
                     className={`h-full bg-sky-400 rounded-full flex items-center transition-all duration-500 ${row.historias > 0 ? "group-hover:bg-sky-500 cursor-pointer" : ""}`}
@@ -188,9 +195,12 @@ function BarChart({ title, subtitle, data, maxValue, onBarClick }) {
                 onClick={() => row.errores > 0 && onBarClick(row.name, "Error")}
                 disabled={row.errores === 0}
               >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-red-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
                 <div className="flex-1 bg-gray-100 rounded-full h-6 overflow-hidden">
                   <div
-                    className={`h-full bg-rose-400 rounded-full flex items-center transition-all duration-500 ${row.errores > 0 ? "group-hover:bg-rose-500 cursor-pointer" : ""}`}
+                    className={`h-full bg-red-400/80 rounded-full flex items-center transition-all duration-500 ${row.errores > 0 ? "group-hover:bg-red-500/80 cursor-pointer" : ""}`}
                     style={{ width: maxValue > 0 ? `${Math.max((row.errores / maxValue) * 100, row.errores > 0 ? 4 : 0)}%` : "0%" }}
                   >
                     {row.errores > 0 && (
@@ -225,6 +235,7 @@ export default function ErroresEstadisticasPage() {
   const [persons, setPersons] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedSprint, setSelectedSprint] = useState("");
+  const [filterType, setFilterType] = useState(""); // "", "Historia", "Error"
   const [modal, setModal] = useState(null); // { title, personName, items }
 
   useEffect(() => {
@@ -315,9 +326,11 @@ export default function ErroresEstadisticasPage() {
     return tickets.filter((t) => {
       if (EXCLUDE_PATTERN.test(t.summary || "")) return false;
       if (selectedSprint && t.sprint !== selectedSprint) return false;
+      if (filterType === "Historia" && t.issue_type !== "Historia") return false;
+      if (filterType === "Error" && !ERROR_TYPES.includes(t.issue_type)) return false;
       return true;
     });
-  }, [tickets, selectedSprint]);
+  }, [tickets, selectedSprint, filterType]);
 
   // Group by reporter
   const reporterData = useMemo(() => {
@@ -359,9 +372,19 @@ export default function ErroresEstadisticasPage() {
   const maxReporter = useMemo(() => Math.max(...reporterData.map((r) => Math.max(r.historias, r.errores)), 1), [reporterData]);
   const maxAssignee = useMemo(() => Math.max(...assigneeData.map((r) => Math.max(r.historias, r.errores)), 1), [assigneeData]);
 
-  // Totals
-  const totalHistorias = useMemo(() => validTickets.filter((t) => t.issue_type === "Historia").length, [validTickets]);
-  const totalErrores = useMemo(() => validTickets.filter((t) => ERROR_TYPES.includes(t.issue_type)).length, [validTickets]);
+  // Base tickets (sprint + exclusion only, without type filter) for badge counts
+  const baseTickets = useMemo(() => {
+    return tickets.filter((t) => {
+      if (EXCLUDE_PATTERN.test(t.summary || "")) return false;
+      if (selectedSprint && t.sprint !== selectedSprint) return false;
+      return true;
+    });
+  }, [tickets, selectedSprint]);
+
+  // Totals (always show full counts regardless of type filter)
+  const totalHistorias = useMemo(() => baseTickets.filter((t) => t.issue_type === "Historia").length, [baseTickets]);
+  const totalErrores = useMemo(() => baseTickets.filter((t) => ERROR_TYPES.includes(t.issue_type)).length, [baseTickets]);
+  const totalAll = useMemo(() => baseTickets.length, [baseTickets]);
 
   // Bar click handler: open modal with filtered tickets
   const handleBarClick = useCallback((field) => (personName, type) => {
@@ -421,7 +444,7 @@ export default function ErroresEstadisticasPage() {
         <select
           value={selectedSprint}
           onChange={(e) => setSelectedSprint(e.target.value)}
-          className="px-4 py-2 rounded-xl border border-gray-300 bg-white text-sm text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-400 transition-colors"
+          className="px-4 py-2.5 rounded-xl border-2 border-indigo-200 bg-indigo-50 text-sm text-indigo-700 font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 transition-colors"
         >
           <option value="">Todos los sprints</option>
           {sprints.map((s) => (
@@ -430,26 +453,47 @@ export default function ErroresEstadisticasPage() {
         </select>
       </div>
 
-      {/* Stats banner */}
+      {/* Stats banner - clickeable filters */}
       <div className="flex flex-wrap gap-3 animate-fade-in">
-        <div className="bg-white rounded-xl border border-gray-200 px-5 py-3 inline-flex items-center gap-3 shadow-sm">
+        <button
+          onClick={() => setFilterType(filterType === "Historia" ? "" : "Historia")}
+          className={`rounded-xl border px-5 py-3 inline-flex items-center gap-3 shadow-sm transition-all duration-200 cursor-pointer ${
+            filterType === "Historia"
+              ? "bg-sky-50 border-sky-400 ring-2 ring-sky-200"
+              : "bg-white border-gray-200 hover:border-sky-300 hover:bg-sky-50/50"
+          }`}
+        >
           <span className="w-2.5 h-2.5 rounded-full bg-sky-400" />
           <span className="text-sm text-gray-600">
             <span className="font-semibold text-gray-900">{totalHistorias}</span> historia{totalHistorias !== 1 ? "s" : ""}
           </span>
-        </div>
-        <div className="bg-white rounded-xl border border-gray-200 px-5 py-3 inline-flex items-center gap-3 shadow-sm">
-          <span className="w-2.5 h-2.5 rounded-full bg-rose-400" />
+        </button>
+        <button
+          onClick={() => setFilterType(filterType === "Error" ? "" : "Error")}
+          className={`rounded-xl border px-5 py-3 inline-flex items-center gap-3 shadow-sm transition-all duration-200 cursor-pointer ${
+            filterType === "Error"
+              ? "bg-red-50 border-red-400 ring-2 ring-red-200"
+              : "bg-white border-gray-200 hover:border-red-300 hover:bg-red-50/50"
+          }`}
+        >
+          <span className="w-2.5 h-2.5 rounded-full bg-red-400/80" />
           <span className="text-sm text-gray-600">
             <span className="font-semibold text-gray-900">{totalErrores}</span> error{totalErrores !== 1 ? "es" : ""}
           </span>
-        </div>
-        <div className="bg-white rounded-xl border border-gray-200 px-5 py-3 inline-flex items-center gap-3 shadow-sm">
+        </button>
+        <button
+          onClick={() => setFilterType("")}
+          className={`rounded-xl border px-5 py-3 inline-flex items-center gap-3 shadow-sm transition-all duration-200 cursor-pointer ${
+            filterType === ""
+              ? "bg-gray-100 border-gray-400 ring-2 ring-gray-200"
+              : "bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+          }`}
+        >
           <span className="w-2.5 h-2.5 rounded-full bg-gray-400" />
           <span className="text-sm text-gray-600">
-            <span className="font-semibold text-gray-900">{validTickets.length}</span> total (excl. Prueba/Revisión)
+            <span className="font-semibold text-gray-900">{totalAll}</span> total (excl. Prueba/Revisión)
           </span>
-        </div>
+        </button>
       </div>
 
       {/* Chart 1: Reporters */}
