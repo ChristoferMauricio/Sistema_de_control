@@ -189,6 +189,19 @@ async function runSync() {
     // 1. Descubrir el campo Epic Link dinámicamente y obtener issues de Jira
     const epicLinkFieldId = await getEpicLinkFieldId();
     const issues   = await searchJira(jql, epicLinkFieldId);
+
+    // DEBUG: capturar campos crudos de un ticket PF3QA de tipo Historia
+    const debugIssue = issues.find(i => i.key?.startsWith("PF3QA") && i.fields?.issuetype?.name === "Historia");
+    const debugFields = debugIssue ? {
+      key: debugIssue.key,
+      parent: debugIssue.fields?.parent,
+      customfield_10014: debugIssue.fields?.customfield_10014,
+      epicLinkFieldId_value: epicLinkFieldId ? debugIssue.fields?.[epicLinkFieldId] : undefined,
+      allCustomFields: Object.entries(debugIssue.fields || {})
+        .filter(([k]) => k.startsWith("customfield_") && debugIssue.fields[k] !== null && debugIssue.fields[k] !== undefined)
+        .reduce((acc, [k, v]) => { acc[k] = v; return acc; }, {}),
+    } : null;
+
     const transformed = issues.map(i => transformIssue(i, epicLinkFieldId));
 
     if (transformed.length === 0) {
@@ -289,6 +302,7 @@ async function runSync() {
       subtasks:         allSubtasks.length,
       links:            allLinks.length,
       epicLinkFieldId:  epicLinkFieldId,
+      debug_pf3qa:      debugFields,
       timestamp:        now,
     });
 
