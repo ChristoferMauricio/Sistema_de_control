@@ -281,14 +281,15 @@ async function runSync() {
     }
 
     return Response.json({
-      success:       true,
-      message:       "Sincronización completada",
-      synced:        tickets.length,
-      statusChanges: statusChanges.length,
-      persons:       allPersons.length,
-      subtasks:      allSubtasks.length,
-      links:         allLinks.length,
-      timestamp:     now,
+      success:          true,
+      message:          "Sincronización completada",
+      synced:           tickets.length,
+      statusChanges:    statusChanges.length,
+      persons:          allPersons.length,
+      subtasks:         allSubtasks.length,
+      links:            allLinks.length,
+      epicLinkFieldId:  epicLinkFieldId,
+      timestamp:        now,
     });
 
   } catch (error) {
