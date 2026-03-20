@@ -22,8 +22,12 @@ export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
 
   // Derive unique iterations from the data
   const iteraciones = useMemo(() => {
-    const iters = new Set(incidencias.map((inc) => inc.iteracion));
-    return ["Todas", ...Array.from(iters).sort()]; // Assuming Iteración X format sorts well enough or can be customized
+    const iters = [...new Set(incidencias.map((inc) => inc.iteracion))].sort((a, b) => {
+      const numA = parseInt(a.match(/(\d+)/)?.[1]) || 0;
+      const numB = parseInt(b.match(/(\d+)/)?.[1]) || 0;
+      return numB - numA; // Descendente: más reciente primero
+    });
+    return ["Todas", ...iters];
   }, [incidencias]);
 
   // Filter data
