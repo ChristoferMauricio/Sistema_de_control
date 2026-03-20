@@ -552,14 +552,17 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
     }, [equipo]);
 
     // Cadena: correo directo → jira display_name → equipo_desarrollo / Nombres → fallback
+    const NAME_OVERRIDES = { "miguel castillo": "Supervisor de Servicio" };
+
     const resolveName = useCallback((email) => {
         if (!email || email.trim() === "") return "Sin asignar";
         const byEmail = equipoEmailMap[email.toLowerCase()];
-        if (byEmail) return byEmail;
+        if (byEmail) return NAME_OVERRIDES[byEmail.toLowerCase()] || byEmail;
         const displayName = personsMap[email] || email;
-        return equipoKeyMap[displayName.toLowerCase()]
+        const resolved = equipoKeyMap[displayName.toLowerCase()]
             || nameMap[displayName.toLowerCase()]
             || displayName;
+        return NAME_OVERRIDES[resolved.toLowerCase()] || resolved;
     }, [nameMap, personsMap, equipoEmailMap, equipoKeyMap]);
 
     // Crear mapa inverso: Nombre → lista de Programador keys

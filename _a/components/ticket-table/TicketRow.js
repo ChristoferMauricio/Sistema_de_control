@@ -204,7 +204,9 @@ export default function TicketRow({
                 {ticket.sprint}
               </span>
             ) : (
-              <span className="text-gray-300 text-xs">—</span>
+              <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-md whitespace-nowrap border border-amber-200">
+                Backlog
+              </span>
             )}
           </td>
         )}

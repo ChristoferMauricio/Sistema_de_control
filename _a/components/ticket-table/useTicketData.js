@@ -177,17 +177,20 @@ export function useTicketData({ tickets = [], externalFilterType = "", defaultFi
    * 3. jira_persons → display_name → Nombres (Programador)
    * 4. Fallback: display_name o email crudo
    */
+  const NAME_OVERRIDES = { "miguel castillo": "Supervisor de Servicio" };
+
   const resolveName = useCallback(
     (email) => {
       if (!email || email.trim() === "") return "—";
       // 1. Match directo por correo en equipo_desarrollo
       const byEmail = equipoEmailMap[email.toLowerCase()];
-      if (byEmail) return byEmail;
+      if (byEmail) return NAME_OVERRIDES[byEmail.toLowerCase()] || byEmail;
       // 2 y 3. Resolver display name via jira_persons, luego buscar en tablas
       const displayName = personsMap[email] || email;
-      return equipoKeyMap[displayName.toLowerCase()]
+      const resolved = equipoKeyMap[displayName.toLowerCase()]
         || nameMap[displayName.toLowerCase()]
         || displayName;
+      return NAME_OVERRIDES[resolved.toLowerCase()] || resolved;
     },
     [nameMap, personsMap, equipoEmailMap, equipoKeyMap]
   );

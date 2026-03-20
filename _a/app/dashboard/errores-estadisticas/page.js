@@ -403,13 +403,16 @@ export default function ErroresEstadisticasPage() {
     return map;
   }, [persons]);
 
+  const NAME_OVERRIDES = { "miguel castillo": "Supervisor de Servicio" };
+
   const resolveName = useCallback((email) => {
     if (!email || email.trim() === "") return null;
     const key = email.toLowerCase();
     const byEmail = equipoEmailMap[key];
-    if (byEmail) return byEmail;
+    if (byEmail) return NAME_OVERRIDES[byEmail.toLowerCase()] || byEmail;
     const displayName = personsMap[key] || email;
-    return equipoKeyMap[displayName.toLowerCase()] || displayName;
+    const resolved = equipoKeyMap[displayName.toLowerCase()] || displayName;
+    return NAME_OVERRIDES[resolved.toLowerCase()] || resolved;
   }, [equipoEmailMap, equipoKeyMap, personsMap]);
 
   // Sprints disponibles
