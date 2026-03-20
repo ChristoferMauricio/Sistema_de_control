@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
+import { sortSprints } from "@/lib/utils";
 
 const ERROR_TYPES = ["Bug", "Error", "Error Desarrollo", "Error Certificación", "Error en Certificación"];
 const EXCLUDE_PATTERN = /prueba|revisión|revision/i;
@@ -44,7 +45,7 @@ function DetailModal({ title, personName, items, linksMap, ticketMap, onClose })
                 const linkedKeys = linksMap[ticket.jira_key] || [];
 
                 return (
-                  <div key={ticket.jira_key} className="p-4 bg-gray-50 rounded-xl border border-gray-100">
+                  <div key={ticket.jira_key} className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border-2 border-gray-300 dark:border-gray-600">
                     {/* Ticket header */}
                     <div className="flex items-start gap-3">
                       <a
@@ -223,6 +224,7 @@ export default function ErroresEstadisticasPage() {
   const [equipo, setEquipo] = useState([]);
   const [persons, setPersons] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedSprint, setSelectedSprint] = useState("");
   const [modal, setModal] = useState(null); // { title, personName, items }
 
   useEffect(() => {
@@ -230,7 +232,7 @@ export default function ErroresEstadisticasPage() {
       const [ticketsRes, linksRes, equipoRes, personsRes] = await Promise.all([
         supabase
           .from("jira_tickets")
-          .select("jira_key, summary, issue_type, status, assignee_email, reporter_email")
+          .select("jira_key, summary, issue_type, status, sprint, assignee_email, reporter_email")
           .like("jira_key", "PF3QA-%"),
         supabase
           .from("jira_ticket_links")
@@ -301,10 +303,21 @@ export default function ErroresEstadisticasPage() {
     return equipoKeyMap[displayName.toLowerCase()] || displayName;
   }, [equipoEmailMap, equipoKeyMap, personsMap]);
 
+  // Sprints disponibles
+  const sprints = useMemo(() => {
+    const s = new Set();
+    tickets.forEach((t) => { if (t.sprint) s.add(t.sprint); });
+    return sortSprints([...s]);
+  }, [tickets]);
+
   // Filter & classify tickets
   const validTickets = useMemo(() => {
-    return tickets.filter((t) => !EXCLUDE_PATTERN.test(t.summary || ""));
-  }, [tickets]);
+    return tickets.filter((t) => {
+      if (EXCLUDE_PATTERN.test(t.summary || "")) return false;
+      if (selectedSprint && t.sprint !== selectedSprint) return false;
+      return true;
+    });
+  }, [tickets, selectedSprint]);
 
   // Group by reporter
   const reporterData = useMemo(() => {
@@ -401,6 +414,20 @@ export default function ErroresEstadisticasPage() {
         <p className="text-gray-500 mt-2">
           Distribución de historias y errores por integrante del tablero PF3QA
         </p>
+      </div>
+
+      {/* Sprint filter */}
+      <div className="animate-fade-in">
+        <select
+          value={selectedSprint}
+          onChange={(e) => setSelectedSprint(e.target.value)}
+          className="px-4 py-2 rounded-xl border border-gray-300 bg-white text-sm text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-400 transition-colors"
+        >
+          <option value="">Todos los sprints</option>
+          {sprints.map((s) => (
+            <option key={s} value={s}>{s}</option>
+          ))}
+        </select>
       </div>
 
       {/* Stats banner */}
