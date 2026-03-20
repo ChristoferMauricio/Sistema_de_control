@@ -481,6 +481,9 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
         return sortSprints([...s]);
     }, [historias]);
 
+    // Detectar si el sprint seleccionado pertenece al tablero PF3QA
+    const isPF3QA = /Tablero\s+Sprint/i.test(selectedSprint);
+
     // Filtrar por sprint
     const filtered = useMemo(() => {
         if (!selectedSprint) return historias;
@@ -827,9 +830,11 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                                 <th className="text-center px-3 py-2 font-semibold text-gray-700 border-l border-gray-200" style={{ minWidth: "100px" }}>
                                     Historias
                                 </th>
-                                <th className="text-center px-3 py-2 font-semibold text-gray-700 border-l border-gray-200" style={{ minWidth: "160px" }}>
-                                    Soporte e Incidencias
-                                </th>
+                                {!isPF3QA && (
+                                    <th className="text-center px-3 py-2 font-semibold text-gray-700 border-l border-gray-200" style={{ minWidth: "160px" }}>
+                                        Soporte e Incidencias
+                                    </th>
+                                )}
                                 <th className="text-center px-4 py-2 font-bold text-gray-900 border-l border-gray-200 bg-orange-50/50" style={{ minWidth: "100px" }}>
                                     TOTAL
                                 </th>
@@ -876,25 +881,27 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                                                     </button>
                                                 </div>
                                             </td>
-                                            <td className="px-3 py-2 text-center border-l border-gray-100">
-                                                <div className="inline-flex items-center gap-1.5">
-                                                    <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                                                        {row.subtareasCount}
-                                                    </span>
-                                                    <button
-                                                        onClick={() => openSubtasks(row.assignee)}
-                                                        className="p-1 rounded-md hover:bg-gray-200 text-gray-400 hover:text-gray-600 transition-colors"
-                                                        title="Ver detalles de soporte e incidencias"
-                                                    >
-                                                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-                                                        </svg>
-                                                    </button>
-                                                </div>
-                                            </td>
+                                            {!isPF3QA && (
+                                                <td className="px-3 py-2 text-center border-l border-gray-100">
+                                                    <div className="inline-flex items-center gap-1.5">
+                                                        <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                                            {row.subtareasCount}
+                                                        </span>
+                                                        <button
+                                                            onClick={() => openSubtasks(row.assignee)}
+                                                            className="p-1 rounded-md hover:bg-gray-200 text-gray-400 hover:text-gray-600 transition-colors"
+                                                            title="Ver detalles de soporte e incidencias"
+                                                        >
+                                                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+                                                            </svg>
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            )}
                                             <td className="px-4 py-2 text-center border-l border-gray-100 bg-gray-50/50">
                                                 <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-sm font-bold text-gray-800">
-                                                    {row.puntajeTotal}
+                                                    {isPF3QA ? row.total : row.puntajeTotal}
                                                 </span>
                                             </td>
                                         </tr>
@@ -915,14 +922,16 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                                                 {totals.total}
                                             </span>
                                         </td>
-                                        <td className="px-4 py-3 text-center border-l border-gray-100">
-                                            <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-sm font-bold bg-blue-100 text-blue-800">
-                                                {totals.subtareasCount}
-                                            </span>
-                                        </td>
+                                        {!isPF3QA && (
+                                            <td className="px-4 py-3 text-center border-l border-gray-100">
+                                                <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-sm font-bold bg-blue-100 text-blue-800">
+                                                    {totals.subtareasCount}
+                                                </span>
+                                            </td>
+                                        )}
                                         <td className="px-4 py-3 text-center border-l border-gray-200 bg-gray-100">
                                             <span className="inline-flex items-center justify-center min-w-[36px] px-3 py-1 rounded-lg text-base font-bold text-gray-900">
-                                                {totals.puntajeTotal}
+                                                {isPF3QA ? totals.total : totals.puntajeTotal}
                                             </span>
                                         </td>
                                     </tr>
@@ -933,8 +942,8 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                 </div>
             </div>
 
-            {/* ─── Tabla 02: Story Points por integrante ─── */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden animate-fade-in">
+            {/* ─── Tabla 02: Story Points por integrante (solo PF3) ─── */}
+            {!isPF3QA && <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden animate-fade-in">
                 {/* Header */}
                 <div className="px-6 py-4 border-b border-gray-100">
                     <h3 className="text-lg font-semibold font-[family-name:var(--font-heading)] text-gray-900">
@@ -1055,7 +1064,7 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                         </tbody>
                     </table>
                 </div>
-            </div>
+            </div>}
 
             {/* Traceability Modal */}
             {traceModal && (
