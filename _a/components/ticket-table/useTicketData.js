@@ -257,7 +257,7 @@ export function useTicketData({ tickets = [], externalFilterType = "", defaultFi
         if (exclude !== "type" && filterType)       r = r.filter((t) => t.issue_type === filterType);
         if (filterKey.length >= 3)                  r = r.filter((t) => t.jira_key?.toLowerCase().includes(filterKey.toLowerCase()));
         if (filterSummary.length >= 3)              r = r.filter((t) => t.summary?.toLowerCase().includes(filterSummary.toLowerCase()));
-        if (exclude !== "sprint" && filterSprint)   r = r.filter((t) => t.sprint === filterSprint);
+        if (exclude !== "sprint" && filterSprint)   r = r.filter((t) => filterSprint === "Backlog" ? !t.sprint : t.sprint === filterSprint);
         if (exclude !== "status" && filterStatus)   r = r.filter((t) => t.status === filterStatus);
         if (filterPrincipal.length >= 3)            r = r.filter((t) => t.parent_key?.toLowerCase().includes(filterPrincipal.toLowerCase()));
 
@@ -306,7 +306,12 @@ export function useTicketData({ tickets = [], externalFilterType = "", defaultFi
       return {
         filtered: result,
         uniqueTypes:    [...new Set(base("type").map((t) => t.issue_type).filter(Boolean))].sort(),
-        uniqueSprints:  sortSprints([...new Set(base("sprint").map((t) => t.sprint).filter(Boolean))]),
+        uniqueSprints:  (() => {
+          const sprintBase = base("sprint");
+          const named = sortSprints([...new Set(sprintBase.map((t) => t.sprint).filter(Boolean))]);
+          const hasBacklog = sprintBase.some((t) => !t.sprint);
+          return hasBacklog ? [...named, "Backlog"] : named;
+        })(),
         uniqueStatuses: [...new Set(base("status").map((t) => t.status).filter(Boolean))].sort(),
         uniqueAssignees:[...new Set(base("assignee").map((t) => resolveName(t.assignee_email)).filter((v) => v && v !== "—"))].sort(),
         uniqueReporters:[...new Set(base("reporter").map((t) => resolveName(t.reporter_email)).filter((v) => v && v !== "—"))].sort(),
