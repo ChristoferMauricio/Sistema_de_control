@@ -116,3 +116,24 @@ export function getInitials(name) {
     .join('')
     .toUpperCase();
 }
+
+/**
+ * Ordena sprints: Iteración F3.XX descendente (más reciente primero),
+ * luego Tablero Sprint X ascendente, luego el resto alfabéticamente.
+ */
+export function sortSprints(sprints) {
+  return [...sprints].sort((a, b) => {
+    const iterA = a.match(/F3[,.](\d+)/i);
+    const iterB = b.match(/F3[,.](\d+)/i);
+    const tabA  = a.match(/Tablero\s+Sprint\s+(\d+)/i);
+    const tabB  = b.match(/Tablero\s+Sprint\s+(\d+)/i);
+
+    if (iterA && iterB) return parseInt(iterB[1]) - parseInt(iterA[1]);
+    if (tabA  && tabB)  return parseInt(tabA[1])  - parseInt(tabB[1]);
+    if (iterA) return -1;
+    if (iterB) return  1;
+    if (tabA)  return -1;
+    if (tabB)  return  1;
+    return a.localeCompare(b);
+  });
+}

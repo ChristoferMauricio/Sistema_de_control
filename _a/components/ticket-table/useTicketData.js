@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
+import { sortSprints } from "@/lib/utils";
 
 const PAGE_SIZE = 15;
 
@@ -20,7 +21,11 @@ export const isEpic = (type) =>
 export const hasStatusHistory = (type) => !isSubtask(type) && !isEpic(type);
 
 // ─── Hook principal ─────────────────────────────────────────────────────────
-export function useTicketData({ tickets = [], externalFilterType = "", defaultFilterSprint = "", localComments = {} }) {
+// defaultFilterSprint semántica:
+//   null  → no se pasó ningún valor, se lee desde la URL (comportamiento por defecto)
+//   ""    → se pasó explícitamente vacío: sin sprint inicial, NO leer de URL
+//   "xyz" → forzar ese sprint como valor inicial
+export function useTicketData({ tickets = [], externalFilterType = "", defaultFilterSprint = null, localComments = {} }) {
   const [search, setSearch]               = useState("");
   const [sortField, setSortField]         = useState("updated_at");
   const [sortDir, setSortDir]             = useState("desc");
@@ -67,7 +72,8 @@ export function useTicketData({ tickets = [], externalFilterType = "", defaultFi
     const sprintParam = params.get("sprint");
     const typeParam   = params.get("tipo");
     const statusParam = params.get("estado");
-    if (sprintParam !== null && !defaultFilterSprint) setFilterSprint(sprintParam);
+    // Solo restaurar sprint desde URL cuando el padre no forzó un valor explícito
+    if (sprintParam !== null && defaultFilterSprint === null) setFilterSprint(sprintParam);
     if (typeParam   !== null && !externalFilterType)  setFilterType(typeParam);
     if (statusParam !== null)                         setFilterStatus(statusParam);
   }, [defaultFilterSprint, externalFilterType]);
@@ -266,7 +272,7 @@ export function useTicketData({ tickets = [], externalFilterType = "", defaultFi
       return {
         filtered: result,
         uniqueTypes:    [...new Set(base("type").map((t) => t.issue_type).filter(Boolean))].sort(),
-        uniqueSprints:  [...new Set(base("sprint").map((t) => t.sprint).filter(Boolean))].sort(),
+        uniqueSprints:  sortSprints([...new Set(base("sprint").map((t) => t.sprint).filter(Boolean))]),
         uniqueStatuses: [...new Set(base("status").map((t) => t.status).filter(Boolean))].sort(),
         uniqueAssignees:[...new Set(base("assignee").map((t) => resolveName(t.assignee_email)).filter((v) => v && v !== "—"))].sort(),
         uniqueReporters:[...new Set(base("reporter").map((t) => resolveName(t.reporter_email)).filter((v) => v && v !== "—"))].sort(),

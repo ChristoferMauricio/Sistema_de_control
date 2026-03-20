@@ -6,6 +6,7 @@ import * as XLSX from "xlsx-js-style";
 import JSZip from "jszip";
 import { Download } from "lucide-react";
 import { getCurrentSprint } from "@/lib/cronogramaData";
+import { sortSprints } from "@/lib/utils";
 
 // Mapeo de estados internos de Jira → nombres de columna para el reporte
 const STATUS_COLUMNS = [
@@ -472,12 +473,7 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
     const sprints = useMemo(() => {
         const s = new Set();
         historias.forEach((t) => { if (t.sprint) s.add(t.sprint); });
-        return [...s].sort((a, b) => {
-            const numA = a.match(/(\d+)/);
-            const numB = b.match(/(\d+)/);
-            if (numA && numB) return parseInt(numA[1]) - parseInt(numB[1]);
-            return a.localeCompare(b);
-        });
+        return sortSprints([...s]);
     }, [historias]);
 
     // Filtrar por sprint
