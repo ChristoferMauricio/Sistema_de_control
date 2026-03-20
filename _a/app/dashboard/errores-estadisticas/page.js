@@ -419,10 +419,13 @@ export default function ErroresEstadisticasPage() {
     return sortSprints([...s]);
   }, [tickets]);
 
-  // Default sprint: highest (first in sorted list)
+  // Default sprint: the most recent one (highest number)
   useEffect(() => {
     if (selectedSprint === null && sprints.length > 0) {
-      setSelectedSprint(sprints[0]);
+      // sprints is sorted: Iteración F3.12 desc, then Tablero Sprint 1,2,... asc
+      // Pick the last Tablero Sprint (highest number) or the first Iteración
+      const lastTablero = [...sprints].reverse().find((s) => /Tablero\s+Sprint/i.test(s));
+      setSelectedSprint(lastTablero || sprints[0]);
     }
   }, [sprints, selectedSprint]);
 
