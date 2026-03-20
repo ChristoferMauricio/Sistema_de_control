@@ -529,11 +529,11 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
     }, [persons]);
 
     // Recibe email → displayName (jira_persons) → alias (Nombres) → fallback email
-    function resolveName(email) {
+    const resolveName = useCallback((email) => {
         if (!email || email.trim() === "") return "Sin asignar";
         const displayName = personsMap[email] || email;
         return nameMap[displayName.toLowerCase()] || displayName;
-    }
+    }, [nameMap, personsMap]);
 
     // Crear mapa inverso: Nombre → lista de Programador keys
     const reverseNameMap = useMemo(() => {
@@ -582,7 +582,7 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
             ...row,
             puntajeTotal: row.total + row.subtareasCount
         })).sort((a, b) => b.puntajeTotal - a.puntajeTotal);
-    }, [filtered, filteredSubtasks, nameMap]);
+    }, [filtered, filteredSubtasks, resolveName]);
 
     // Totales por columna
     const totals = useMemo(() => {
@@ -633,7 +633,7 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
             ...row,
             puntajeTotal: row.total + row.subtareasCount
         })).sort((a, b) => b.puntajeTotal - a.puntajeTotal);
-    }, [filtered, filteredSubtasks, nameMap]);
+    }, [filtered, filteredSubtasks, resolveName]);
 
     const totalsSP = useMemo(() => {
         const t = { total: 0, subtareasCount: 0, puntajeTotal: 0 };
