@@ -102,8 +102,8 @@ export function useTicketData({ tickets = [], externalFilterType = "", defaultFi
   useEffect(() => {
     async function fetchRelational() {
       const [subtasksRes, linksRes] = await Promise.all([
-        supabase.from("jira_ticket_subtasks").select("parent_key, child_key"),
-        supabase.from("jira_ticket_links").select("source_key, target_key"),
+        supabase.from("jira_ticket_subtasks").select("parent_key, child_key").limit(10000),
+        supabase.from("jira_ticket_links").select("source_key, target_key").limit(10000),
       ]);
 
       const sMap = {};
