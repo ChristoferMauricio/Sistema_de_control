@@ -8,8 +8,25 @@ const ERROR_TYPES = ["Bug", "Error", "Error Desarrollo", "Error Certificación",
 const EXCLUDE_PATTERN = /prueba|revisión|revision/i;
 const JIRA_BASE = "https://supervisorservicio2020.atlassian.net/browse";
 
+// Status classification
+const STATUS_DEFS = [
+  { key: "por_hacer", label: "Por hacer", match: ["tareas por hacer", "por hacer"], color: "bg-gray-200 text-gray-700" },
+  { key: "en_curso", label: "En curso", match: ["en curso", "in progress", "en progreso"], color: "bg-blue-100 text-blue-700" },
+  { key: "listo_dev", label: "Listo para dev", match: ["listo para dev"], color: "bg-cyan-100 text-cyan-700" },
+  { key: "qa", label: "QA", match: ["control de calidad", "qa en dev"], color: "bg-amber-100 text-amber-700" },
+  { key: "finalizada", label: "Finalizada", match: ["finalizada", "listo (pase a cert)", "terminada", "done", "cerrado", "resuelto", "cerrada"], color: "bg-green-100 text-green-700" },
+];
+
+function classifyStatus(status) {
+  const s = (status || "").toLowerCase();
+  for (const def of STATUS_DEFS) {
+    if (def.match.some((m) => s.includes(m))) return def.key;
+  }
+  return "por_hacer"; // default
+}
+
 /* ───────── Detail Modal ───────── */
-function DetailModal({ title, personName, items, linksMap, ticketMap, onClose }) {
+function DetailModal({ title, personName, items, linksMap, allTicketMap, onClose }) {
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="min-h-full flex items-start justify-center p-4 py-8">
@@ -83,23 +100,25 @@ function DetailModal({ title, personName, items, linksMap, ticketMap, onClose })
                         <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
                           Actividades vinculadas ({linkedKeys.length})
                         </p>
-                        <div className="space-y-1">
+                        <div className="space-y-1.5">
                           {linkedKeys.map((lk) => {
-                            const linked = ticketMap[lk.target_key];
+                            const linked = allTicketMap[lk.target_key];
                             return (
-                              <div key={`${ticket.jira_key}-${lk.target_key}`} className="flex items-center gap-2 text-xs">
-                                <span className="text-gray-400 italic shrink-0">{lk.link_type}</span>
-                                <a
-                                  href={`${JIRA_BASE}/${lk.target_key}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="font-mono font-semibold text-indigo-600 hover:underline shrink-0"
-                                >
-                                  {lk.target_key}
-                                </a>
-                                {linked && (
-                                  <span className="text-gray-500 truncate">{linked.summary}</span>
-                                )}
+                              <div key={`${ticket.jira_key}-${lk.target_key}`} className="flex items-start gap-2 text-xs">
+                                <span className="text-gray-400 italic shrink-0 pt-0.5">{lk.link_type}</span>
+                                <div className="min-w-0">
+                                  <a
+                                    href={`${JIRA_BASE}/${lk.target_key}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="font-mono font-semibold text-indigo-600 hover:underline"
+                                  >
+                                    {lk.target_key}
+                                  </a>
+                                  {linked && (
+                                    <span className="ml-1.5 text-indigo-500/80">{linked.summary}</span>
+                                  )}
+                                </div>
                               </div>
                             );
                           })}
@@ -139,7 +158,7 @@ function BarChart({ title, subtitle, data, maxValue, onBarClick }) {
       </div>
 
       {/* Legend */}
-      <div className="px-6 pt-4 flex items-center gap-6 text-xs text-gray-500">
+      <div className="px-6 pt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-gray-500">
         <div className="flex items-center gap-1.5">
           <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-sky-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
@@ -152,10 +171,25 @@ function BarChart({ title, subtitle, data, maxValue, onBarClick }) {
           </svg>
           <span>Errores</span>
         </div>
+        {data.some((r) => r.excluidos > 0) && (
+          <div className="flex items-center gap-1.5">
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878l4.242 4.242M21 21l-4.879-4.879" />
+            </svg>
+            <span>Excluidos</span>
+          </div>
+        )}
+        <span className="border-l border-gray-200 pl-4 flex items-center gap-2 flex-wrap">
+          {STATUS_DEFS.map((sd) => (
+            <span key={sd.key} className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold ${sd.color}`}>
+              {sd.label}
+            </span>
+          ))}
+        </span>
         <span className="text-gray-300 ml-auto">Click en una barra para ver detalle</span>
       </div>
 
-      <div className="px-6 py-4 space-y-4">
+      <div className="px-6 py-4 space-y-5">
         {data.map((row) => (
           <div key={row.name} className="flex items-start gap-3">
             {/* Name label */}
@@ -164,8 +198,8 @@ function BarChart({ title, subtitle, data, maxValue, onBarClick }) {
             </div>
 
             {/* Bars */}
-            <div className="flex-1 space-y-1.5 min-w-0">
-              {/* Historias bar */}
+            <div className="flex-1 space-y-1 min-w-0">
+              {/* Historias bar + status pills */}
               <button
                 className="w-full flex items-center gap-2 group"
                 onClick={() => row.historias > 0 && onBarClick(row.name, "Historia")}
@@ -188,10 +222,22 @@ function BarChart({ title, subtitle, data, maxValue, onBarClick }) {
                 </div>
                 {row.historias === 0 && <span className="text-xs text-gray-300 w-4">0</span>}
               </button>
+              {row.historias > 0 && (
+                <div className="flex items-center gap-1 pl-6 flex-wrap">
+                  {STATUS_DEFS.map((sd) => {
+                    const count = row.historiasStatus[sd.key];
+                    return count > 0 ? (
+                      <span key={sd.key} className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold ${sd.color}`}>
+                        {sd.label}: {count}
+                      </span>
+                    ) : null;
+                  })}
+                </div>
+              )}
 
-              {/* Errores bar */}
+              {/* Errores bar + status pills */}
               <button
-                className="w-full flex items-center gap-2 group"
+                className="w-full flex items-center gap-2 group mt-1"
                 onClick={() => row.errores > 0 && onBarClick(row.name, "Error")}
                 disabled={row.errores === 0}
               >
@@ -212,12 +258,48 @@ function BarChart({ title, subtitle, data, maxValue, onBarClick }) {
                 </div>
                 {row.errores === 0 && <span className="text-xs text-gray-300 w-4">0</span>}
               </button>
+              {row.errores > 0 && (
+                <div className="flex items-center gap-1 pl-6 flex-wrap">
+                  {STATUS_DEFS.map((sd) => {
+                    const count = row.erroresStatus[sd.key];
+                    return count > 0 ? (
+                      <span key={sd.key} className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold ${sd.color}`}>
+                        {sd.label}: {count}
+                      </span>
+                    ) : null;
+                  })}
+                </div>
+              )}
+
+              {/* Excluidos bar */}
+              {row.excluidos > 0 && (
+                <>
+                  <button
+                    className="w-full flex items-center gap-2 group mt-1"
+                    onClick={() => onBarClick(row.name, "Excluido")}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-amber-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878l4.242 4.242M21 21l-4.879-4.879" />
+                    </svg>
+                    <div className="flex-1 bg-gray-100 rounded-full h-6 overflow-hidden">
+                      <div
+                        className="h-full bg-amber-300/80 rounded-full flex items-center transition-all duration-500 group-hover:bg-amber-400/80 cursor-pointer"
+                        style={{ width: maxValue > 0 ? `${Math.max((row.excluidos / maxValue) * 100, 4)}%` : "0%" }}
+                      >
+                        <span className="ml-auto mr-2 text-[11px] font-bold text-amber-800 drop-shadow-sm">
+                          {row.excluidos}
+                        </span>
+                      </div>
+                    </div>
+                  </button>
+                </>
+              )}
             </div>
 
             {/* Total */}
             <div className="w-10 shrink-0 text-center pt-2">
               <span className="inline-flex items-center justify-center min-w-[28px] px-1.5 py-0.5 rounded-lg text-xs font-bold bg-gray-100 text-gray-700 border border-gray-200">
-                {row.historias + row.errores}
+                {row.historias + row.errores + row.excluidos}
               </span>
             </div>
           </div>
@@ -230,12 +312,13 @@ function BarChart({ title, subtitle, data, maxValue, onBarClick }) {
 /* ───────── Main Page ───────── */
 export default function ErroresEstadisticasPage() {
   const [tickets, setTickets] = useState([]);
+  const [linkedTickets, setLinkedTickets] = useState([]);
   const [links, setLinks] = useState([]);
   const [equipo, setEquipo] = useState([]);
   const [persons, setPersons] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedSprint, setSelectedSprint] = useState("");
-  const [filterType, setFilterType] = useState(""); // "", "Historia", "Error"
+  const [selectedSprint, setSelectedSprint] = useState(null); // null = not initialized yet
+  const [activeFilters, setActiveFilters] = useState(new Set(["Historia", "Error"])); // default: both active
   const [modal, setModal] = useState(null); // { title, personName, items }
 
   useEffect(() => {
@@ -253,10 +336,24 @@ export default function ErroresEstadisticasPage() {
         supabase.from("jira_persons").select("email, display_name"),
       ]);
 
-      setTickets(ticketsRes.data || []);
-      setLinks(linksRes.data || []);
+      const tix = ticketsRes.data || [];
+      const lnk = linksRes.data || [];
+      setTickets(tix);
+      setLinks(lnk);
       setEquipo(equipoRes.data || []);
       setPersons(personsRes.data || []);
+
+      // Fetch summaries for linked tickets (PF3-XXXX) not in PF3QA
+      const pf3qaKeys = new Set(tix.map((t) => t.jira_key));
+      const externalKeys = [...new Set(lnk.map((l) => l.target_key).filter((k) => !pf3qaKeys.has(k)))];
+      if (externalKeys.length > 0) {
+        const { data: extTickets } = await supabase
+          .from("jira_tickets")
+          .select("jira_key, summary")
+          .in("jira_key", externalKeys);
+        setLinkedTickets(extTickets || []);
+      }
+
       setLoading(false);
     }
     fetchData();
@@ -272,12 +369,13 @@ export default function ErroresEstadisticasPage() {
     return map;
   }, [links]);
 
-  // Ticket map for quick lookup of linked ticket summaries
-  const ticketMap = useMemo(() => {
+  // Ticket map for quick lookup (PF3QA + linked PF3 tickets)
+  const allTicketMap = useMemo(() => {
     const map = {};
     tickets.forEach((t) => { map[t.jira_key] = t; });
+    linkedTickets.forEach((t) => { if (!map[t.jira_key]) map[t.jira_key] = t; });
     return map;
-  }, [tickets]);
+  }, [tickets, linkedTickets]);
 
   // Name resolution maps
   const equipoEmailMap = useMemo(() => {
@@ -321,16 +419,42 @@ export default function ErroresEstadisticasPage() {
     return sortSprints([...s]);
   }, [tickets]);
 
+  // Default sprint: highest (first in sorted list)
+  useEffect(() => {
+    if (selectedSprint === null && sprints.length > 0) {
+      setSelectedSprint(sprints[0]);
+    }
+  }, [sprints, selectedSprint]);
+
   // Filter & classify tickets
   const validTickets = useMemo(() => {
     return tickets.filter((t) => {
-      if (EXCLUDE_PATTERN.test(t.summary || "")) return false;
       if (selectedSprint && t.sprint !== selectedSprint) return false;
-      if (filterType === "Historia" && t.issue_type !== "Historia") return false;
-      if (filterType === "Error" && !ERROR_TYPES.includes(t.issue_type)) return false;
-      return true;
+      const isExcluded = EXCLUDE_PATTERN.test(t.summary || "");
+      const isHistoria = !isExcluded && t.issue_type === "Historia";
+      const isError = !isExcluded && ERROR_TYPES.includes(t.issue_type);
+
+      if (isExcluded && activeFilters.has("Excluido")) return true;
+      if (isHistoria && activeFilters.has("Historia")) return true;
+      if (isError && activeFilters.has("Error")) return true;
+      return false;
     });
-  }, [tickets, selectedSprint, filterType]);
+  }, [tickets, selectedSprint, activeFilters]);
+
+  // Helper: create empty status map
+  const emptyStatusMap = () => {
+    const m = {};
+    STATUS_DEFS.forEach((d) => { m[d.key] = 0; });
+    return m;
+  };
+
+  // Classify ticket category
+  const classifyTicket = useCallback((t) => {
+    if (EXCLUDE_PATTERN.test(t.summary || "")) return "excluido";
+    if (ERROR_TYPES.includes(t.issue_type)) return "error";
+    if (t.issue_type === "Historia") return "historia";
+    return null;
+  }, []);
 
   // Group by reporter
   const reporterData = useMemo(() => {
@@ -338,17 +462,17 @@ export default function ErroresEstadisticasPage() {
     validTickets.forEach((t) => {
       const name = resolveName(t.reporter_email);
       if (!name) return;
-      if (!map[name]) map[name] = { name, historias: 0, errores: 0 };
-      if (ERROR_TYPES.includes(t.issue_type)) {
-        map[name].errores += 1;
-      } else if (t.issue_type === "Historia") {
-        map[name].historias += 1;
-      }
+      if (!map[name]) map[name] = { name, historias: 0, errores: 0, excluidos: 0, historiasStatus: emptyStatusMap(), erroresStatus: emptyStatusMap() };
+      const cat = classifyTicket(t);
+      const sk = classifyStatus(t.status);
+      if (cat === "error") { map[name].errores += 1; map[name].erroresStatus[sk] += 1; }
+      else if (cat === "historia") { map[name].historias += 1; map[name].historiasStatus[sk] += 1; }
+      else if (cat === "excluido") { map[name].excluidos += 1; }
     });
     return Object.values(map)
-      .filter((r) => r.historias + r.errores > 0)
-      .sort((a, b) => (b.historias + b.errores) - (a.historias + a.errores));
-  }, [validTickets, resolveName]);
+      .filter((r) => r.historias + r.errores + r.excluidos > 0)
+      .sort((a, b) => (b.historias + b.errores + b.excluidos) - (a.historias + a.errores + a.excluidos));
+  }, [validTickets, resolveName, classifyTicket]);
 
   // Group by assignee
   const assigneeData = useMemo(() => {
@@ -356,47 +480,47 @@ export default function ErroresEstadisticasPage() {
     validTickets.forEach((t) => {
       const name = resolveName(t.assignee_email);
       if (!name) return;
-      if (!map[name]) map[name] = { name, historias: 0, errores: 0 };
-      if (ERROR_TYPES.includes(t.issue_type)) {
-        map[name].errores += 1;
-      } else if (t.issue_type === "Historia") {
-        map[name].historias += 1;
-      }
+      if (!map[name]) map[name] = { name, historias: 0, errores: 0, excluidos: 0, historiasStatus: emptyStatusMap(), erroresStatus: emptyStatusMap() };
+      const cat = classifyTicket(t);
+      const sk = classifyStatus(t.status);
+      if (cat === "error") { map[name].errores += 1; map[name].erroresStatus[sk] += 1; }
+      else if (cat === "historia") { map[name].historias += 1; map[name].historiasStatus[sk] += 1; }
+      else if (cat === "excluido") { map[name].excluidos += 1; }
     });
     return Object.values(map)
-      .filter((r) => r.historias + r.errores > 0)
-      .sort((a, b) => (b.historias + b.errores) - (a.historias + a.errores));
-  }, [validTickets, resolveName]);
+      .filter((r) => r.historias + r.errores + r.excluidos > 0)
+      .sort((a, b) => (b.historias + b.errores + b.excluidos) - (a.historias + a.errores + a.excluidos));
+  }, [validTickets, resolveName, classifyTicket]);
 
   // Max values for bar scaling
-  const maxReporter = useMemo(() => Math.max(...reporterData.map((r) => Math.max(r.historias, r.errores)), 1), [reporterData]);
-  const maxAssignee = useMemo(() => Math.max(...assigneeData.map((r) => Math.max(r.historias, r.errores)), 1), [assigneeData]);
+  const maxReporter = useMemo(() => Math.max(...reporterData.map((r) => Math.max(r.historias, r.errores, r.excluidos)), 1), [reporterData]);
+  const maxAssignee = useMemo(() => Math.max(...assigneeData.map((r) => Math.max(r.historias, r.errores, r.excluidos)), 1), [assigneeData]);
 
-  // Base tickets (sprint + exclusion only, without type filter) for badge counts
-  const baseTickets = useMemo(() => {
+  // Sprint-filtered tickets (no type filter) for badge counts
+  const sprintTickets = useMemo(() => {
     return tickets.filter((t) => {
-      if (EXCLUDE_PATTERN.test(t.summary || "")) return false;
       if (selectedSprint && t.sprint !== selectedSprint) return false;
       return true;
     });
   }, [tickets, selectedSprint]);
 
   // Totals (always show full counts regardless of type filter)
-  const totalHistorias = useMemo(() => baseTickets.filter((t) => t.issue_type === "Historia").length, [baseTickets]);
-  const totalErrores = useMemo(() => baseTickets.filter((t) => ERROR_TYPES.includes(t.issue_type)).length, [baseTickets]);
-  const totalAll = useMemo(() => baseTickets.length, [baseTickets]);
+  const totalHistorias = useMemo(() => sprintTickets.filter((t) => !EXCLUDE_PATTERN.test(t.summary || "") && t.issue_type === "Historia").length, [sprintTickets]);
+  const totalErrores = useMemo(() => sprintTickets.filter((t) => !EXCLUDE_PATTERN.test(t.summary || "") && ERROR_TYPES.includes(t.issue_type)).length, [sprintTickets]);
+  const totalExcluidos = useMemo(() => sprintTickets.filter((t) => EXCLUDE_PATTERN.test(t.summary || "")).length, [sprintTickets]);
 
   // Bar click handler: open modal with filtered tickets
   const handleBarClick = useCallback((field) => (personName, type) => {
-    const isError = type === "Error";
     const items = validTickets.filter((t) => {
       const name = resolveName(t[field]);
       if (name !== personName) return false;
-      if (isError) return ERROR_TYPES.includes(t.issue_type);
-      return t.issue_type === "Historia";
+      if (type === "Error") return ERROR_TYPES.includes(t.issue_type) && !EXCLUDE_PATTERN.test(t.summary || "");
+      if (type === "Excluido") return EXCLUDE_PATTERN.test(t.summary || "");
+      return t.issue_type === "Historia" && !EXCLUDE_PATTERN.test(t.summary || "");
     });
+    const titles = { Error: "Errores", Historia: "Historias", Excluido: "Excluidos (Prueba/Revisión)" };
     setModal({
-      title: isError ? "Errores" : "Historias",
+      title: titles[type] || type,
       personName,
       items,
     });
@@ -442,7 +566,7 @@ export default function ErroresEstadisticasPage() {
       {/* Sprint filter */}
       <div className="animate-fade-in">
         <select
-          value={selectedSprint}
+          value={selectedSprint || ""}
           onChange={(e) => setSelectedSprint(e.target.value)}
           className="px-4 py-2.5 rounded-xl border-2 border-indigo-200 bg-indigo-50 text-sm text-indigo-700 font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 transition-colors"
         >
@@ -453,14 +577,18 @@ export default function ErroresEstadisticasPage() {
         </select>
       </div>
 
-      {/* Stats banner - clickeable filters */}
+      {/* Stats banner - clickeable toggle filters */}
       <div className="flex flex-wrap gap-3 animate-fade-in">
         <button
-          onClick={() => setFilterType(filterType === "Historia" ? "" : "Historia")}
+          onClick={() => {
+            const next = new Set(activeFilters);
+            next.has("Historia") ? next.delete("Historia") : next.add("Historia");
+            setActiveFilters(next);
+          }}
           className={`rounded-xl border px-5 py-3 inline-flex items-center gap-3 shadow-sm transition-all duration-200 cursor-pointer ${
-            filterType === "Historia"
+            activeFilters.has("Historia")
               ? "bg-sky-50 border-sky-400 ring-2 ring-sky-200"
-              : "bg-white border-gray-200 hover:border-sky-300 hover:bg-sky-50/50"
+              : "bg-white border-gray-200 hover:border-sky-300 hover:bg-sky-50/50 opacity-60"
           }`}
         >
           <span className="w-2.5 h-2.5 rounded-full bg-sky-400" />
@@ -469,11 +597,15 @@ export default function ErroresEstadisticasPage() {
           </span>
         </button>
         <button
-          onClick={() => setFilterType(filterType === "Error" ? "" : "Error")}
+          onClick={() => {
+            const next = new Set(activeFilters);
+            next.has("Error") ? next.delete("Error") : next.add("Error");
+            setActiveFilters(next);
+          }}
           className={`rounded-xl border px-5 py-3 inline-flex items-center gap-3 shadow-sm transition-all duration-200 cursor-pointer ${
-            filterType === "Error"
+            activeFilters.has("Error")
               ? "bg-red-50 border-red-400 ring-2 ring-red-200"
-              : "bg-white border-gray-200 hover:border-red-300 hover:bg-red-50/50"
+              : "bg-white border-gray-200 hover:border-red-300 hover:bg-red-50/50 opacity-60"
           }`}
         >
           <span className="w-2.5 h-2.5 rounded-full bg-red-400/80" />
@@ -482,16 +614,20 @@ export default function ErroresEstadisticasPage() {
           </span>
         </button>
         <button
-          onClick={() => setFilterType("")}
+          onClick={() => {
+            const next = new Set(activeFilters);
+            next.has("Excluido") ? next.delete("Excluido") : next.add("Excluido");
+            setActiveFilters(next);
+          }}
           className={`rounded-xl border px-5 py-3 inline-flex items-center gap-3 shadow-sm transition-all duration-200 cursor-pointer ${
-            filterType === ""
-              ? "bg-gray-100 border-gray-400 ring-2 ring-gray-200"
-              : "bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+            activeFilters.has("Excluido")
+              ? "bg-amber-50 border-amber-400 ring-2 ring-amber-200"
+              : "bg-white border-gray-200 hover:border-amber-300 hover:bg-amber-50/50 opacity-60"
           }`}
         >
-          <span className="w-2.5 h-2.5 rounded-full bg-gray-400" />
+          <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
           <span className="text-sm text-gray-600">
-            <span className="font-semibold text-gray-900">{totalAll}</span> total (excl. Prueba/Revisión)
+            <span className="font-semibold text-gray-900">{totalExcluidos}</span> excluido{totalExcluidos !== 1 ? "s" : ""} (Prueba/Revisión)
           </span>
         </button>
       </div>
@@ -521,7 +657,7 @@ export default function ErroresEstadisticasPage() {
           personName={modal.personName}
           items={modal.items}
           linksMap={linksMap}
-          ticketMap={ticketMap}
+          allTicketMap={allTicketMap}
           onClose={() => setModal(null)}
         />
       )}
