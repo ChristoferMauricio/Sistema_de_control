@@ -403,11 +403,16 @@ function SubtasksModal({ assigneeName, subtasks, onClose }) {
 export default function ReportesTable({ tickets = [], nombres = [] }) {
     const [selectedSprint, setSelectedSprint] = useState(() => getCurrentSprint(new Date())?.iteracion || "");
     const [persons, setPersons] = useState([]);
+    const [equipo,  setEquipo]  = useState([]);
 
-    // Cargar jira_persons para resolver email → displayName
+    // Cargar jira_persons + equipo_desarrollo para resolver nombres
     useEffect(() => {
-        supabase.from("jira_persons").select("email, display_name").then(({ data }) => {
-            if (data) setPersons(data);
+        Promise.all([
+            supabase.from("jira_persons").select("email, display_name"),
+            supabase.from("equipo_desarrollo").select("nombre, nombre_clave, correo_pgim, correo_gcorp"),
+        ]).then(([personsRes, equipoRes]) => {
+            if (personsRes.data) setPersons(personsRes.data);
+            if (equipoRes.data)  setEquipo(equipoRes.data);
         });
     }, []);
     const [traceModal, setTraceModal] = useState(null); // { assigneeName, stories }
@@ -517,19 +522,42 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
         return map;
     }, [nombres]);
 
-    // personsMap: email → jira displayName
+    // personsMap: accountId/email → jira displayName
     const personsMap = useMemo(() => {
         const map = {};
         persons.forEach((p) => { if (p.email) map[p.email] = p.display_name; });
         return map;
     }, [persons]);
 
-    // Recibe email → displayName (jira_persons) → alias (Nombres) → fallback email
+    // equipoEmailMap: correo_pgim / correo_gcorp → nombre real
+    const equipoEmailMap = useMemo(() => {
+        const map = {};
+        equipo.forEach((m) => {
+            if (m.correo_pgim) map[m.correo_pgim.toLowerCase()] = m.nombre;
+            if (m.correo_gcorp && m.correo_gcorp !== "-") map[m.correo_gcorp.toLowerCase()] = m.nombre;
+        });
+        return map;
+    }, [equipo]);
+
+    // equipoKeyMap: nombre_clave → nombre real
+    const equipoKeyMap = useMemo(() => {
+        const map = {};
+        equipo.forEach((m) => {
+            if (m.nombre_clave && m.nombre_clave !== "-") map[m.nombre_clave.toLowerCase()] = m.nombre;
+        });
+        return map;
+    }, [equipo]);
+
+    // Cadena: correo directo → jira display_name → equipo_desarrollo / Nombres → fallback
     const resolveName = useCallback((email) => {
         if (!email || email.trim() === "") return "Sin asignar";
+        const byEmail = equipoEmailMap[email.toLowerCase()];
+        if (byEmail) return byEmail;
         const displayName = personsMap[email] || email;
-        return nameMap[displayName.toLowerCase()] || displayName;
-    }, [nameMap, personsMap]);
+        return equipoKeyMap[displayName.toLowerCase()]
+            || nameMap[displayName.toLowerCase()]
+            || displayName;
+    }, [nameMap, personsMap, equipoEmailMap, equipoKeyMap]);
 
     // Crear mapa inverso: Nombre → lista de Programador keys
     const reverseNameMap = useMemo(() => {

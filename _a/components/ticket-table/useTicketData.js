@@ -45,6 +45,7 @@ export function useTicketData({ tickets = [], externalFilterType = "", defaultFi
 
   const [nombres, setNombres]   = useState([]);
   const [persons, setPersons]   = useState([]); // jira_persons: { email, display_name }
+  const [equipo,  setEquipo]    = useState([]); // equipo_desarrollo
   const [linksMap, setLinksMap] = useState({}); // source_key → [target_keys]
 
   // ── Sync con filtros externos (props) ──────────────────────────────────────
@@ -90,15 +91,17 @@ export function useTicketData({ tickets = [], externalFilterType = "", defaultFi
     window.history.replaceState({}, "", newUrl);
   }, [filterSprint, filterType, filterStatus]);
 
-  // ── Fetch Nombres + jira_persons ──────────────────────────────────────────
+  // ── Fetch Nombres + jira_persons + equipo_desarrollo ─────────────────────
   useEffect(() => {
     async function fetchPersonData() {
-      const [nombresRes, personsRes] = await Promise.all([
+      const [nombresRes, personsRes, equipoRes] = await Promise.all([
         supabase.from("Nombres").select("Nombre, Programador"),
         supabase.from("jira_persons").select("email, display_name"),
+        supabase.from("equipo_desarrollo").select("nombre, nombre_clave, correo_pgim, correo_gcorp"),
       ]);
       if (nombresRes.data)  setNombres(nombresRes.data);
       if (personsRes.data)  setPersons(personsRes.data);
+      if (equipoRes.data)   setEquipo(equipoRes.data);
     }
     fetchPersonData();
   }, []);
@@ -141,24 +144,52 @@ export function useTicketData({ tickets = [], externalFilterType = "", defaultFi
     return map;
   }, [nombres]);
 
-  // personsMap: email → jira displayName
+  // personsMap: accountId/email → jira displayName
   const personsMap = useMemo(() => {
     const map = {};
     persons.forEach((p) => { if (p.email) map[p.email] = p.display_name; });
     return map;
   }, [persons]);
 
+  // equipoEmailMap: correo_pgim / correo_gcorp → nombre real
+  const equipoEmailMap = useMemo(() => {
+    const map = {};
+    equipo.forEach((m) => {
+      if (m.correo_pgim) map[m.correo_pgim.toLowerCase()] = m.nombre;
+      if (m.correo_gcorp && m.correo_gcorp !== "-") map[m.correo_gcorp.toLowerCase()] = m.nombre;
+    });
+    return map;
+  }, [equipo]);
+
+  // equipoKeyMap: nombre_clave (Jira display name) → nombre real
+  const equipoKeyMap = useMemo(() => {
+    const map = {};
+    equipo.forEach((m) => {
+      if (m.nombre_clave && m.nombre_clave !== "-") map[m.nombre_clave.toLowerCase()] = m.nombre;
+    });
+    return map;
+  }, [equipo]);
+
   /**
-   * Recibe un email → devuelve nombre personalizado (Nombres) o displayName de Jira
-   * Cadena: email → personsMap → nameMap → fallback email
+   * Cadena de resolución de nombre:
+   * 1. Email directo en equipo_desarrollo (correo_pgim / correo_gcorp)
+   * 2. jira_persons → display_name → equipo_desarrollo nombre_clave
+   * 3. jira_persons → display_name → Nombres (Programador)
+   * 4. Fallback: display_name o email crudo
    */
   const resolveName = useCallback(
     (email) => {
       if (!email || email.trim() === "") return "—";
+      // 1. Match directo por correo en equipo_desarrollo
+      const byEmail = equipoEmailMap[email.toLowerCase()];
+      if (byEmail) return byEmail;
+      // 2 y 3. Resolver display name via jira_persons, luego buscar en tablas
       const displayName = personsMap[email] || email;
-      return nameMap[displayName.toLowerCase()] || displayName;
+      return equipoKeyMap[displayName.toLowerCase()]
+        || nameMap[displayName.toLowerCase()]
+        || displayName;
     },
-    [nameMap, personsMap]
+    [nameMap, personsMap, equipoEmailMap, equipoKeyMap]
   );
 
   // ── Mapa de tickets y resolución de épica ──────────────────────────────────
