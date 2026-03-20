@@ -973,15 +973,23 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                                         <td className="px-4 py-2 text-gray-700">TOTAL</td>
                                         {STATUS_COLUMNS.map((col) => (
                                             <td key={col.key} className="px-2 py-2 text-center border-l border-gray-100">
-                                                <span className={`inline-flex items-center justify-center min-w-[28px] px-2 py-0.5 rounded-lg text-xs font-bold ${STATUS_COLORS[col.key]}`}>
-                                                    {totals[col.key]}
-                                                </span>
+                                                <div className="flex flex-col items-center">
+                                                    <span className={`inline-flex items-center justify-center min-w-[28px] px-2 py-0.5 rounded-lg text-xs font-bold ${STATUS_COLORS[col.key]}`}>
+                                                        {totals[col.key]}
+                                                    </span>
+                                                    <span className="text-[10px] text-gray-400 mt-0.5">
+                                                        {totals.total > 0 ? Math.round(totals[col.key] / totals.total * 100) : 0}%
+                                                    </span>
+                                                </div>
                                             </td>
                                         ))}
                                         <td className="px-4 py-3 text-center border-l border-gray-100">
-                                            <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-sm font-bold bg-gray-200 text-gray-700">
-                                                {totals.total}
-                                            </span>
+                                            <div className="flex flex-col items-center">
+                                                <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-sm font-bold bg-gray-200 text-gray-700">
+                                                    {totals.total}
+                                                </span>
+                                                <span className="text-[10px] text-gray-400 mt-0.5">100%</span>
+                                            </div>
                                         </td>
                                         {!isPF3QA && (
                                             <td className="px-4 py-3 text-center border-l border-gray-100">
@@ -1099,15 +1107,23 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                                         <td className="px-4 py-2 text-gray-700">TOTAL</td>
                                         {STATUS_COLUMNS.map((col) => (
                                             <td key={col.key} className="px-2 py-2 text-center border-l border-gray-100">
-                                                <span className={`inline-flex items-center justify-center min-w-[28px] px-2 py-0.5 rounded-lg text-xs font-bold ${STATUS_COLORS[col.key]}`}>
-                                                    {totalsSP[col.key]}
-                                                </span>
+                                                <div className="flex flex-col items-center">
+                                                    <span className={`inline-flex items-center justify-center min-w-[28px] px-2 py-0.5 rounded-lg text-xs font-bold ${STATUS_COLORS[col.key]}`}>
+                                                        {totalsSP[col.key]}
+                                                    </span>
+                                                    <span className="text-[10px] text-gray-400 mt-0.5">
+                                                        {totalsSP.total > 0 ? Math.round(totalsSP[col.key] / totalsSP.total * 100) : 0}%
+                                                    </span>
+                                                </div>
                                             </td>
                                         ))}
                                         <td className="px-4 py-3 text-center border-l border-gray-100">
-                                            <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-sm font-bold bg-gray-200 text-gray-700">
-                                                {totalsSP.total}
-                                            </span>
+                                            <div className="flex flex-col items-center">
+                                                <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-sm font-bold bg-gray-200 text-gray-700">
+                                                    {totalsSP.total}
+                                                </span>
+                                                <span className="text-[10px] text-gray-400 mt-0.5">100%</span>
+                                            </div>
                                         </td>
                                         <td className="px-4 py-3 text-center border-l border-gray-100">
                                             <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-sm font-bold bg-blue-100 text-blue-800">
