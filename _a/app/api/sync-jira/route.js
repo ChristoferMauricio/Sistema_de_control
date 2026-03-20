@@ -77,30 +77,34 @@ function transformIssue(issue) {
   const f = issue.fields || {};
   const now = new Date().toISOString();
 
+  // Usar emailAddress si existe, sino accountId como identificador único
+  const assigneeId = f.assignee?.emailAddress || f.assignee?.accountId || "";
+  const reporterId = f.reporter?.emailAddress  || f.reporter?.accountId  || "";
+
   const ticket = {
     jira_key:       issue.key,
     summary:        f.summary       || "",
     description:    f.description   || null,
     status:         f.status?.name  || "",
-    assignee_email: f.assignee?.emailAddress || "",
+    assignee_email: assigneeId,
     priority:       f.priority?.name || "",
     issue_type:     f.issuetype?.name || "",
     sprint:         extractSprintName(f.customfield_10020),
     story_points:   f.customfield_10036 ?? null,
-    reporter_email: f.reporter?.emailAddress || "",
+    reporter_email: reporterId,
     parent_key:     f.parent?.key   || null,
     created_at:     f.created       || null,
     updated_at:     f.updated       || null,
     synced_at:      now,
   };
 
-  // Persons: deduplicar más adelante por email
+  // Persons: deduplicar más adelante por email/accountId
   const persons = [];
-  if (f.assignee?.emailAddress) {
-    persons.push({ email: f.assignee.emailAddress, display_name: f.assignee.displayName || "" });
+  if (assigneeId) {
+    persons.push({ email: assigneeId, display_name: f.assignee.displayName || assigneeId });
   }
-  if (f.reporter?.emailAddress) {
-    persons.push({ email: f.reporter.emailAddress, display_name: f.reporter.displayName || "" });
+  if (reporterId) {
+    persons.push({ email: reporterId, display_name: f.reporter.displayName || reporterId });
   }
 
   // Subtareas
