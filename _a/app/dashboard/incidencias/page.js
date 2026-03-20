@@ -39,7 +39,7 @@ export default function IncidenciasPage() {
       // 2. Fetch subtasks belonging to these stories
       const { data: subtasks, error: subtasksError } = await supabase
         .from("jira_tickets")
-        .select("jira_key, summary, status, assignee_name, created_at, parent_key, description")
+        .select("jira_key, summary, status, assignee_email, created_at, parent_key, description")
         .eq("issue_type", "Subtarea")
         .in("parent_key", parentKeys)
         .order("created_at", { ascending: false });
@@ -59,43 +59,42 @@ export default function IncidenciasPage() {
         return;
       }
 
-      // 3. Fetch Nombres mapping
-      const { data: nombresData, error: nombresError } = await supabase
-        .from("Nombres")
-        .select("Nombre, Programador");
+      // 3. Fetch name resolution tables
+      const [nombresRes, equipoRes, personsRes] = await Promise.all([
+        supabase.from("Nombres").select("Nombre, Programador"),
+        supabase.from("equipo_desarrollo").select("correo_pgim, correo_gcorp, nombre_clave, nombre"),
+        supabase.from("jira_persons").select("email, display_name"),
+      ]);
 
       const nombreMap = {};
-      if (!nombresError && nombresData) {
-        nombresData.forEach((n) => {
-          if (n.Programador) {
-            nombreMap[n.Programador.toLowerCase()] = n.Nombre;
-          }
-        });
+      (nombresRes.data || []).forEach((n) => {
+        if (n.Programador) nombreMap[n.Programador.toLowerCase()] = n.Nombre;
+      });
+
+      const equipoEmailMap = {};
+      const equipoKeyMap = {};
+      (equipoRes.data || []).forEach((e) => {
+        if (e.correo_pgim) equipoEmailMap[e.correo_pgim.toLowerCase()] = e.nombre;
+        if (e.correo_gcorp) equipoEmailMap[e.correo_gcorp.toLowerCase()] = e.nombre;
+        if (e.nombre_clave) equipoKeyMap[e.nombre_clave.toLowerCase()] = e.nombre;
+      });
+
+      const personsMap = {};
+      (personsRes.data || []).forEach((p) => {
+        if (p.email && p.display_name) personsMap[p.email.toLowerCase()] = p.display_name;
+      });
+
+      function resolveName(email) {
+        if (!email || email.trim() === "") return "Sin Asignar";
+        const key = email.toLowerCase();
+        if (equipoEmailMap[key]) return equipoEmailMap[key];
+        const displayName = personsMap[key] || email;
+        return equipoKeyMap[displayName.toLowerCase()] || nombreMap[displayName.toLowerCase()] || displayName;
       }
 
       // 4. Transform data for the table
       const formattedData = (subtasks || []).map((t) => {
-        // Try to match exact or partial name logic. Usually Jira assignee_name is like "John Doe".
-        // The Nombres table logic assumes mapping based on Programador logic or direct name.
-        // We will do a generic pass.
-        let resolvedName = t.assignee_name || "Sin Asignar";
-        
-        // Example resolution logic based on common patterns:
-        const lowerAssignee = (t.assignee_name || "").toLowerCase();
-        
-        // Find best match in Nombres
-        if (nombreMap[lowerAssignee]) {
-            resolvedName = nombreMap[lowerAssignee];
-        } else {
-            // Partial match fallback
-            const match = nombresData?.find(n => 
-              n.Programador && lowerAssignee.includes(n.Programador.toLowerCase()) ||
-              n.Nombre && lowerAssignee.includes(n.Nombre.toLowerCase())
-            );
-            if (match) {
-                resolvedName = match.Nombre;
-            }
-        }
+        const resolvedName = resolveName(t.assignee_email);
 
         return {
           id: t.jira_key,
@@ -106,7 +105,7 @@ export default function IncidenciasPage() {
           description: t.description, // Added description propagation
           iteracion: iterationMap[t.parent_key] || "Iteración Desconocida",
           asignado: resolvedName,
-          asignado_original: t.assignee_name // Kept for debugging
+          asignado_original: t.assignee_email // Kept for debugging
         };
       });
 
