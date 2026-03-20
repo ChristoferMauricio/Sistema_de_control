@@ -33,7 +33,7 @@ export const maxDuration = 60;
  */
 async function searchJira(jql) {
   const allIssues = [];
-  const fields = "key,summary,status,assignee,priority,issuetype,created,updated,reporter,parent,subtasks,customfield_10036,customfield_10020,description,issuelinks";
+  const fields = "key,summary,status,assignee,priority,issuetype,created,updated,reporter,parent,subtasks,customfield_10036,customfield_10020,customfield_10014,description,issuelinks";
   let nextPageToken = null;
 
   while (true) {
@@ -92,7 +92,9 @@ function transformIssue(issue) {
     sprint:         extractSprintName(f.customfield_10020),
     story_points:   f.customfield_10036 ?? null,
     reporter_email: reporterId,
-    parent_key:     f.parent?.key   || null,
+    // f.parent?.key = relación directa (next-gen / subtareas)
+    // f.customfield_10014 = Epic Link clásico (proyectos company-managed)
+    parent_key:     f.parent?.key || f.customfield_10014 || null,
     created_at:     f.created       || null,
     updated_at:     f.updated       || null,
     synced_at:      now,
