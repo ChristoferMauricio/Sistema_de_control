@@ -40,6 +40,8 @@ export function useTicketData({ tickets = [], externalFilterType = "", defaultFi
 
   const [nombres, setNombres]   = useState([]);
   const [persons, setPersons]   = useState([]); // jira_persons: { email, display_name }
+  const [subtasksMap, setSubtasksMap] = useState({}); // parent_key → [child_keys]
+  const [linksMap, setLinksMap]       = useState({}); // source_key → [target_keys]
 
   // ── Sync con filtros externos (props) ──────────────────────────────────────
   useEffect(() => {
@@ -95,6 +97,30 @@ export function useTicketData({ tickets = [], externalFilterType = "", defaultFi
     }
     fetchPersonData();
   }, []);
+
+  // ── Fetch subtasks + links cuando cambia la lista de tickets ───────────────
+  useEffect(() => {
+    if (!tickets.length) return;
+    const keys = tickets.map((t) => t.jira_key);
+    Promise.all([
+      supabase.from("jira_ticket_subtasks").select("parent_key, child_key").in("parent_key", keys),
+      supabase.from("jira_ticket_links").select("source_key, target_key").in("source_key", keys),
+    ]).then(([subtasksRes, linksRes]) => {
+      const sMap = {};
+      for (const row of subtasksRes.data || []) {
+        if (!sMap[row.parent_key]) sMap[row.parent_key] = [];
+        sMap[row.parent_key].push(row.child_key);
+      }
+      setSubtasksMap(sMap);
+
+      const lMap = {};
+      for (const row of linksRes.data || []) {
+        if (!lMap[row.source_key]) lMap[row.source_key] = [];
+        lMap[row.source_key].push(row.target_key);
+      }
+      setLinksMap(lMap);
+    });
+  }, [tickets]);
 
   // nameMap: jiraDisplayName.lower → Nombres.Nombre (alias personalizado)
   const nameMap = useMemo(() => {
@@ -306,5 +332,7 @@ export function useTicketData({ tickets = [], externalFilterType = "", defaultFi
     resolveName, resolveEpic,
     // Opciones para dropdowns
     uniqueTypes, uniqueSprints, uniqueStatuses, uniqueAssignees, uniqueReporters,
+    // Datos relacionales
+    subtasksMap, linksMap,
   };
 }

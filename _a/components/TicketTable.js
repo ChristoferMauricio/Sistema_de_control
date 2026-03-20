@@ -107,6 +107,7 @@ export default function TicketTable({
     activeFilterCount, clearAllFilters,
     resolveName, resolveEpic,
     uniqueTypes, uniqueSprints, uniqueStatuses, uniqueAssignees, uniqueReporters,
+    subtasksMap, linksMap,
   } = data;
 
   // ── Guardar comentario ─────────────────────────────────────────────────────
@@ -441,6 +442,8 @@ export default function TicketTable({
                   resolveName={resolveName}
                   localComments={localComments}
                   onEditComment={setEditingComment}
+                  subtasksMap={subtasksMap}
+                  linksMap={linksMap}
                 />
               ))
             )}

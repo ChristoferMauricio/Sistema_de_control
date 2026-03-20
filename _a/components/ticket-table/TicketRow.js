@@ -16,6 +16,8 @@ export default function TicketRow({
   resolveName,
   localComments,
   onEditComment,
+  subtasksMap = {},
+  linksMap = {},
 }) {
   const role        = useRole();
   const statusColor = getStatusColor(ticket.status);
@@ -109,9 +111,9 @@ export default function TicketRow({
         {/* ── Subtareas (no errores) ── */}
         {mode !== "errores" && (
           <td className="px-4 py-3">
-            {isStory(ticket.issue_type) && ticket.subtask_keys?.length > 0 ? (
+            {isStory(ticket.issue_type) && (subtasksMap[ticket.jira_key]?.length > 0) ? (
               <div className="flex flex-wrap gap-1">
-                {ticket.subtask_keys.map((sk) => (
+                {subtasksMap[ticket.jira_key].map((sk) => (
                   <a
                     key={sk}
                     href={`https://supervisorservicio2020.atlassian.net/browse/${sk}`}
@@ -141,9 +143,9 @@ export default function TicketRow({
               {ticket.parent_key}
             </a>
           ) : ["Bug", "Error", "Error Desarrollo", "Error Certificación"].includes(ticket.issue_type) &&
-            ticket.linked_keys?.length > 0 ? (
+            (linksMap[ticket.jira_key]?.length > 0) ? (
             <div className="flex flex-wrap gap-1">
-              {ticket.linked_keys.map((lk) => (
+              {linksMap[ticket.jira_key].map((lk) => (
                 <a
                   key={lk}
                   href={`https://supervisorservicio2020.atlassian.net/browse/${lk}`}
