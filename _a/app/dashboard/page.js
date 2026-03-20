@@ -14,6 +14,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState(null);
+  const [syncVersion, setSyncVersion] = useState(0);
   const router = useRouter();
   const role = useRole();
   const [userEmail, setUserEmail] = useState("");
@@ -199,6 +200,7 @@ export default function DashboardPage() {
         });
         // Refrescar datos del dashboard y limpiar caché del router
         await fetchData();
+        setSyncVersion((v) => v + 1);
         router.refresh();
       }
     } catch (err) {
@@ -482,7 +484,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Tickets Table */}
-      <TicketTable tickets={tickets} title="Todos los Tickets" statusHistory={statusHistory} externalFilterType={externalFilter} defaultFilterSprint="" />
+      <TicketTable tickets={tickets} title="Todos los Tickets" statusHistory={statusHistory} externalFilterType={externalFilter} defaultFilterSprint="" syncVersion={syncVersion} />
     </div>
   );
 }

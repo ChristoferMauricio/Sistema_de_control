@@ -190,19 +190,6 @@ async function runSync() {
     const epicLinkFieldId = await getEpicLinkFieldId();
     const issues   = await searchJira(jql, epicLinkFieldId);
 
-    // DEBUG: capturar info de PF3QA
-    const pf3qaIssues = issues.filter(i => i.key?.startsWith("PF3QA"));
-    const debugIssue = pf3qaIssues[0] ?? null;
-    const debugFields = debugIssue ? {
-      key: debugIssue.key,
-      parent: debugIssue.fields?.parent,
-      customfield_10014: debugIssue.fields?.customfield_10014,
-      epicLinkFieldId_value: epicLinkFieldId ? debugIssue.fields?.[epicLinkFieldId] : undefined,
-      allCustomFields: Object.entries(debugIssue.fields || {})
-        .filter(([k]) => k.startsWith("customfield_") && debugIssue.fields[k] !== null && debugIssue.fields[k] !== undefined)
-        .reduce((acc, [k, v]) => { acc[k] = v; return acc; }, {}),
-    } : null;
-
     const transformed = issues.map(i => transformIssue(i, epicLinkFieldId));
 
     if (transformed.length === 0) {
@@ -303,8 +290,6 @@ async function runSync() {
       subtasks:         allSubtasks.length,
       links:            allLinks.length,
       epicLinkFieldId:  epicLinkFieldId,
-      debug_pf3qa_count: pf3qaIssues.length,
-      debug_pf3qa:      debugFields,
       timestamp:        now,
     });
 

@@ -25,7 +25,7 @@ export const hasStatusHistory = (type) => !isSubtask(type) && !isEpic(type);
 //   null  → no se pasó ningún valor, se lee desde la URL (comportamiento por defecto)
 //   ""    → se pasó explícitamente vacío: sin sprint inicial, NO leer de URL
 //   "xyz" → forzar ese sprint como valor inicial
-export function useTicketData({ tickets = [], externalFilterType = "", defaultFilterSprint = null, localComments = {} }) {
+export function useTicketData({ tickets = [], externalFilterType = "", defaultFilterSprint = null, localComments = {}, syncVersion = 0 }) {
   const [search, setSearch]               = useState("");
   const [sortField, setSortField]         = useState("updated_at");
   const [sortDir, setSortDir]             = useState("desc");
@@ -104,7 +104,7 @@ export function useTicketData({ tickets = [], externalFilterType = "", defaultFi
       if (equipoRes.data)   setEquipo(equipoRes.data);
     }
     fetchPersonData();
-  }, []);
+  }, [syncVersion]);
 
   // ── subtasksMap: derivado de los tickets cargados (parent_key) ────────────
   const subtasksMap = useMemo(() => {

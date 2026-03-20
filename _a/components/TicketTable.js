@@ -53,6 +53,7 @@ export default function TicketTable({
   mode = "default",
   externalFilterType = "",
   defaultFilterSprint = "",
+  syncVersion = 0,
 }) {
   // ── Estado de UI local ─────────────────────────────────────────────────────
   const [expandedRow,    setExpandedRow]    = useState(null);
@@ -94,7 +95,7 @@ export default function TicketTable({
   }, []);
 
   // ── Hook de datos / filtros ────────────────────────────────────────────────
-  const data = useTicketData({ tickets, externalFilterType, defaultFilterSprint, localComments });
+  const data = useTicketData({ tickets, externalFilterType, defaultFilterSprint, localComments, syncVersion });
   const {
     search, setSearch,
     filterType, setFilterType, filterSprint, setFilterSprint,
