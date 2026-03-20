@@ -1,7 +1,24 @@
+/**
+ * @file CommentModal.js
+ * @description Modal para editar el comentario/observacion de un ticket Jira.
+ *   Utiliza el componente MarkdownEditor para soporte de formato Markdown.
+ *   Muestra la clave del ticket, story points y resumen en el encabezado.
+ *   El modal se cierra al cancelar o al guardar exitosamente.
+ *   Renderiza null si no hay comentario en edicion (patron de "modal controlado").
+ */
 "use client";
 
 import MarkdownEditor from "@/components/MarkdownEditor";
 
+/**
+ * Modal de edicion de comentarios con editor Markdown y controles de guardado.
+ * @param {Object}   props
+ * @param {Object|null} props.editingComment - Datos del comentario en edicion ({ key, summary, story_points, currentText }) o null para ocultar
+ * @param {Function} props.onClose          - Callback para cerrar el modal
+ * @param {Function} props.onChange          - Callback al cambiar el texto del comentario
+ * @param {Function} props.onSave           - Callback para guardar el comentario
+ * @param {boolean}  props.savingComment     - Indica si se esta guardando (para deshabilitar botones y mostrar spinner)
+ */
 export default function CommentModal({ editingComment, onClose, onChange, onSave, savingComment }) {
   if (!editingComment) return null;
 

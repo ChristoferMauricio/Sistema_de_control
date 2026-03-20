@@ -1,9 +1,32 @@
+/**
+ * @file obs/page.js - Página de observaciones del supervisor
+ * @description Muestra todas las observaciones y comentarios registrados en los tickets de Jira.
+ *              Solo muestra tickets que tienen un campo "comentario" no vacío.
+ *              Los datos se obtienen en paralelo:
+ *              - jira_tickets: tickets con comentarios (filtrados en la consulta)
+ *              - Nombres: tabla de mapeo para resolución de nombres de programadores
+ *
+ * @route /dashboard/obs
+ * @requires supabase - Cliente de Supabase para consultar tickets y nombres
+ * @requires ObsTable - Componente de tabla especializado en observaciones
+ */
 "use client";
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import ObsTable from "@/components/ObsTable";
 
+/**
+ * Componente de página que muestra las observaciones del supervisor sobre tickets.
+ *
+ * @returns {JSX.Element} Tabla de observaciones, estado de carga o mensaje de error
+ *
+ * Estados locales:
+ * - tickets: Array de tickets que tienen comentarios/observaciones
+ * - nombresData: Array de mapeo Nombre ↔ Programador para resolución de nombres
+ * - loading: Estado de carga
+ * - error: Mensaje de error si falla la consulta
+ */
 export default function ObservacionesSupervisorPage() {
   const [tickets, setTickets] = useState([]);
   const [nombresData, setNombresData] = useState([]);
@@ -11,16 +34,23 @@ export default function ObservacionesSupervisorPage() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    /**
+     * Obtiene en paralelo los tickets con comentarios y la tabla de nombres.
+     * Filtra doblemente: en la consulta SQL (not null, not empty) y en JS (trim > 0).
+     */
     async function fetchData() {
       try {
         setLoading(true);
 
+        // Consultas en paralelo para optimizar tiempo de carga
         const [ticketsRes, nombresRes] = await Promise.all([
+          // Obtener solo tickets que tienen comentario no nulo y no vacío
           supabase
             .from("jira_tickets")
             .select("jira_key, summary, status, issue_type, sprint, story_points, assignee_email, reporter_email, parent_key, created_at, updated_at, comentario")
             .not("comentario", "is", null)
             .neq("comentario", ""),
+          // Tabla de nombres para resolución de emails a nombres completos
           supabase
             .from("Nombres")
             .select("Nombre, Programador")
@@ -29,6 +59,7 @@ export default function ObservacionesSupervisorPage() {
         if (ticketsRes.error) throw ticketsRes.error;
         if (nombresRes.error) throw nombresRes.error;
 
+        // Filtro adicional en JS: asegurar que el comentario no sea solo espacios en blanco
         const validTickets = ticketsRes.data || [];
         const filteredTickets = validTickets.filter((t) => t.comentario && t.comentario.trim().length > 0);
 

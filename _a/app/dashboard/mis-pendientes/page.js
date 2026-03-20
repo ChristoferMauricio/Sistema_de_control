@@ -1,16 +1,35 @@
+/**
+ * @file mis-pendientes/page.js - Página de tickets asignados al usuario actual
+ * @description Muestra los tickets de Jira asignados al usuario autenticado.
+ *              Ofrece dos modos de visualización:
+ *              - Vista Kanban: tablero con tres columnas (Pendiente, En curso, Realizado)
+ *              - Vista Lista: tabla tradicional reutilizando el componente TicketTable
+ *
+ *              Los tickets se filtran por el email del usuario autenticado.
+ *              Si no hay tickets asignados, muestra un mensaje de "sin pendientes".
+ *
+ * @route /dashboard/mis-pendientes
+ * @requires supabase - Cliente de Supabase para autenticación y consulta de tickets
+ * @requires TicketTable - Componente de tabla para la vista lista
+ */
 "use client";
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import TicketTable from "@/components/TicketTable";
 
-// Mapeo de estados Jira → columna Kanban
+/**
+ * Mapeo de estados de Jira a las tres columnas del tablero Kanban.
+ * Cada columna agrupa varios estados posibles de Jira.
+ * @type {Object.<string, string[]>}
+ */
 const KANBAN_MAP = {
   Pendiente: ["Tareas por hacer", "POR HACER", "LISTO PARA DEV"],
   "En curso": ["En curso", "Control de calidad", "QA EN DEV"],
   Realizado: ["Finalizada", "LISTO (PASE A CERT)"],
 };
 
+/** Estilos CSS para cada columna del Kanban (header, indicador, badge, estado vacío) */
 const KANBAN_STYLES = {
   Pendiente: {
     header: "bg-gray-50 border-gray-200",
@@ -32,6 +51,11 @@ const KANBAN_STYLES = {
   },
 };
 
+/**
+ * Determina a qué columna Kanban pertenece un ticket según su estado de Jira.
+ * @param {string} jiraStatus - Estado del ticket en Jira
+ * @returns {string} Nombre de la columna Kanban ("Pendiente" | "En curso" | "Realizado")
+ */
 function getKanbanColumn(jiraStatus) {
   for (const [col, statuses] of Object.entries(KANBAN_MAP)) {
     if (statuses.includes(jiraStatus)) return col;
@@ -39,6 +63,14 @@ function getKanbanColumn(jiraStatus) {
   return "Pendiente";
 }
 
+/**
+ * Tarjeta individual del tablero Kanban que muestra un ticket.
+ * Incluye: tipo de ticket, clave Jira, resumen, sprint y story points.
+ *
+ * @param {Object} props
+ * @param {Object} props.ticket - Datos del ticket de Jira
+ * @returns {JSX.Element} Tarjeta con información del ticket
+ */
 function KanbanCard({ ticket }) {
   return (
     <div className="bg-white rounded-xl border border-gray-200 hover:border-orange-300 p-4 shadow-sm hover:shadow-md transition-all">
@@ -72,6 +104,14 @@ function KanbanCard({ ticket }) {
   );
 }
 
+/**
+ * Tablero Kanban completo con tres columnas (Pendiente, En curso, Realizado).
+ * Clasifica automáticamente los tickets en columnas según su estado de Jira.
+ *
+ * @param {Object} props
+ * @param {Array} props.tickets - Array de tickets a distribuir en columnas
+ * @returns {JSX.Element} Grid de tres columnas con tarjetas Kanban
+ */
 function KanbanBoard({ tickets }) {
   const columns = { Pendiente: [], "En curso": [], Realizado: [] };
   tickets.forEach((t) => { columns[getKanbanColumn(t.status)].push(t); });
@@ -110,18 +150,31 @@ function KanbanBoard({ tickets }) {
   );
 }
 
+/**
+ * Componente principal de la página "Mis Pendientes".
+ * Obtiene los tickets asignados al usuario autenticado y los muestra
+ * en vista Kanban (por defecto) o vista Lista.
+ *
+ * @returns {JSX.Element} Página con toggle de vista y tickets del usuario
+ */
 export default function MisPendientesPage() {
-  const [tickets, setTickets] = useState([]);
+  const [tickets, setTickets] = useState([]);       // Tickets asignados al usuario
   const [loading, setLoading] = useState(true);
-  const [userEmail, setUserEmail] = useState("");
-  const [viewMode, setViewMode] = useState("kanban");
+  const [userEmail, setUserEmail] = useState("");    // Email del usuario autenticado
+  const [viewMode, setViewMode] = useState("kanban"); // "kanban" o "lista"
 
   useEffect(() => {
+    /**
+     * Obtiene la sesión del usuario y consulta sus tickets asignados.
+     * Filtra por assignee_email para mostrar solo los tickets del usuario actual.
+     */
     async function fetchMyTickets() {
+      // Obtener email del usuario autenticado
       const { data: { session } } = await supabase.auth.getSession();
       const email = session?.user?.email || "";
       setUserEmail(email);
 
+      // Consultar tickets asignados al usuario actual
       const { data, error } = await supabase
         .from("jira_tickets")
         .select("jira_key, summary, status, issue_type, sprint, story_points, assignee_name, assignee_email, reporter_name, reporter_email, parent_key, subtask_keys, linked_keys, created_at, updated_at, comentario, priority")

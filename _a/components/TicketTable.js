@@ -1,3 +1,14 @@
+/**
+ * @file TicketTable.js
+ * @description Componente principal de tabla de tickets Jira. Muestra tickets paginados con
+ *   filtrado por columna, ordenamiento, doble scrollbar horizontal, exportacion a Excel y
+ *   edicion de comentarios mediante un modal. Soporta dos modos de visualizacion:
+ *   - "default": vista completa con tipo, observaciones, subtareas, epica, sprint, etc.
+ *   - "errores": vista reducida enfocada en bugs/errores con columnas diferentes.
+ *
+ *   Delega la logica de datos (filtrado, ordenamiento, paginacion, resolucion de nombres)
+ *   al hook personalizado `useTicketData` y renderiza cada fila con `TicketRow`.
+ */
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
@@ -8,10 +19,19 @@ import { useTicketData } from "./ticket-table/useTicketData";
 import TicketRow    from "./ticket-table/TicketRow";
 import CommentModal from "./ticket-table/CommentModal";
 
+/** Numero maximo de filas por pagina */
 const PAGE_SIZE = 15;
 
 // ─── Sub-componentes de UI (solo se usan en este archivo) ───────────────────
 
+/**
+ * Icono de flecha que indica la direccion de ordenamiento activo.
+ * Solo se renderiza cuando `field` coincide con el campo actualmente ordenado.
+ * @param {Object} props
+ * @param {string} props.field       - Campo de la columna actual
+ * @param {string} props.sortField   - Campo por el que se esta ordenando
+ * @param {string} props.sortDir     - Direccion actual: "asc" | "desc"
+ */
 function SortIcon({ field, sortField, sortDir }) {
   if (sortField !== field) return null;
   return (
@@ -21,6 +41,15 @@ function SortIcon({ field, sortField, sortDir }) {
   );
 }
 
+/**
+ * Dropdown de filtro reutilizable para las columnas de la tabla.
+ * Aplica estilo visual naranja cuando tiene un filtro activo.
+ * @param {Object} props
+ * @param {string}   props.value       - Valor seleccionado actualmente
+ * @param {Function} props.onChange     - Callback al cambiar la seleccion
+ * @param {string[]} props.options      - Lista de opciones disponibles
+ * @param {string}   props.placeholder  - Texto por defecto ("Todos")
+ */
 function FilterSelect({ value, onChange, options, placeholder }) {
   return (
     <select
@@ -45,6 +74,18 @@ function FilterSelect({ value, onChange, options, placeholder }) {
 
 // ─── Componente principal ────────────────────────────────────────────────────
 
+/**
+ * Tabla principal de tickets Jira con filtrado, ordenamiento, paginacion y exportacion.
+ * @param {Object}   props
+ * @param {Array}    props.tickets            - Arreglo de tickets Jira desde la BD
+ * @param {string}   [props.title]            - Titulo personalizado de la tabla
+ * @param {boolean}  [props.showAssignee=true] - Si se muestra la columna "Persona asignada"
+ * @param {Object}   [props.statusHistory={}] - Mapa jira_key -> arreglo de cambios de estado
+ * @param {string}   [props.mode="default"]   - Modo de visualizacion: "default" | "errores"
+ * @param {string}   [props.externalFilterType=""] - Filtro de tipo aplicado externamente (desde el padre)
+ * @param {string}   [props.defaultFilterSprint=""] - Sprint inicial para filtrar
+ * @param {number}   [props.syncVersion=0]    - Numero incremental que dispara re-fetch de datos auxiliares
+ */
 export default function TicketTable({
   tickets = [],
   title,
@@ -63,11 +104,15 @@ export default function TicketTable({
   const [localComments,  setLocalComments]  = useState({});
 
   // ── Scrollbar dual ─────────────────────────────────────────────────────────
+  // Se mantienen dos scrollbars horizontales sincronizadas (arriba y abajo de la tabla)
+  // para que el usuario pueda hacer scroll horizontal desde cualquier posicion vertical.
   const topScrollRef    = useRef(null);
   const bottomScrollRef = useRef(null);
   const [scrollWidth, setScrollWidth] = useState(0);
+  // Ref tipo semaforo para evitar bucles infinitos al sincronizar scroll
   const isSyncing = useRef(false);
 
+  /** Sincroniza el scroll inferior cuando el usuario mueve el scroll superior */
   const handleTopScroll = useCallback(() => {
     if (isSyncing.current) return;
     isSyncing.current = true;
@@ -76,6 +121,7 @@ export default function TicketTable({
     isSyncing.current = false;
   }, []);
 
+  /** Sincroniza el scroll superior cuando el usuario mueve el scroll inferior */
   const handleBottomScroll = useCallback(() => {
     if (isSyncing.current) return;
     isSyncing.current = true;
@@ -84,6 +130,7 @@ export default function TicketTable({
     isSyncing.current = false;
   }, []);
 
+  // Observa cambios de tamanio en la tabla para mantener el ancho del scrollbar superior
   useEffect(() => {
     const el = bottomScrollRef.current;
     if (!el) return;
@@ -112,6 +159,10 @@ export default function TicketTable({
   } = data;
 
   // ── Guardar comentario ─────────────────────────────────────────────────────
+  /**
+   * Envia el comentario editado a la API y aplica actualizacion optimista
+   * en `localComments` para que se refleje inmediatamente en la tabla.
+   */
   const handleSaveComment = async () => {
     if (!editingComment) return;
     setSavingComment(true);
@@ -134,6 +185,12 @@ export default function TicketTable({
   };
 
   // ── Exportar a Excel ───────────────────────────────────────────────────────
+  /**
+   * Genera y descarga un archivo Excel (.xlsx) con los datos de tickets proporcionados.
+   * Soporta exportar todos los tickets o solo los filtrados.
+   * @param {Array}  dataSet  - Arreglo de tickets a exportar
+   * @param {string} fileName - Nombre del archivo descargado
+   */
   function exportToExcel(dataSet, fileName) {
     const rows = dataSet.map((t) => ({
       "Tipo":             t.issue_type || "",

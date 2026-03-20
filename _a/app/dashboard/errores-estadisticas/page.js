@@ -1,14 +1,48 @@
+/**
+ * @file errores-estadisticas/page.js - Página de estadísticas de errores e historias
+ * @description Muestra gráficos de barras con la distribución de historias y errores
+ *              por integrante del equipo, tanto por informador (reporter) como por asignado (assignee).
+ *              Los datos provienen del tablero PF3QA en Jira.
+ *
+ *              Funcionalidades principales:
+ *              - Filtro por sprint (selector desplegable)
+ *              - Filtros toggle por tipo: Historias, Errores, Excluidos (prueba/revisión)
+ *              - Gráficos de barras interactivos (click para ver detalle en modal)
+ *              - Modal de detalle con lista de tickets y sus actividades vinculadas
+ *              - Clasificación de estados: Por hacer, En curso, Listo para dev, QA, Finalizada
+ *              - Resolución de nombres: email → nombre completo del integrante
+ *
+ *              Componentes internos:
+ *              - DetailModal: Modal con lista de tickets filtrados por persona y tipo
+ *              - BarChart: Gráfico de barras horizontales con leyenda y estados
+ *
+ * @route /dashboard/errores-estadisticas
+ * @requires supabase - Cliente de Supabase para consultar tickets, links, equipo y personas
+ * @requires sortSprints - Utilidad para ordenar sprints por número de iteración
+ */
 "use client";
 
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { sortSprints } from "@/lib/utils";
 
+/* ═══════════════════════════════════════════════════════════════════
+   CONSTANTES Y CONFIGURACIÓN
+   ═══════════════════════════════════════════════════════════════════ */
+
+/** Tipos de issue que se consideran "errores" en Jira */
 const ERROR_TYPES = ["Bug", "Error", "Error Desarrollo", "Error Certificación", "Error en Certificación"];
+
+/** Patrón regex para excluir tickets de prueba/revisión de los conteos principales */
 const EXCLUDE_PATTERN = /prueba|revisión|revision/i;
+
+/** URL base de Jira para construir links directos a tickets */
 const JIRA_BASE = "https://supervisorservicio2020.atlassian.net/browse";
 
-// Status classification
+/**
+ * Definiciones de estados para clasificar tickets.
+ * Cada estado tiene: clave interna, etiqueta visual, patrones de matching y color CSS.
+ */
 const STATUS_DEFS = [
   { key: "por_hacer", label: "Por hacer", match: ["tareas por hacer", "por hacer"], color: "bg-gray-200 text-gray-700" },
   { key: "en_curso", label: "En curso", match: ["en curso", "in progress", "en progreso"], color: "bg-blue-100 text-blue-700" },
@@ -17,15 +51,38 @@ const STATUS_DEFS = [
   { key: "finalizada", label: "Finalizada", match: ["finalizada", "listo (pase a cert)", "terminada", "done", "cerrado", "resuelto", "cerrada"], color: "bg-green-100 text-green-700" },
 ];
 
+/**
+ * Clasifica un estado de Jira en una de las categorías definidas en STATUS_DEFS.
+ * Busca coincidencia parcial (includes) contra los patrones de cada definición.
+ *
+ * @param {string} status - Estado del ticket en Jira
+ * @returns {string} Clave del estado clasificado (ej: "por_hacer", "en_curso", "finalizada")
+ */
 function classifyStatus(status) {
   const s = (status || "").toLowerCase();
   for (const def of STATUS_DEFS) {
     if (def.match.some((m) => s.includes(m))) return def.key;
   }
-  return "por_hacer"; // default
+  return "por_hacer"; // Por defecto si no coincide con ningún patrón
 }
 
-/* ───────── Detail Modal ───────── */
+/* ═══════════════════════════════════════════════════════════════════
+   COMPONENTE: Modal de Detalle
+   ═══════════════════════════════════════════════════════════════════ */
+
+/**
+ * Modal que muestra la lista detallada de tickets al hacer click en una barra del gráfico.
+ * Cada ticket muestra: clave Jira (con link), resumen, tipo, estado y actividades vinculadas.
+ *
+ * @param {Object} props
+ * @param {string} props.title - Título del modal (ej: "Historias", "Errores")
+ * @param {string} props.personName - Nombre del integrante seleccionado
+ * @param {Array} props.items - Lista de tickets a mostrar
+ * @param {Object} props.linksMap - Mapa de vínculos: source_key → [{target_key, link_type}]
+ * @param {Object} props.allTicketMap - Mapa de todos los tickets por jira_key para lookup rápido
+ * @param {Function} props.onClose - Callback para cerrar el modal
+ * @returns {JSX.Element} Modal con overlay oscuro y lista de tickets
+ */
 function DetailModal({ title, personName, items, linksMap, allTicketMap, onClose }) {
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -136,7 +193,24 @@ function DetailModal({ title, personName, items, linksMap, allTicketMap, onClose
   );
 }
 
-/* ───────── Bar Chart ───────── */
+/* ═══════════════════════════════════════════════════════════════════
+   COMPONENTE: Gráfico de Barras Horizontales
+   ═══════════════════════════════════════════════════════════════════ */
+
+/**
+ * Componente de gráfico de barras horizontales que muestra historias y errores
+ * por integrante. Cada persona tiene hasta 3 barras: historias (azul), errores (rojo)
+ * y excluidos (amarillo). Las barras son clicables para abrir el modal de detalle.
+ * Debajo de cada barra se muestran pills con el desglose por estado.
+ *
+ * @param {Object} props
+ * @param {string} props.title - Título del gráfico
+ * @param {string} [props.subtitle] - Subtítulo opcional
+ * @param {Array} props.data - Datos agrupados por persona ({name, historias, errores, excluidos, ...Status})
+ * @param {number} props.maxValue - Valor máximo para escalar las barras (100% = maxValue)
+ * @param {Function} props.onBarClick - Callback al hacer click en una barra: (personName, type) => void
+ * @returns {JSX.Element} Gráfico con leyenda y barras interactivas
+ */
 function BarChart({ title, subtitle, data, maxValue, onBarClick }) {
   if (!data.length) {
     return (
@@ -309,20 +383,41 @@ function BarChart({ title, subtitle, data, maxValue, onBarClick }) {
   );
 }
 
-/* ───────── Main Page ───────── */
+/* ═══════════════════════════════════════════════════════════════════
+   COMPONENTE PRINCIPAL: Página de Estadísticas de Errores
+   ═══════════════════════════════════════════════════════════════════ */
+
+/**
+ * Página principal de estadísticas. Carga datos del tablero PF3QA y genera
+ * dos gráficos de barras: uno por informador y otro por asignado.
+ * Permite filtrar por sprint y por tipo de ticket (Historia/Error/Excluido).
+ *
+ * @returns {JSX.Element} Página con filtros, badges de conteo, gráficos y modal de detalle
+ */
 export default function ErroresEstadisticasPage() {
-  const [tickets, setTickets] = useState([]);
-  const [linkedTickets, setLinkedTickets] = useState([]);
-  const [links, setLinks] = useState([]);
-  const [equipo, setEquipo] = useState([]);
-  const [persons, setPersons] = useState([]);
+  /* ─── Estados de datos ─── */
+  const [tickets, setTickets] = useState([]);         // Tickets del tablero PF3QA
+  const [linkedTickets, setLinkedTickets] = useState([]); // Tickets externos vinculados (PF3-XXX)
+  const [links, setLinks] = useState([]);              // Vínculos entre tickets
+  const [equipo, setEquipo] = useState([]);            // Datos del equipo de desarrollo
+  const [persons, setPersons] = useState([]);          // Datos de personas de Jira
   const [loading, setLoading] = useState(true);
-  const [selectedSprint, setSelectedSprint] = useState(null); // null = not initialized yet
-  const [activeFilters, setActiveFilters] = useState(new Set(["Historia", "Error"])); // default: both active
+
+  /* ─── Estados de filtros ─── */
+  const [selectedSprint, setSelectedSprint] = useState(null); // null = aún no inicializado
+  const [activeFilters, setActiveFilters] = useState(new Set(["Historia", "Error"])); // Filtros activos por defecto
+
+  /* ─── Estado del modal de detalle ─── */
   const [modal, setModal] = useState(null); // { title, personName, items }
 
   useEffect(() => {
+    /**
+     * Carga inicial de datos desde múltiples tablas en paralelo.
+     * Obtiene: tickets PF3QA, vínculos, equipo de desarrollo y personas de Jira.
+     * Luego busca los resúmenes de tickets externos vinculados.
+     */
     async function fetchData() {
+      // Consultas en paralelo para optimizar tiempo de carga
       const [ticketsRes, linksRes, equipoRes, personsRes] = await Promise.all([
         supabase
           .from("jira_tickets")
@@ -343,7 +438,8 @@ export default function ErroresEstadisticasPage() {
       setEquipo(equipoRes.data || []);
       setPersons(personsRes.data || []);
 
-      // Fetch summaries for linked tickets (PF3-XXXX) not in PF3QA
+      // Obtener resúmenes de tickets vinculados externos (PF3-XXXX que no están en PF3QA)
+      // Necesarios para mostrar info en el modal de detalle
       const pf3qaKeys = new Set(tix.map((t) => t.jira_key));
       const externalKeys = [...new Set(lnk.map((l) => l.target_key).filter((k) => !pf3qaKeys.has(k)))];
       if (externalKeys.length > 0) {
@@ -359,7 +455,7 @@ export default function ErroresEstadisticasPage() {
     fetchData();
   }, []);
 
-  // Links map: source_key → [{target_key, link_type}]
+  /** Mapa de vínculos: source_key → [{target_key, link_type}] para acceso O(1) */
   const linksMap = useMemo(() => {
     const map = {};
     links.forEach((l) => {
@@ -369,7 +465,7 @@ export default function ErroresEstadisticasPage() {
     return map;
   }, [links]);
 
-  // Ticket map for quick lookup (PF3QA + linked PF3 tickets)
+  /** Mapa de todos los tickets (PF3QA + externos vinculados) por jira_key para lookup rápido */
   const allTicketMap = useMemo(() => {
     const map = {};
     tickets.forEach((t) => { map[t.jira_key] = t; });
@@ -377,7 +473,9 @@ export default function ErroresEstadisticasPage() {
     return map;
   }, [tickets, linkedTickets]);
 
-  // Name resolution maps
+  /* ─── Mapas de resolución de nombres (email → nombre completo) ─── */
+
+  /** Mapa: correo del equipo (PGIM/GCORP) → nombre completo */
   const equipoEmailMap = useMemo(() => {
     const map = {};
     equipo.forEach((e) => {
@@ -387,6 +485,7 @@ export default function ErroresEstadisticasPage() {
     return map;
   }, [equipo]);
 
+  /** Mapa: nombre_clave del equipo → nombre completo */
   const equipoKeyMap = useMemo(() => {
     const map = {};
     equipo.forEach((e) => {
@@ -395,6 +494,7 @@ export default function ErroresEstadisticasPage() {
     return map;
   }, [equipo]);
 
+  /** Mapa: email de Jira → display_name de Jira */
   const personsMap = useMemo(() => {
     const map = {};
     persons.forEach((p) => {
@@ -403,8 +503,17 @@ export default function ErroresEstadisticasPage() {
     return map;
   }, [persons]);
 
+  /** Sobrescrituras manuales de nombres para casos especiales */
   const NAME_OVERRIDES = { "miguel castillo": "Supervisor de Servicio" };
 
+  /**
+   * Resuelve un email a nombre completo del integrante.
+   * Cadena de resolución: equipo (email) → jira_persons → equipo (nombre_clave) → email original.
+   * Aplica NAME_OVERRIDES al final para casos especiales.
+   *
+   * @param {string} email - Email del usuario en Jira
+   * @returns {string|null} Nombre resuelto o null si email está vacío
+   */
   const resolveName = useCallback((email) => {
     if (!email || email.trim() === "") return null;
     const key = email.toLowerCase();
@@ -415,14 +524,14 @@ export default function ErroresEstadisticasPage() {
     return NAME_OVERRIDES[resolved.toLowerCase()] || resolved;
   }, [equipoEmailMap, equipoKeyMap, personsMap]);
 
-  // Sprints disponibles
+  /** Lista de sprints disponibles extraída de los tickets, ordenada con sortSprints */
   const sprints = useMemo(() => {
     const s = new Set();
     tickets.forEach((t) => { if (t.sprint) s.add(t.sprint); });
     return sortSprints([...s]);
   }, [tickets]);
 
-  // Default sprint: the most recent one (highest number)
+  // Seleccionar sprint por defecto: el "Tablero Sprint" más reciente (mayor número)
   useEffect(() => {
     if (selectedSprint === null && sprints.length > 0) {
       // sprints is sorted: Iteración F3.12 desc, then Tablero Sprint 1,2,... asc
@@ -432,7 +541,10 @@ export default function ErroresEstadisticasPage() {
     }
   }, [sprints, selectedSprint]);
 
-  // Filter & classify tickets
+  /**
+   * Tickets válidos: filtrados por sprint seleccionado y tipos activos (Historia/Error/Excluido).
+   * Se recalcula cuando cambian los filtros o el sprint.
+   */
   const validTickets = useMemo(() => {
     return tickets.filter((t) => {
       if (selectedSprint && t.sprint !== selectedSprint) return false;
@@ -447,14 +559,17 @@ export default function ErroresEstadisticasPage() {
     });
   }, [tickets, selectedSprint, activeFilters]);
 
-  // Helper: create empty status map
+  /** Crea un mapa de contadores de estado inicializado en 0 para cada categoría */
   const emptyStatusMap = () => {
     const m = {};
     STATUS_DEFS.forEach((d) => { m[d.key] = 0; });
     return m;
   };
 
-  // Classify ticket category
+  /**
+   * Clasifica un ticket en una categoría: "excluido", "error", "historia" o null.
+   * Los tickets excluidos son aquellos cuyo resumen contiene "prueba" o "revisión".
+   */
   const classifyTicket = useCallback((t) => {
     if (EXCLUDE_PATTERN.test(t.summary || "")) return "excluido";
     if (ERROR_TYPES.includes(t.issue_type)) return "error";
@@ -462,7 +577,7 @@ export default function ErroresEstadisticasPage() {
     return null;
   }, []);
 
-  // Group by reporter
+  /** Datos agrupados por INFORMADOR (reporter): historias, errores y excluidos con desglose por estado */
   const reporterData = useMemo(() => {
     const map = {};
     validTickets.forEach((t) => {
@@ -480,7 +595,7 @@ export default function ErroresEstadisticasPage() {
       .sort((a, b) => (b.historias + b.errores + b.excluidos) - (a.historias + a.errores + a.excluidos));
   }, [validTickets, resolveName, classifyTicket]);
 
-  // Group by assignee
+  /** Datos agrupados por ASIGNADO (assignee): historias, errores y excluidos con desglose por estado */
   const assigneeData = useMemo(() => {
     const map = {};
     validTickets.forEach((t) => {
@@ -498,11 +613,11 @@ export default function ErroresEstadisticasPage() {
       .sort((a, b) => (b.historias + b.errores + b.excluidos) - (a.historias + a.errores + a.excluidos));
   }, [validTickets, resolveName, classifyTicket]);
 
-  // Max values for bar scaling
+  /* ─── Valores máximos para escalar las barras del gráfico (100% = maxValue) ─── */
   const maxReporter = useMemo(() => Math.max(...reporterData.map((r) => Math.max(r.historias, r.errores, r.excluidos)), 1), [reporterData]);
   const maxAssignee = useMemo(() => Math.max(...assigneeData.map((r) => Math.max(r.historias, r.errores, r.excluidos)), 1), [assigneeData]);
 
-  // Sprint-filtered tickets (no type filter) for badge counts
+  /** Tickets filtrados solo por sprint (sin filtro de tipo) para mostrar conteos en badges */
   const sprintTickets = useMemo(() => {
     return tickets.filter((t) => {
       if (selectedSprint && t.sprint !== selectedSprint) return false;
@@ -510,12 +625,18 @@ export default function ErroresEstadisticasPage() {
     });
   }, [tickets, selectedSprint]);
 
-  // Totals (always show full counts regardless of type filter)
+  /* ─── Totales globales (se muestran siempre, independientemente del filtro de tipo activo) ─── */
   const totalHistorias = useMemo(() => sprintTickets.filter((t) => !EXCLUDE_PATTERN.test(t.summary || "") && t.issue_type === "Historia").length, [sprintTickets]);
   const totalErrores = useMemo(() => sprintTickets.filter((t) => !EXCLUDE_PATTERN.test(t.summary || "") && ERROR_TYPES.includes(t.issue_type)).length, [sprintTickets]);
   const totalExcluidos = useMemo(() => sprintTickets.filter((t) => EXCLUDE_PATTERN.test(t.summary || "")).length, [sprintTickets]);
 
-  // Bar click handler: open modal with filtered tickets
+  /**
+   * Manejador de click en barras del gráfico. Abre el modal con tickets filtrados
+   * por persona, campo (reporter/assignee) y tipo (Historia/Error/Excluido).
+   *
+   * @param {string} field - Campo de email a comparar ("reporter_email" o "assignee_email")
+   * @returns {Function} Callback que recibe (personName, type) y abre el modal
+   */
   const handleBarClick = useCallback((field) => (personName, type) => {
     const items = validTickets.filter((t) => {
       const name = resolveName(t[field]);

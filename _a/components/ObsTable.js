@@ -1,3 +1,14 @@
+/**
+ * @file ObsTable.js
+ * @description Tabla de "Observaciones del Supervisor". Muestra unicamente tickets que tienen
+ *   un campo `comentario` no vacio. Permite:
+ *   - Filtrado por multiples columnas (epica, principal, sprint, iteracion, asignado, estado, observacion)
+ *   - Edicion de comentarios con editor Markdown
+ *   - Exportacion a Excel de los datos filtrados
+ *   - Resolucion de jerarquia de tickets (Subtarea -> Historia -> Epica)
+ *   - Extraccion del numero de iteracion desde el resumen de la historia padre
+ *   - Paginacion local
+ */
 "use client";
 
 import { useState, useMemo } from "react";
@@ -7,7 +18,9 @@ import { es } from "date-fns/locale";
 import { supabase } from "@/lib/supabase";
 import MarkdownEditor from "@/components/MarkdownEditor";
 
-// Icon helpers
+// ─── Iconos auxiliares ──────────────────────────────────────────────────────
+
+/** Icono que representa visualmente el tipo de issue (Subtarea, Historia, Epica u otro) */
 const TypeIcon = ({ type }) => {
   switch (type) {
     case "Subtarea":
@@ -38,6 +51,7 @@ const TypeIcon = ({ type }) => {
   }
 };
 
+/** Icono de flecha que indica la prioridad del ticket (Highest, High, Low/Lowest, Medium/default) */
 const PriorityIcon = ({ priority }) => {
   switch (priority) {
     case "Highest":
@@ -68,6 +82,12 @@ const PriorityIcon = ({ priority }) => {
   }
 };
 
+/**
+ * Tabla de observaciones del supervisor con filtrado, edicion de comentarios y exportacion Excel.
+ * @param {Object} props
+ * @param {Array}  props.tickets      - Tickets Jira que tienen comentario (pre-filtrados desde el padre)
+ * @param {Array}  props.nombresData  - Datos de la tabla "Nombres" con campos { Clave, Nombre } para resolver asignados
+ */
 export default function ObservacionesSupervisorTable({ tickets, nombresData }) {
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 15;
@@ -91,7 +111,8 @@ export default function ObservacionesSupervisorTable({ tickets, nombresData }) {
     comentario: "",
   });
 
-  // Map assignees to `Nombres` data
+  // ─── Resolucion de nombres ──────────────────────────────────────────────────
+  // Mapa Clave (email/identificador) -> Nombre legible desde la tabla Nombres
   const nameMap = useMemo(() => {
     const m = new Map();
     nombresData.forEach((row) => {
@@ -100,17 +121,25 @@ export default function ObservacionesSupervisorTable({ tickets, nombresData }) {
     return m;
   }, [nombresData]);
 
-  // Map tickets for hierarchy lookups (Subtask -> Story -> Epic)
+  // Mapa jira_key -> ticket completo para busquedas de jerarquia O(1)
   const ticketMap = useMemo(() => {
     const m = new Map();
     tickets.forEach(t => m.set(t.jira_key, t));
     return m;
   }, [tickets]);
 
+  /**
+   * Resuelve el nombre de la epica navegando la jerarquia Jira:
+   * - Epica: devuelve su propio resumen
+   * - Historia: su parent_key apunta a la Epica
+   * - Subtarea: sube dos niveles (Subtarea -> Historia -> Epica)
+   * @param {Object} ticket - Ticket Jira
+   * @returns {string} Resumen de la epica o "-" si no se encuentra
+   */
   const resolveEpic = (ticket) => {
     if (!ticket) return "-";
-    
-    // Si es tipo Épica, devolvemos su propio resumen
+
+    // Si es tipo Epica, devolvemos su propio resumen
     if (ticket.issue_type === "Épica" || ticket.issue_type === "Epic") {
       return ticket.summary;
     }
@@ -134,12 +163,18 @@ export default function ObservacionesSupervisorTable({ tickets, nombresData }) {
     return "-";
   };
   
+  /**
+   * Extrae el numero de iteracion del resumen de una historia, p.ej. "(Iteracion 6)" -> "Iteracion 6"
+   * @param {string} summary - Resumen del ticket
+   * @returns {string|null}
+   */
   const extractIteration = (summary) => {
     if (!summary) return null;
     const match = summary.match(/\(Iteraci[oó]n\s+(\d+)\)/i);
     return match ? `Iteración ${match[1]}` : null;
   };
 
+  /** Resuelve la iteracion de un ticket (busca en el ticket o en su historia padre) */
   const resolveIteration = (ticket) => {
     if (!ticket) return "-";
     if (ticket.issue_type === "Historia" || ticket.issue_type === "Story") {
@@ -160,7 +195,9 @@ export default function ObservacionesSupervisorTable({ tickets, nombresData }) {
     return emailOrKey.split("@")[0];
   };
 
-  // Pre-process tickets to attach Epic, Iteration and local comments
+  // ─── Pre-procesamiento de datos ─────────────────────────────────────────────
+  // Enriquece cada ticket con: epica resuelta, nombre de iteracion, nombre completo del asignado
+  // y el comentario a mostrar (local si fue editado, o el de BD)
   const processedData = useMemo(() => {
     return tickets.map((t) => ({
       ...t,
@@ -172,7 +209,8 @@ export default function ObservacionesSupervisorTable({ tickets, nombresData }) {
     }));
   }, [tickets, nameMap, ticketMap, localComments]);
 
-  // Filter Logic
+  // ─── Filtrado ──────────────────────────────────────────────────────────────
+  // Aplica todos los filtros de columna simultaneamente
   const filteredData = useMemo(() => {
     return processedData.filter((row) => {
       const gMatch = filters.global
@@ -224,6 +262,10 @@ export default function ObservacionesSupervisorTable({ tickets, nombresData }) {
     setCurrentPage(1);
   };
 
+  /**
+   * Guarda el comentario editado via API y aplica actualizacion optimista.
+   * En caso de error, muestra un mensaje al usuario sin perder el contenido editado.
+   */
   const handleSaveComment = async () => {
     if (!editingComment) return;
     setIsSavingComment(true);
@@ -255,6 +297,7 @@ export default function ObservacionesSupervisorTable({ tickets, nombresData }) {
     }
   };
 
+  /** Exporta los datos filtrados a un archivo Excel (.xlsx) con todas las columnas visibles */
   const exportToExcel = () => {
     const exportData = filteredData.map((row) => ({
       "Épica": row.resolved_epic,

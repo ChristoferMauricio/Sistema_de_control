@@ -1,30 +1,77 @@
+/**
+ * @file useTicketData.js
+ * @description Hook personalizado que centraliza toda la logica de datos para la tabla de tickets:
+ *   - Gestion de filtros por columna (tipo, sprint, estado, asignado, epica, comentario, etc.)
+ *   - Ordenamiento multi-campo con soporte para campos virtuales (nombre resuelto, epica)
+ *   - Paginacion
+ *   - Resolucion de nombres de Jira a nombres reales mediante multiples tablas (Nombres, jira_persons, equipo_desarrollo)
+ *   - Resolucion de epica navegando la jerarquia Subtarea -> Historia -> Epica
+ *   - Sincronizacion bidireccional de filtros con URL params
+ *   - Filtros en cascada: cada dropdown solo muestra opciones validas dado el resto de filtros activos
+ *   - Fetch de datos auxiliares (nombres, personas Jira, equipo, links entre tickets)
+ */
 "use client";
 
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { sortSprints } from "@/lib/utils";
 
+/** Numero maximo de filas por pagina */
 const PAGE_SIZE = 15;
 
 // ─── Funciones puras (sin dependencia de estado) ────────────────────────────
+
+/**
+ * Determina si un tipo de issue es "Historia" (soporta nombres en espaniol e ingles).
+ * @param {string} type - Tipo de issue de Jira
+ * @returns {boolean}
+ */
 export const isStory = (type) =>
   (type || "").toLowerCase().includes("histori") || (type || "").toLowerCase() === "story";
 
+/**
+ * Determina si un tipo de issue es "Subtarea" (soporta variantes de nombre).
+ * @param {string} type - Tipo de issue de Jira
+ * @returns {boolean}
+ */
 export const isSubtask = (type) =>
   (type || "").toLowerCase().includes("subtare") ||
   (type || "").toLowerCase().includes("sub-task") ||
   (type || "").toLowerCase() === "subtask";
 
+/**
+ * Determina si un tipo de issue es "Epica".
+ * @param {string} type - Tipo de issue de Jira
+ * @returns {boolean}
+ */
 export const isEpic = (type) =>
   (type || "").toLowerCase().includes("epic") || (type || "").toLowerCase().includes("épica");
 
+/**
+ * Solo Historias y tipos que no son subtarea ni epica tienen historial de estados.
+ * @param {string} type - Tipo de issue de Jira
+ * @returns {boolean}
+ */
 export const hasStatusHistory = (type) => !isSubtask(type) && !isEpic(type);
 
 // ─── Hook principal ─────────────────────────────────────────────────────────
-// defaultFilterSprint semántica:
-//   null  → no se pasó ningún valor, se lee desde la URL (comportamiento por defecto)
-//   ""    → se pasó explícitamente vacío: sin sprint inicial, NO leer de URL
-//   "xyz" → forzar ese sprint como valor inicial
+
+/**
+ * Hook que encapsula toda la logica de datos de la tabla de tickets.
+ *
+ * Semantica de `defaultFilterSprint`:
+ *   - `null`  : no se paso ningun valor, se lee desde la URL (comportamiento por defecto)
+ *   - `""`    : se paso explicitamente vacio: sin sprint inicial, NO leer de URL
+ *   - `"xyz"` : forzar ese sprint como valor inicial
+ *
+ * @param {Object}  params
+ * @param {Array}   params.tickets               - Arreglo de tickets Jira
+ * @param {string}  [params.externalFilterType]   - Filtro de tipo inyectado desde el padre
+ * @param {string|null} [params.defaultFilterSprint] - Sprint inicial (ver semantica arriba)
+ * @param {Object}  [params.localComments]        - Comentarios editados localmente (optimistas)
+ * @param {number}  [params.syncVersion]          - Incrementar para forzar re-fetch de datos auxiliares
+ * @returns {Object} Estado de filtros, datos procesados, helpers y funciones de control
+ */
 export function useTicketData({ tickets = [], externalFilterType = "", defaultFilterSprint = null, localComments = {}, syncVersion = 0 }) {
   const [search, setSearch]               = useState("");
   const [sortField, setSortField]         = useState("updated_at");
@@ -48,7 +95,8 @@ export function useTicketData({ tickets = [], externalFilterType = "", defaultFi
   const [equipo,  setEquipo]    = useState([]); // equipo_desarrollo
   const [linksMap, setLinksMap] = useState({}); // source_key → [target_keys]
 
-  // ── Sync con filtros externos (props) ──────────────────────────────────────
+  // ── Sincronizacion con filtros externos (props del padre) ──────────────────
+  // Cuando el padre cambia externalFilterType, se refleja en el filtro local
   useEffect(() => {
     if (externalFilterType !== undefined && externalFilterType !== null) {
       setFilterType(externalFilterType === "Todos" ? "" : externalFilterType);
@@ -56,6 +104,7 @@ export function useTicketData({ tickets = [], externalFilterType = "", defaultFi
     }
   }, [externalFilterType]);
 
+  // Aplicar sprint por defecto solo una vez al montar
   const hasAppliedDefaultSprint = useRef(false);
   useEffect(() => {
     if (defaultFilterSprint && !hasAppliedDefaultSprint.current) {
@@ -64,7 +113,8 @@ export function useTicketData({ tickets = [], externalFilterType = "", defaultFi
     }
   }, [defaultFilterSprint]);
 
-  // ── Sincronización con URL params ──────────────────────────────────────────
+  // ── Sincronizacion bidireccional con URL params ───────────────────────────
+  // Lee parametros de URL al montar (sprint, tipo, estado) para permitir deep-linking
   const hasReadUrl = useRef(false);
   useEffect(() => {
     if (hasReadUrl.current || typeof window === "undefined") return;
@@ -79,6 +129,7 @@ export function useTicketData({ tickets = [], externalFilterType = "", defaultFi
     if (statusParam !== null)                         setFilterStatus(statusParam);
   }, [defaultFilterSprint, externalFilterType]);
 
+  // Escribe los filtros activos en la URL (sin recargar la pagina) para persistencia
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
@@ -91,7 +142,9 @@ export function useTicketData({ tickets = [], externalFilterType = "", defaultFi
     window.history.replaceState({}, "", newUrl);
   }, [filterSprint, filterType, filterStatus]);
 
-  // ── Fetch Nombres + jira_persons + equipo_desarrollo ─────────────────────
+  // ── Fetch de datos auxiliares de personas ──────────────────────────────────
+  // Carga tres tablas en paralelo: Nombres (alias), jira_persons (display names) y
+  // equipo_desarrollo (nombres reales con correos). Se re-ejecuta cuando syncVersion cambia.
   useEffect(() => {
     async function fetchPersonData() {
       const [nombresRes, personsRes, equipoRes] = await Promise.all([
@@ -107,6 +160,7 @@ export function useTicketData({ tickets = [], externalFilterType = "", defaultFi
   }, [syncVersion]);
 
   // ── subtasksMap: derivado de los tickets cargados (parent_key) ────────────
+  // Construye un mapa { parent_key -> [child_keys] } para mostrar las subtareas de cada ticket
   const subtasksMap = useMemo(() => {
     const map = {};
     tickets.forEach((t) => {
@@ -118,7 +172,8 @@ export function useTicketData({ tickets = [], externalFilterType = "", defaultFi
     return map;
   }, [tickets]);
 
-  // ── Fetch links (tabla relacional, no derivable de tickets) ────────────────
+  // ── Fetch links (relaciones entre tickets desde BD) ────────────────────────
+  // Carga la tabla jira_ticket_links para mostrar actividades vinculadas en errores
   useEffect(() => {
     async function fetchLinks() {
       const { data } = await supabase
@@ -135,7 +190,8 @@ export function useTicketData({ tickets = [], externalFilterType = "", defaultFi
     fetchLinks();
   }, []);
 
-  // nameMap: jiraDisplayName.lower → Nombres.Nombre (alias personalizado)
+  // ── Mapas de resolucion de nombres ────────────────────────────────────────
+  // nameMap: Programador (display name Jira) en minusculas -> Nombre (alias personalizado de tabla Nombres)
   const nameMap = useMemo(() => {
     const map = {};
     nombres.forEach((n) => {
@@ -144,14 +200,14 @@ export function useTicketData({ tickets = [], externalFilterType = "", defaultFi
     return map;
   }, [nombres]);
 
-  // personsMap: accountId/email → jira displayName
+  // personsMap: email/accountId de Jira -> display_name de Jira
   const personsMap = useMemo(() => {
     const map = {};
     persons.forEach((p) => { if (p.email) map[p.email] = p.display_name; });
     return map;
   }, [persons]);
 
-  // equipoEmailMap: correo_pgim / correo_gcorp → nombre real
+  // equipoEmailMap: correo_pgim o correo_gcorp en minusculas -> nombre real del integrante
   const equipoEmailMap = useMemo(() => {
     const map = {};
     equipo.forEach((m) => {
@@ -161,7 +217,7 @@ export function useTicketData({ tickets = [], externalFilterType = "", defaultFi
     return map;
   }, [equipo]);
 
-  // equipoKeyMap: nombre_clave (Jira display name) → nombre real
+  // equipoKeyMap: nombre_clave (display name usado en Jira) en minusculas -> nombre real
   const equipoKeyMap = useMemo(() => {
     const map = {};
     equipo.forEach((m) => {
@@ -195,22 +251,34 @@ export function useTicketData({ tickets = [], externalFilterType = "", defaultFi
     [nameMap, personsMap, equipoEmailMap, equipoKeyMap]
   );
 
-  // ── Mapa de tickets y resolución de épica ──────────────────────────────────
+  // ── Mapa de tickets y resolucion de epica ──────────────────────────────────
+  // ticketMap: jira_key -> ticket completo, para busquedas O(1) en la jerarquia
   const ticketMap = useMemo(() => {
     const map = {};
     tickets.forEach((t) => { map[t.jira_key] = t; });
     return map;
   }, [tickets]);
 
+  /**
+   * Resuelve la epica de un ticket navegando la jerarquia de Jira:
+   * - Epica:    devuelve a si misma
+   * - Historia: su parent_key es la Epica
+   * - Subtarea: sube dos niveles (Subtarea -> Historia -> Epica)
+   * @param {Object} ticket - Ticket Jira
+   * @returns {{ key: string, summary: string } | null} Datos de la epica o null
+   */
   const resolveEpic = useCallback(
     (ticket) => {
+      // Si el ticket ya es una epica, devuelve sus propios datos
       if (isEpic(ticket.issue_type)) return { key: ticket.jira_key, summary: ticket.summary };
 
+      // Historia: su padre directo deberia ser la Epica
       if (isStory(ticket.issue_type) && ticket.parent_key) {
         const parent = ticketMap[ticket.parent_key];
         if (parent && isEpic(parent.issue_type)) return { key: parent.jira_key, summary: parent.summary };
       }
 
+      // Subtarea: sube al padre (Historia) y luego al abuelo (Epica)
       if (isSubtask(ticket.issue_type) && ticket.parent_key) {
         const parentStory = ticketMap[ticket.parent_key];
         if (parentStory && isStory(parentStory.issue_type) && parentStory.parent_key) {
@@ -225,6 +293,7 @@ export function useTicketData({ tickets = [], externalFilterType = "", defaultFi
     [ticketMap]
   );
 
+  // Conteo de filtros activos para mostrar al usuario (los filtros de texto requieren >= 3 caracteres)
   const activeFilterCount = [
     filterType, filterSprint, filterStatus, filterAssignee, filterReporter,
     filterKey.length     >= 3 ? filterKey      : "",
@@ -235,8 +304,10 @@ export function useTicketData({ tickets = [], externalFilterType = "", defaultFi
   ].filter(Boolean).length;
 
   // ── Filtrado + opciones en cascada ─────────────────────────────────────────
-  // `base(exclude)` aplica todos los filtros activos excepto el indicado,
-  // para que cada dropdown solo muestre valores válidos dado el resto de filtros.
+  // `base(exclude)` aplica todos los filtros activos EXCEPTO el indicado por nombre,
+  // de modo que cada dropdown solo muestre valores que realmente existen dado el
+  // resto de filtros. Esto previene que un dropdown quede vacio por combinaciones
+  // imposibles de filtros.
   const { filtered, uniqueTypes, uniqueSprints, uniqueStatuses, uniqueAssignees, uniqueReporters } =
     useMemo(() => {
       const base = (exclude) => {
@@ -328,6 +399,7 @@ export function useTicketData({ tickets = [], externalFilterType = "", defaultFi
   const paginated  = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   // ── Acciones ───────────────────────────────────────────────────────────────
+  /** Alterna la direccion de ordenamiento o cambia el campo activo, y resetea a pagina 1 */
   function toggleSort(field) {
     if (sortField === field) {
       setSortDir(sortDir === "asc" ? "desc" : "asc");
@@ -338,13 +410,14 @@ export function useTicketData({ tickets = [], externalFilterType = "", defaultFi
     setCurrentPage(1);
   }
 
+  /** Limpia todos los filtros, la busqueda global y resetea la paginacion */
   function clearAllFilters() {
     setFilterType(""); setFilterKey("");       setFilterSummary("");   setFilterPrincipal("");
     setFilterEpic(""); setFilterSprint("");    setFilterStatus("");    setFilterAssignee("");
     setFilterReporter(""); setFilterComentario(""); setSearch("");     setCurrentPage(1);
   }
 
-  // Setters que también resetean la página
+  // Wrapper que envuelve cada setter para que tambien resetee la pagina a 1 al cambiar un filtro
   const pg = (setter) => (v) => { setter(v); setCurrentPage(1); };
 
   return {

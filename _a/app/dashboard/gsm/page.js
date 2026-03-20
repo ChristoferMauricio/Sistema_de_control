@@ -1,19 +1,47 @@
+/**
+ * @file gsm/page.js - Página del directorio de personal GSM
+ * @description Muestra el directorio de personal perteneciente a la Gerencia de
+ *              Supervisión Minera (GSM). Incluye filtros interactivos por nombre,
+ *              modalidad y cargo. Los registros se ordenan jerárquicamente por cargo
+ *              (gerente > coordinador > senior > especialista > ... > practicante).
+ *
+ *              Cada registro muestra: nombre, modalidad de contratación, cargo y correo.
+ *              Los cargos se muestran con badges de colores diferenciados según nivel
+ *              jerárquico (gerencia/coordinación = dorado, senior = azul, practicante = verde).
+ *
+ * @route /dashboard/gsm
+ * @requires supabase - Cliente de Supabase para consultar la tabla "gsm"
+ */
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 
+/**
+ * Componente de página del directorio GSM con filtros y ordenamiento jerárquico.
+ *
+ * @returns {JSX.Element} Tabla filtrable del personal GSM o estado de carga/error
+ *
+ * Estados locales:
+ * - personal: Array completo de registros del personal GSM
+ * - loading: Estado de carga inicial
+ * - error: Mensaje de error si falla la consulta
+ * - filterNombre: Texto de filtro por nombre
+ * - filterModalidad: Texto de filtro por modalidad de contratación
+ * - filterCargo: Texto de filtro por cargo
+ */
 export default function GSMPage() {
   const [personal, setPersonal] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Filtros
+  /* ─── Estados de filtros de búsqueda ─── */
   const [filterNombre, setFilterNombre] = useState("");
   const [filterModalidad, setFilterModalidad] = useState("");
   const [filterCargo, setFilterCargo] = useState("");
 
   useEffect(() => {
+    /** Consulta todos los registros de la tabla "gsm" en Supabase */
     async function fetchPersonal() {
       try {
         const { data, error } = await supabase
@@ -38,7 +66,13 @@ export default function GSMPage() {
     fetchPersonal();
   }, []);
 
-  // Función para determinar el peso jerárquico del cargo para ordenarlos
+  /**
+   * Asigna un peso numérico al cargo para ordenamiento jerárquico.
+   * Menor peso = mayor jerarquía (gerente = 1, practicante = 8).
+   *
+   * @param {string} cargo - Nombre del cargo del trabajador
+   * @returns {number} Peso jerárquico (1-9, donde 1 es el más alto)
+   */
   const getCargoWeight = (cargo) => {
     const c = cargo.toLowerCase();
     if (c.includes("gerente")) return 1;
@@ -49,11 +83,17 @@ export default function GSMPage() {
     if (c.includes("analista")) return 6;
     if (c.includes("asistente")) return 7;
     if (c.includes("practicante")) return 8;
-    return 9; // Otros
+    return 9; // Otros cargos no clasificados
   };
 
+  /**
+   * Lista filtrada y ordenada del personal GSM.
+   * Aplica los tres filtros de texto y luego ordena por:
+   * 1. Peso jerárquico del cargo (ascendente)
+   * 2. Nombre alfabéticamente (dentro del mismo nivel jerárquico)
+   */
   const filteredAndSorted = useMemo(() => {
-    // 1. Filtrar
+    // Paso 1: Aplicar filtros de texto (insensible a mayúsculas/minúsculas)
     let result = personal.filter((p) => {
       const matchNombre = p.nombre.toLowerCase().includes(filterNombre.toLowerCase());
       const matchModalidad = p.modalidad.toLowerCase().includes(filterModalidad.toLowerCase());
@@ -61,15 +101,15 @@ export default function GSMPage() {
       return matchNombre && matchModalidad && matchCargo;
     });
 
-    // 2. Ordenar por jerarquía (peso) y luego alfabéticamente por nombre
+    // Paso 2: Ordenar por jerarquía de cargo y luego alfabéticamente
     result.sort((a, b) => {
       const weightA = getCargoWeight(a.cargo);
       const weightB = getCargoWeight(b.cargo);
-      
+
       if (weightA !== weightB) {
-        return weightA - weightB;
+        return weightA - weightB; // Menor peso = mayor jerarquía primero
       }
-      return a.nombre.localeCompare(b.nombre);
+      return a.nombre.localeCompare(b.nombre); // Empate: orden alfabético
     });
 
     return result;

@@ -1,3 +1,18 @@
+/**
+ * @file Card.js
+ * @description Componente de tarjeta (card) reutilizable. Contenedor visual con bordes redondeados,
+ *   sombra y opciones de hover interactivo y efecto glow (resplandor naranja).
+ */
+
+/**
+ * Contenedor tipo tarjeta con bordes, sombra y efectos interactivos opcionales.
+ * @param {Object}  props
+ * @param {React.ReactNode} props.children     - Contenido de la tarjeta
+ * @param {string}  [props.className=""]       - Clases CSS adicionales
+ * @param {boolean} [props.hover=false]        - Activa efecto hover (sombra y borde mas visible, cursor pointer)
+ * @param {boolean} [props.glow=false]         - Activa efecto glow naranja al pasar el cursor
+ * @param {Object}  props....props             - Props adicionales pasados al elemento <div>
+ */
 export default function Card({
   children,
   className = "",

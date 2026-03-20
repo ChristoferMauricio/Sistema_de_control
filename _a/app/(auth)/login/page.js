@@ -1,9 +1,32 @@
+/**
+ * @file login/page.js - Página de inicio de sesión
+ * @description Formulario de autenticación que permite a los usuarios iniciar sesión
+ *              usando su correo electrónico y contraseña a través de Supabase Auth.
+ *              Tras una autenticación exitosa, redirige al dashboard principal.
+ *              Incluye funcionalidades de UX como mostrar/ocultar contraseña,
+ *              indicador de carga durante el proceso de login, y mensajes de error.
+ *
+ * @route /login
+ * @requires supabase - Cliente de Supabase para autenticación con email/password
+ */
 "use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
+/**
+ * Componente de página de login con formulario de autenticación.
+ *
+ * @returns {JSX.Element} Formulario de inicio de sesión con validación
+ *
+ * Estados locales:
+ * - email: Correo electrónico ingresado por el usuario
+ * - password: Contraseña ingresada por el usuario
+ * - loading: Indica si la petición de autenticación está en curso
+ * - error: Mensaje de error de autenticación (si falla el login)
+ * - showPassword: Controla la visibilidad del campo de contraseña
+ */
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -12,20 +35,30 @@ export default function LoginPage() {
   const [error, setError] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
 
+  /**
+   * Maneja el envío del formulario de login.
+   * Autentica al usuario con Supabase usando email/password.
+   * Si es exitoso, redirige a /dashboard; si falla, muestra el error.
+   *
+   * @param {Event} e - Evento del formulario (submit)
+   */
   async function handleLogin(e) {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
+    // Intentar autenticación con Supabase Auth
     const { error: authError } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
     if (authError) {
+      // Mostrar error y reactivar el formulario
       setError(authError.message);
       setLoading(false);
     } else {
+      // Autenticación exitosa → redirigir al dashboard
       router.replace("/dashboard");
     }
   }

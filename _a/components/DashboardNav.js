@@ -1,3 +1,18 @@
+/**
+ * @file DashboardNav.js
+ * @description Barra de navegacion lateral (sidebar) del dashboard. Incluye:
+ *   - Menu de navegacion con items agrupados y sub-items desplegables
+ *   - Control de acceso por rol (admin, developer, qa, viewer)
+ *   - Contadores (badges) en tiempo real para errores, observaciones y cambios de estado
+ *   - Soporte responsive con menu hamburguesa para movil
+ *   - Toggle de tema claro/oscuro
+ *   - Seccion de usuario con nombre, email, rol y boton de logout
+ *
+ *   Los contadores se calculan consultando Supabase al montar el componente:
+ *   - Errores de Certificacion y Desarrollo: bugs PF3QA filtrados por sprint vinculado
+ *   - Observaciones del Supervisor: tickets con comentario no vacio
+ *   - Mis Pendientes: cambios de estado en tickets del usuario desde la ultima visita
+ */
 "use client";
 
 import { useState, useEffect } from "react";
@@ -6,7 +21,11 @@ import { supabase } from "@/lib/supabase";
 import { getInitials } from "@/lib/utils";
 import { useTheme } from "@/app/dashboard/ThemeContext";
 
-// Configuración de navegación con permisos por rol
+/**
+ * Configuracion estatica de navegacion.
+ * Cada item tiene: label, href (o subItems), icon (JSX SVG), y roles permitidos.
+ * Los sub-items se agrupan bajo un dropdown desplegable.
+ */
 const navItems = [
   {
     label: "Vista General",
@@ -148,13 +167,19 @@ const navItems = [
   },
 ];
 
+/**
+ * Barra de navegacion lateral del dashboard con contadores, sub-menus y control de tema.
+ * @param {Object} props
+ * @param {Object} props.user - Objeto de usuario de Supabase Auth (email, user_metadata, etc.)
+ * @param {string} props.role - Rol del usuario: "admin" | "developer" | "qa" | "viewer"
+ */
 export default function DashboardNav({ user, role }) {
   const router = useRouter();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
   
-  // By default expand drops if child path is active
+  // Auto-expande los dropdowns cuyo sub-item corresponde a la ruta activa
   const [openDropdowns, setOpenDropdowns] = useState(() => {
     const drops = {};
     navItems.forEach(item => {
@@ -165,6 +190,7 @@ export default function DashboardNav({ user, role }) {
     return drops;
   });
 
+  // Contadores de badges que se muestran junto a los items de navegacion
   const [counts, setCounts] = useState({
     certificacion: 0,
     desarrollo: 0,
@@ -176,6 +202,9 @@ export default function DashboardNav({ user, role }) {
     setOpenDropdowns(prev => ({ ...prev, [label]: !prev[label] }));
   };
 
+  // ── Fetch de contadores al montar ─────────────────────────────────────────
+  // Carga en paralelo: bugs QA (errores certificacion/desarrollo), observaciones,
+  // y cambios de estado recientes para el usuario actual.
   useEffect(() => {
     async function fetchCounts() {
       try {
@@ -183,7 +212,7 @@ export default function DashboardNav({ user, role }) {
           { data: bugsQA },
           { data: obsData }
         ] = await Promise.all([
-          // 1. Fetch PF3QA bugs from active Sprint 2
+          // 1. Bugs del tablero PF3QA en Sprint 2 activo
           supabase
             .from("jira_tickets")
             .select("jira_key, linked_keys")
@@ -201,7 +230,7 @@ export default function DashboardNav({ user, role }) {
 
         const countObs = (obsData || []).filter(t => t.comentario && t.comentario.trim().length > 0).length;
 
-        // 3. Process Errores logic
+        // 3. Clasificar bugs en Certificacion o Desarrollo segun el sprint de sus historias vinculadas
         let countCert = 0;
         let countDes = 0;
 
@@ -248,7 +277,8 @@ export default function DashboardNav({ user, role }) {
           });
         }
 
-        // --- Cambios de estado en tickets del usuario desde última visita ---
+        // --- Cambios de estado en tickets asignados al usuario desde su ultima visita ---
+        // Usa sessionStorage para mantener el timestamp de inicio de sesion y evitar resetear en cada navegacion
         let countMisChanges = 0;
         if (user?.email) {
           // Obtener timestamp de última visita (por sesión para no resetear en cada navegación)
@@ -291,7 +321,8 @@ export default function DashboardNav({ user, role }) {
     fetchCounts();
   }, []);
 
-  // Filtrar por rol
+  // ─── Renderizado ────────────────────────────────────────────────────────────
+  // Filtra los items de navegacion segun el rol del usuario
   const visibleItems = navItems.filter((item) => item.roles.includes(role));
 
   async function handleLogout() {

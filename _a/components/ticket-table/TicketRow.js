@@ -1,3 +1,13 @@
+/**
+ * @file TicketRow.js
+ * @description Componente de fila individual para la tabla de tickets. Renderiza una fila <tr>
+ *   con todas las columnas del ticket (tipo, observaciones, clave, resumen, subtareas, principal,
+ *   epica, sprint, asignado, SP, estado, informador, fecha, historial) y opcionalmente una fila
+ *   expandible con el historial de cambios de estado.
+ *
+ *   Soporta dos modos de visualizacion ("default" y "errores") que muestran/ocultan columnas
+ *   diferentes. Solo usuarios con rol distinto a "viewer" pueden editar comentarios.
+ */
 "use client";
 
 import ReactMarkdown from "react-markdown";
@@ -5,6 +15,22 @@ import { formatDate, timeAgo, getStatusColor, getIssueTypeStyle, truncate } from
 import { useRole } from "@/app/dashboard/RoleContext";
 import { isStory, isSubtask, isEpic, hasStatusHistory } from "./useTicketData";
 
+/**
+ * Fila individual de la tabla de tickets con soporte para expansion de historial.
+ * @param {Object}   props
+ * @param {Object}   props.ticket        - Objeto ticket de Jira con todos sus campos
+ * @param {boolean}  props.isExpanded     - Si la fila de historial esta visible
+ * @param {Function} props.onToggleExpand - Callback para expandir/colapsar el historial
+ * @param {Array}    props.history        - Arreglo de cambios de estado del ticket
+ * @param {boolean}  props.showAssignee   - Si se muestra la columna de asignado
+ * @param {string}   props.mode           - "default" | "errores"
+ * @param {Function} props.resolveEpic    - Funcion para resolver la epica del ticket
+ * @param {Function} props.resolveName    - Funcion para resolver email -> nombre legible
+ * @param {Object}   props.localComments  - Comentarios editados localmente (actualizacion optimista)
+ * @param {Function} props.onEditComment  - Callback para abrir el modal de edicion de comentario
+ * @param {Object}   [props.subtasksMap]  - Mapa parent_key -> [child_keys]
+ * @param {Object}   [props.linksMap]     - Mapa source_key -> [target_keys] (actividades vinculadas)
+ */
 export default function TicketRow({
   ticket,
   isExpanded,
@@ -20,9 +46,11 @@ export default function TicketRow({
   linksMap = {},
 }) {
   const role        = useRole();
-  const statusColor = getStatusColor(ticket.status);
-  const typeStyle   = getIssueTypeStyle(ticket.issue_type);
+  const statusColor = getStatusColor(ticket.status);  // Colores CSS segun el estado
+  const typeStyle   = getIssueTypeStyle(ticket.issue_type); // Estilo visual segun tipo de issue
   const expanded    = isExpanded;
+
+  // Priorizar el comentario local (editado pero no guardado aun) sobre el de la BD
   const currentComment =
     localComments[ticket.jira_key] !== undefined
       ? localComments[ticket.jira_key]

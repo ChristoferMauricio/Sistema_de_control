@@ -1,16 +1,43 @@
+/**
+ * @file errores-desarrollo/page.js - Página de errores en fase de desarrollo
+ * @description Muestra los bugs/errores del tablero PF3QA (Sprint 2) cuyas historias
+ *              vinculadas pertenecen a las iteraciones de desarrollo (F3.03, F3.4, F3.5).
+ *
+ *              El flujo de datos es idéntico al de errores-certificacion, pero filtra
+ *              por sprints de desarrollo en lugar de certificación:
+ *              1. Consulta bugs tipo Error/Bug del proyecto PF3QA en Sprint 2
+ *              2. Obtiene los vínculos entre bugs y tickets PF3 desde jira_ticket_links
+ *              3. Consulta los sprints de los tickets vinculados
+ *              4. Filtra bugs cuyas historias contienen "F3.03", "F3.4" o "F3.5"
+ *              5. Adjunta el sprint vinculado para mostrarlo en la tabla
+ *
+ * @route /dashboard/errores-desarrollo
+ * @requires supabase - Cliente de Supabase para consultar tickets y vínculos
+ * @requires TicketTable - Componente de tabla reutilizable para mostrar tickets
+ */
 "use client";
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import TicketTable from "@/components/TicketTable";
 
+/**
+ * Componente de página que muestra errores clasificados como "de desarrollo".
+ * Un error pertenece a desarrollo si sus tickets vinculados están en sprints F3.03, F3.4 o F3.5.
+ *
+ * @returns {JSX.Element} Tabla de errores en desarrollo con banner de conteo
+ */
 export default function ErroresDesarrolloPage() {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    /**
+     * Obtiene y clasifica los errores de desarrollo mediante consultas
+     * encadenadas a Supabase (mismo flujo que errores-certificacion).
+     */
     async function fetchTickets() {
-      // 1. Fetch PF3QA bugs from active Sprint 2
+      // Paso 1: Obtener todos los bugs del tablero PF3QA en Sprint 2
       const { data: bugsQA, error } = await supabase
         .from("jira_tickets")
         .select("jira_key, summary, status, issue_type, sprint, story_points, assignee_email, reporter_email, parent_key, created_at, updated_at, comentario, priority")
@@ -22,20 +49,20 @@ export default function ErroresDesarrolloPage() {
       if (!error && bugsQA && bugsQA.length > 0) {
         const bugKeys = bugsQA.map(b => b.jira_key);
 
-        // 2. Obtener links desde jira_ticket_links (tabla normalizada)
+        // Paso 2: Obtener vínculos entre bugs y otros tickets
         const { data: linkRows } = await supabase
           .from("jira_ticket_links")
           .select("source_key, target_key")
           .in("source_key", bugKeys);
 
-        // Mapa: bugKey → [targetKeys]
+        // Construir mapa: clave del bug → [claves de tickets vinculados]
         const linksMap = {};
         for (const row of linkRows || []) {
           if (!linksMap[row.source_key]) linksMap[row.source_key] = [];
           linksMap[row.source_key].push(row.target_key);
         }
 
-        // 3. Obtener sprints de los tickets vinculados
+        // Paso 3: Consultar sprints de los tickets vinculados
         const allTargetKeys = Array.from(new Set(Object.values(linksMap).flat()));
         const linkedStoriesMap = {};
         if (allTargetKeys.length > 0) {
@@ -48,7 +75,8 @@ export default function ErroresDesarrolloPage() {
           });
         }
 
-        // 4. Filtrar bugs que apuntan a Desarrollo (F3.03, F3.4, F3.5)
+        // Paso 4: Filtrar bugs cuyas historias vinculadas pertenecen a desarrollo
+        // Desarrollo = sprints que contienen "F3.03" (Sprint 3), "F3.4" (Sprint 4) o "F3.5" (Sprint 5)
         const desBugs = bugsQA.filter(bug => {
           const targets = linksMap[bug.jira_key] || [];
           return targets.some(tk => {
@@ -57,7 +85,7 @@ export default function ErroresDesarrolloPage() {
           });
         });
 
-        // 5. Adjuntar storySprint para la tabla
+        // Paso 5: Adjuntar el sprint de la historia vinculada a cada bug
         const updatedTickets = desBugs.map(b => {
           const targets = linksMap[b.jira_key] || [];
           const sprints = [...new Set(targets.map(tk => linkedStoriesMap[tk]).filter(Boolean))];

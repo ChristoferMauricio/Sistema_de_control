@@ -1,5 +1,48 @@
-// lib/cronogramaData.js
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * Archivo: lib/cronogramaData.js
+ * Descripcion: Datos y funciones del cronograma de iteraciones del proyecto PGIM.
+ *
+ * Este modulo contiene:
+ *   1. `cronogramaData`: Arreglo con todas las iteraciones del proyecto,
+ *      incluyendo fechas de inicio, fin, duracion y plazos de presentacion.
+ *   2. `getCurrentSprint()`: Determina la iteracion vigente segun la fecha actual.
+ *   3. `formatCronogramaDate()`: Formatea fechas ISO a formato legible con
+ *      dia de la semana en espanol.
+ *
+ * Estructura de cada entrada del cronograma:
+ *   - no: Numero secuencial de la iteracion (0 = pre-operativa)
+ *   - etapa: "Pre-Operativa" o "Etapa Operativa"
+ *   - iteracion: Nombre de la iteracion (ej: "Iteracion F3.01")
+ *   - duracion: Dias calendario de la iteracion
+ *   - duracionAcumulada: Dias acumulados desde el inicio del proyecto
+ *   - fechaInicio: Fecha de inicio (formato YYYY-MM-DD)
+ *   - fechaFin: Fecha de fin de la iteracion (formato YYYY-MM-DD)
+ *   - plazoPresentacion: Dias habiles para presentar entregables despues del fin
+ *   - fechaMaxima: Fecha limite para presentacion de entregables (YYYY-MM-DD)
+ * ════════════════════════════════════════════════════════════════════════════
+ */
 
+// ─── Datos del Cronograma ───────────────────────────────────────────────────
+
+/**
+ * Cronograma completo del proyecto PGIM Fase 3.
+ * Contiene la etapa pre-operativa y las 18 iteraciones operativas (F3.01 a F3.18).
+ * Cada iteracion tiene una duracion de 30 dias calendario, con 5 dias adicionales
+ * de plazo para presentacion de entregables.
+ *
+ * @type {Array<{
+ *   no: number,
+ *   etapa: string,
+ *   iteracion: string,
+ *   duracion: number,
+ *   duracionAcumulada: number,
+ *   fechaInicio: string,
+ *   fechaFin: string,
+ *   plazoPresentacion: number|null,
+ *   fechaMaxima: string|null
+ * }>}
+ */
 export const cronogramaData = [
   { no: 0, etapa: "Pre-Operativa", iteracion: "Ninguna", duracion: 15, duracionAcumulada: 15, fechaInicio: "2025-03-18", fechaFin: "2025-04-01", plazoPresentacion: null, fechaMaxima: null },
   { no: 1, etapa: "Etapa Operativa", iteracion: "Iteración F3.01", duracion: 30, duracionAcumulada: 45, fechaInicio: "2025-04-02", fechaFin: "2025-05-01", plazoPresentacion: 5, fechaMaxima: "2025-05-06" },
@@ -22,26 +65,39 @@ export const cronogramaData = [
   { no: 18, etapa: "Etapa Operativa", iteracion: "Iteración F3.18", duracion: 30, duracionAcumulada: 555, fechaInicio: "2026-08-25", fechaFin: "2026-09-23", plazoPresentacion: 5, fechaMaxima: "2026-09-28" },
 ];
 
+// ─── Funciones del Cronograma ───────────────────────────────────────────────
+
 /**
- * Returns the current sprint based on a given Date object.
- * Returns null if no sprint matches the exact date range.
+ * Determina la iteracion/sprint vigente segun una fecha dada.
  *
- * @param {Date} today The date to check (defaults to new Date())
- * @returns {Object|null} The matching sprint object from cronogramaData
+ * La logica recorre el cronograma y verifica si la fecha proporcionada
+ * cae dentro del rango [fechaInicio, fechaMaxima] de alguna iteracion.
+ * Si la iteracion no tiene fechaMaxima, se usa fechaFin + 5 dias como
+ * fecha limite efectiva.
+ *
+ * Las fechas se parsean manualmente (split de "YYYY-MM-DD") en lugar de
+ * usar `new Date("YYYY-MM-DD")` para evitar problemas de zona horaria
+ * donde el constructor de Date interpreta la cadena como UTC.
+ *
+ * @param {Date} [today=new Date()] - Fecha a evaluar (por defecto, la fecha actual)
+ * @returns {Object|null} El objeto de la iteracion vigente del cronograma, o null si
+ *   ninguna iteracion coincide con la fecha proporcionada
  */
 export function getCurrentSprint(today = new Date()) {
-  // Reset time to start of day for accurate YYYY-MM-DD comparisons
+  // Resetear la hora a medianoche para comparaciones precisas solo por fecha
   const checkDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
 
   for (const row of cronogramaData) {
+    // Saltar filas sin fechas definidas
     if (!row.fechaInicio || !row.fechaFin) continue;
-    
-    // Parse strings into accurate local Date objects
-    // Split "YYYY-MM-DD" directly to avoid timezone quirks
+
+    // Parsear la fecha de inicio separando "YYYY-MM-DD" manualmente
+    // para evitar desfases de zona horaria del constructor de Date
     const [sy, sm, sd] = row.fechaInicio.split("-").map(Number);
     const startDate = new Date(sy, sm - 1, sd);
 
-    // Use fechaMaxima if available, otherwise fechaFin + 5 days
+    // Determinar la fecha limite: usar fechaMaxima si existe,
+    // de lo contrario usar fechaFin + 5 dias como margen
     let endDate;
     if (row.fechaMaxima) {
       const [ey, em, ed] = row.fechaMaxima.split("-").map(Number);
@@ -52,27 +108,39 @@ export function getCurrentSprint(today = new Date()) {
       endDate.setDate(endDate.getDate() + 5);
     }
 
+    // Verificar si la fecha cae dentro del rango de esta iteracion
     if (checkDate >= startDate && checkDate <= endDate) {
       return row;
     }
   }
 
+  // Ninguna iteracion coincide con la fecha proporcionada
   return null;
 }
 
 /**
- * Validates a formatted date string for display
- * Example: "mar. 18/03/2025"
+ * Formatea una fecha ISO (YYYY-MM-DD) a un formato legible con dia de la semana
+ * abreviado en espanol.
+ *
+ * Ejemplo: "2025-03-18" -> "mar. 18/03/2025"
+ *
+ * @param {string} isoDateString - Fecha en formato "YYYY-MM-DD"
+ * @returns {string} Fecha formateada como "dia. DD/MM/YYYY", o cadena vacia si no hay fecha
  */
 export function formatCronogramaDate(isoDateString) {
   if (!isoDateString) return "";
+
+  // Nombres abreviados de los dias de la semana en espanol
   const days = ["dom.", "lun.", "mar.", "mié.", "jue.", "vie.", "sáb."];
+
+  // Parsear manualmente para evitar desfases de zona horaria
   const [y, m, d] = isoDateString.split("-").map(Number);
   const date = new Date(y, m - 1, d);
-  
+
+  // Obtener el nombre del dia y formatear con ceros a la izquierda
   const dayName = days[date.getDay()];
   const paddedDay = String(d).padStart(2, "0");
   const paddedMonth = String(m).padStart(2, "0");
-  
+
   return `${dayName} ${paddedDay}/${paddedMonth}/${y}`;
 }

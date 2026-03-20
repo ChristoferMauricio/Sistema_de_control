@@ -1,37 +1,87 @@
 /**
- * ═══════════════════════════════════════════════════════════
- * API Route: /api/sync-jira
- * GET  → Vercel Cron Job (verifica CRON_SECRET)
- * POST → Botón manual desde la UI
- * ═══════════════════════════════════════════════════════════
+ * ════════════════════════════════════════════════════════════════════════════
+ * Archivo: app/api/sync-jira/route.js
+ * Descripcion: API Route de Next.js para sincronizar tickets de Jira con Supabase.
+ *
+ * Esta ruta soporta dos formas de invocacion:
+ *   - GET: Llamada automatica desde Vercel Cron Jobs (requiere CRON_SECRET)
+ *   - POST: Llamada manual desde el boton de sincronizacion en la UI
+ *
+ * Flujo de sincronizacion:
+ *   1. Descubrir dinamicamente el campo "Epic Link" en la instancia Jira
+ *   2. Buscar todos los tickets del proyecto mediante la API de Jira (con paginacion)
+ *   3. Transformar cada ticket en 4 entidades relacionales normalizadas
+ *   4. Comparar estados actuales en Supabase para detectar cambios
+ *   5. Hacer upsert de personas, tickets, subtareas y enlaces en Supabase
+ *   6. Registrar cambios de estado en la tabla de historial
+ *
+ * Tablas de Supabase involucradas:
+ *   - jira_persons: Personas (asignados, reporteros)
+ *   - jira_tickets: Tickets de Jira normalizados
+ *   - jira_ticket_subtasks: Relaciones padre-hijo entre tickets
+ *   - jira_ticket_links: Enlaces entre tickets (bloquea, relacionado, etc.)
+ *   - jira_ticket_status_history: Historial de cambios de estado
+ *
+ * Variables de entorno requeridas:
+ *   - JIRA_BASE_URL: URL base de la instancia Jira (ej: https://miempresa.atlassian.net)
+ *   - JIRA_USER_EMAIL: Email del usuario para autenticacion en Jira
+ *   - JIRA_API_TOKEN: Token de API generado en Jira
+ *   - JIRA_PROJECT_KEY: Clave(s) del proyecto (separadas por coma para multiples)
+ *   - NEXT_PUBLIC_SUPABASE_URL: URL del proyecto Supabase
+ *   - SUPABASE_SERVICE_ROLE_KEY: Clave de servicio de Supabase
+ *   - CRON_SECRET (opcional): Secreto para validar llamadas de Vercel Cron
+ * ════════════════════════════════════════════════════════════════════════════
  */
 
 import { createClient } from "@supabase/supabase-js";
 
+// ─── Configuracion de Variables de Entorno ──────────────────────────────────
+
+/** URL base de Jira, con barras finales eliminadas para evitar doble barra en endpoints */
 const JIRA_BASE_URL      = (process.env.JIRA_BASE_URL || "").replace(/\/+$/, "");
+/** Email del usuario para autenticacion basica en la API de Jira */
 const JIRA_USER_EMAIL    = process.env.JIRA_USER_EMAIL;
+/** Token de API de Jira (se combina con el email para autenticacion Basic) */
 const JIRA_API_TOKEN     = process.env.JIRA_API_TOKEN;
+/** Clave(s) del proyecto Jira a sincronizar (separadas por coma si son multiples) */
 const JIRA_PROJECT_KEY   = process.env.JIRA_PROJECT_KEY || "";
+/** URL del proyecto Supabase */
 const SUPABASE_URL       = process.env.NEXT_PUBLIC_SUPABASE_URL;
+/** Clave de servicio de Supabase (acceso completo sin RLS) */
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+/** Cliente de Supabase con permisos administrativos para operaciones de escritura */
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
+/**
+ * Headers HTTP para todas las peticiones a la API de Jira.
+ * Usa autenticacion Basic con email:token codificado en Base64.
+ */
 const jiraHeaders = {
   Authorization: `Basic ${Buffer.from(`${JIRA_USER_EMAIL}:${JIRA_API_TOKEN}`).toString("base64")}`,
   "Content-Type": "application/json",
   Accept: "application/json",
 };
 
-// Vercel: máximo tiempo de ejecución (60s en plan Hobby)
+/**
+ * Tiempo maximo de ejecucion permitido para esta API route.
+ * Vercel Hobby permite hasta 60 segundos; planes superiores permiten mas.
+ * @type {number}
+ */
 export const maxDuration = 60;
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
+// ─── Funciones Auxiliares (Helpers) ─────────────────────────────────────────
 
 /**
- * Busca dinámicamente el ID del campo "Epic Link" en la instancia Jira.
- * Retorna algo como "customfield_10014" o "customfield_10008", según la instancia.
- * Si no lo encuentra, retorna null.
+ * Busca dinamicamente el ID del campo personalizado "Epic Link" en la instancia Jira.
+ *
+ * El nombre del campo varia segun la configuracion e idioma de la instancia:
+ *   - "Epic Link" (ingles)
+ *   - "Enlace de epica" / "Enlace epica" (espanol)
+ *
+ * El ID resultante tiene formato "customfield_XXXXX" (ej: "customfield_10014").
+ *
+ * @returns {Promise<string|null>} El ID del campo Epic Link, o null si no se encuentra
  */
 async function getEpicLinkFieldId() {
   try {
@@ -40,7 +90,10 @@ async function getEpicLinkFieldId() {
       headers: jiraHeaders,
     });
     if (!res.ok) return null;
+
     const fields = await res.json();
+
+    // Buscar el campo por nombre, soportando variantes en ingles y espanol
     const epicField = fields.find(
       (f) =>
         f.name?.toLowerCase().includes("epic link") ||
@@ -54,16 +107,32 @@ async function getEpicLinkFieldId() {
 }
 
 /**
- * Busca tickets en Jira via API con paginación por cursor
+ * Busca tickets en Jira usando JQL (Jira Query Language) con paginacion por cursor.
+ *
+ * Utiliza el endpoint /rest/api/2/search/jql que soporta paginacion basada en
+ * `nextPageToken` (mas eficiente que offset para conjuntos grandes de datos).
+ * Solicita hasta 100 tickets por pagina y continua hasta agotar los resultados.
+ *
+ * @param {string} jql - Consulta JQL para filtrar tickets (ej: "project = PGIM ORDER BY updated DESC")
+ * @param {string|null} epicLinkFieldId - ID del campo Epic Link descubierto dinamicamente,
+ *   para incluirlo en los campos solicitados si difiere del valor por defecto
+ * @returns {Promise<Array<Object>>} Arreglo con todos los issues encontrados en Jira
+ * @throws {Error} Si la API de Jira responde con un codigo de error HTTP
  */
 async function searchJira(jql, epicLinkFieldId) {
   const allIssues = [];
+
+  // Campos base a solicitar en cada peticion
   const baseFields = "key,summary,status,assignee,priority,issuetype,created,updated,reporter,parent,subtasks,customfield_10036,customfield_10020,customfield_10014,description,issuelinks";
+
+  // Agregar el campo Epic Link descubierto si es diferente al incluido por defecto
   const fields = epicLinkFieldId && epicLinkFieldId !== "customfield_10014"
     ? `${baseFields},${epicLinkFieldId}`
     : baseFields;
+
   let nextPageToken = null;
 
+  // Bucle de paginacion por cursor: continuar hasta que no haya mas paginas
   while (true) {
     const params = new URLSearchParams({ jql, maxResults: "100", fields });
     if (nextPageToken) params.set("nextPageToken", nextPageToken);
@@ -78,6 +147,7 @@ async function searchJira(jql, epicLinkFieldId) {
     const data = await res.json();
     allIssues.push(...(data.issues || []));
 
+    // Si no hay token de siguiente pagina o no hay issues, terminar
     if (!data.nextPageToken || !data.issues?.length) break;
     nextPageToken = data.nextPageToken;
   }
@@ -86,32 +156,49 @@ async function searchJira(jql, epicLinkFieldId) {
 }
 
 /**
- * Extrae el nombre del sprint activo (o el más reciente)
+ * Extrae el nombre del sprint activo de un campo de sprint de Jira.
+ * Si no hay sprint activo, retorna el nombre del ultimo sprint en el arreglo
+ * (generalmente el mas reciente).
+ *
+ * @param {Array<Object>|null} sprintField - Campo customfield_10020 de Jira que contiene
+ *   un arreglo de objetos sprint con propiedades { name, state, ... }
+ * @returns {string|null} Nombre del sprint activo o mas reciente, o null si no hay sprints
  */
 function extractSprintName(sprintField) {
   if (!Array.isArray(sprintField) || sprintField.length === 0) return null;
+  // Priorizar el sprint con estado "active"; si no hay, tomar el ultimo del arreglo
   const active = sprintField.find(s => s.state === "active") ?? sprintField[sprintField.length - 1];
   return active?.name ?? null;
 }
 
 /**
- * Transforma un issue de Jira en los 4 objetos relacionales normalizados:
- *   ticket   → fila para jira_tickets (sin arrays, sin nombres derivados)
- *   persons  → filas para jira_persons (assignee + reporter)
- *   subtasks → filas para jira_ticket_subtasks
- *   links    → filas para jira_ticket_links
+ * Transforma un issue crudo de la API de Jira en 4 objetos relacionales normalizados
+ * listos para insertar en Supabase.
+ *
+ * La transformacion separa la informacion del ticket en entidades independientes
+ * para mantener la base de datos normalizada y evitar datos duplicados.
+ *
+ * @param {Object} issue - Issue crudo de la API de Jira (con campos .key y .fields)
+ * @param {string|null} epicLinkFieldId - ID del campo Epic Link descubierto dinamicamente
+ * @returns {{
+ *   ticket: Object,    - Fila para la tabla jira_tickets
+ *   persons: Array,    - Filas para la tabla jira_persons (asignado y reportero)
+ *   subtasks: Array,   - Filas para la tabla jira_ticket_subtasks
+ *   links: Array       - Filas para la tabla jira_ticket_links
+ * }}
  */
 function transformIssue(issue, epicLinkFieldId) {
   const f = issue.fields || {};
   const now = new Date().toISOString();
 
-  // Usar emailAddress si existe, sino accountId como identificador único
+  // Identificador unico de personas: preferir email, si no existe usar accountId
   const assigneeId = f.assignee?.emailAddress || f.assignee?.accountId || "";
   const reporterId = f.reporter?.emailAddress  || f.reporter?.accountId  || "";
 
-  // Epic Link dinámico: campo descubierto en tiempo de ejecución
+  // Epic Link: obtener del campo descubierto dinamicamente en tiempo de ejecucion
   const epicLinkKey = epicLinkFieldId ? (f[epicLinkFieldId] ?? null) : null;
 
+  // Construir el objeto del ticket normalizado
   const ticket = {
     jira_key:       issue.key,
     summary:        f.summary       || "",
@@ -123,16 +210,17 @@ function transformIssue(issue, epicLinkFieldId) {
     sprint:         extractSprintName(f.customfield_10020),
     story_points:   f.customfield_10036 ?? null,
     reporter_email: reporterId,
-    // f.parent?.key = relación directa (next-gen / subtareas)
-    // f.customfield_10014 = Epic Link clásico (proyectos company-managed)
-    // epicLinkKey = campo descubierto dinámicamente (varía por instancia Jira)
+    // Jerarquia del ticket: 3 posibles fuentes de relacion padre
+    // f.parent?.key = relacion directa en proyectos next-gen / subtareas
+    // f.customfield_10014 = Epic Link clasico en proyectos company-managed
+    // epicLinkKey = campo descubierto dinamicamente (varia por instancia Jira)
     parent_key:     f.parent?.key || f.customfield_10014 || epicLinkKey || null,
     created_at:     f.created       || null,
     updated_at:     f.updated       || null,
     synced_at:      now,
   };
 
-  // Persons: deduplicar más adelante por email/accountId
+  // Construir arreglo de personas (se deduplicara mas adelante por email/accountId)
   const persons = [];
   if (assigneeId) {
     persons.push({ email: assigneeId, display_name: f.assignee.displayName || assigneeId });
@@ -141,38 +229,61 @@ function transformIssue(issue, epicLinkFieldId) {
     persons.push({ email: reporterId, display_name: f.reporter.displayName || reporterId });
   }
 
-  // Subtareas
+  // Subtareas: mapear relaciones padre-hijo
   const subtasks = (f.subtasks || []).map(s => ({
     parent_key: issue.key,
     child_key:  s.key,
   }));
 
-  // Links entre tickets
+  // Enlaces entre tickets: extraer la clave destino y el tipo de relacion
   const links = (f.issuelinks || [])
     .map(l => {
+      // Un enlace puede ser inward (entrante) u outward (saliente)
       const targetKey = l.inwardIssue?.key ?? l.outwardIssue?.key;
       const linkType  = l.inwardIssue ? (l.type?.inward ?? "inward") : (l.type?.outward ?? "outward");
       return targetKey ? { source_key: issue.key, target_key: targetKey, link_type: linkType } : null;
     })
-    .filter(Boolean);
+    .filter(Boolean); // Eliminar entradas nulas
 
   return { ticket, persons, subtasks, links };
 }
 
 /**
- * Verifica que la petición venga de un Cron Job de Vercel.
- * Vercel envía: Authorization: Bearer <CRON_SECRET>
+ * Verifica que una peticion GET provenga de un Cron Job de Vercel.
+ * Vercel envia el header `Authorization: Bearer <CRON_SECRET>` en cada ejecucion programada.
+ *
+ * Si CRON_SECRET no esta configurado (desarrollo local), permite todas las peticiones.
+ *
+ * @param {Request} request - Objeto Request de la peticion HTTP entrante
+ * @returns {boolean} true si la autenticacion es valida o si no hay secreto configurado
  */
 function verifyCronSecret(request) {
   const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret) return true; // Sin configurar → permitir (desarrollo local)
+  if (!cronSecret) return true; // Sin configurar: permitir (desarrollo local)
   return request.headers.get("authorization") === `Bearer ${cronSecret}`;
 }
 
-// ─── Lógica principal de sincronización ─────────────────────────────────────
+// ─── Logica Principal de Sincronizacion ─────────────────────────────────────
 
+/**
+ * Ejecuta el flujo completo de sincronizacion Jira -> Supabase.
+ *
+ * Pasos:
+ *   1. Validar configuracion de Jira
+ *   2. Construir consulta JQL segun los proyectos configurados
+ *   3. Descubrir el campo Epic Link y obtener todos los tickets
+ *   4. Transformar cada ticket en entidades normalizadas
+ *   5. Consultar estados actuales en Supabase para detectar cambios
+ *   6. Hacer upsert por lotes de: personas, tickets, subtareas y enlaces
+ *   7. Registrar cambios de estado en el historial
+ *
+ * @returns {Promise<Response>} Respuesta JSON con el resultado de la sincronizacion:
+ *   - En exito: { success, message, synced, statusChanges, persons, subtasks, links, timestamp }
+ *   - En error: { error } con status 500
+ */
 async function runSync() {
   try {
+    // Validar que la configuracion de Jira este completa
     if (!JIRA_BASE_URL || !JIRA_USER_EMAIL || !JIRA_API_TOKEN) {
       return Response.json(
         { error: "Configuración de Jira incompleta en el servidor" },
@@ -180,16 +291,19 @@ async function runSync() {
       );
     }
 
+    // Construir consulta JQL: si hay proyectos configurados, filtrar por ellos
     let jql = "ORDER BY updated DESC";
     if (JIRA_PROJECT_KEY) {
+      // Soporta multiples proyectos separados por coma (ej: "PGIM,OTRO")
       const projects = JIRA_PROJECT_KEY.split(",").map(p => `"${p.trim()}"`).join(", ");
       jql = `project in (${projects}) ORDER BY updated DESC`;
     }
 
-    // 1. Descubrir el campo Epic Link dinámicamente y obtener issues de Jira
+    // Paso 1: Descubrir el campo Epic Link y obtener todos los issues de Jira
     const epicLinkFieldId = await getEpicLinkFieldId();
     const issues   = await searchJira(jql, epicLinkFieldId);
 
+    // Transformar todos los issues en entidades normalizadas
     const transformed = issues.map(i => transformIssue(i, epicLinkFieldId));
 
     if (transformed.length === 0) {
@@ -199,18 +313,20 @@ async function runSync() {
     const tickets  = transformed.map(t => t.ticket);
     const jiraKeys = tickets.map(t => t.jira_key);
 
-    // Deduplicar persons por email (un mismo email puede aparecer en múltiples tickets)
+    // Deduplicar personas por email (un mismo usuario puede aparecer como
+    // asignado en un ticket y como reportero en otro)
     const personsMap = new Map();
     transformed.forEach(({ persons }) =>
       persons.forEach(p => personsMap.set(p.email, p))
     );
     const allPersons = [...personsMap.values()];
 
-    // Aplanar subtasks y links
+    // Aplanar arreglos de subtareas y enlaces de todos los tickets
     const allSubtasks = transformed.flatMap(t => t.subtasks);
     const allLinks    = transformed.flatMap(t => t.links);
 
-    // 2. Obtener estados actuales en Supabase (para detectar cambios)
+    // Paso 2: Obtener estados actuales en Supabase para detectar cambios
+    // Se consulta en lotes de 200 para evitar exceder limites de la API
     const statusMap = {};
     const batchSize = 200;
     for (let i = 0; i < jiraKeys.length; i += batchSize) {
@@ -221,19 +337,21 @@ async function runSync() {
       for (const t of data || []) statusMap[t.jira_key] = t.status;
     }
 
-    // 3. Detectar cambios de estado
+    // Paso 3: Detectar cambios de estado comparando Jira vs Supabase
     const now = new Date().toISOString();
     const statusChanges = [];
     for (const t of tickets) {
       const oldStatus = statusMap[t.jira_key];
       if (oldStatus === undefined) {
+        // Ticket nuevo: registrar como primer estado
         statusChanges.push({ jira_key: t.jira_key, old_status: null,      new_status: t.status, changed_at: now });
       } else if (oldStatus !== t.status) {
+        // Ticket existente con estado diferente: registrar el cambio
         statusChanges.push({ jira_key: t.jira_key, old_status: oldStatus, new_status: t.status, changed_at: now });
       }
     }
 
-    // 4. Upsert jira_persons (antes de tickets para respetar FK si se activa)
+    // Paso 4: Upsert de personas (antes que tickets para respetar claves foraneas)
     if (allPersons.length > 0) {
       for (let i = 0; i < allPersons.length; i += batchSize) {
         await supabaseAdmin
@@ -242,7 +360,7 @@ async function runSync() {
       }
     }
 
-    // 5. Upsert jira_tickets en lotes de 500
+    // Paso 5: Upsert de tickets en lotes de 500 (limite practico para Supabase)
     const upsertBatch = 500;
     for (let i = 0; i < tickets.length; i += upsertBatch) {
       const { error } = await supabaseAdmin
@@ -251,7 +369,7 @@ async function runSync() {
       if (error) throw new Error(`Supabase upsert tickets (lote ${i}): ${error.message}`);
     }
 
-    // 6. Upsert jira_ticket_subtasks
+    // Paso 6: Upsert de subtareas (relaciones padre-hijo)
     if (allSubtasks.length > 0) {
       for (let i = 0; i < allSubtasks.length; i += upsertBatch) {
         const { error } = await supabaseAdmin
@@ -261,7 +379,7 @@ async function runSync() {
       }
     }
 
-    // 7. Upsert jira_ticket_links
+    // Paso 7: Upsert de enlaces entre tickets
     if (allLinks.length > 0) {
       for (let i = 0; i < allLinks.length; i += upsertBatch) {
         const { error } = await supabaseAdmin
@@ -271,7 +389,7 @@ async function runSync() {
       }
     }
 
-    // 8. Registrar cambios de estado
+    // Paso 8: Registrar cambios de estado en la tabla de historial
     if (statusChanges.length > 0) {
       for (let i = 0; i < statusChanges.length; i += upsertBatch) {
         const { error } = await supabaseAdmin
@@ -281,6 +399,7 @@ async function runSync() {
       }
     }
 
+    // Retornar resumen de la sincronizacion exitosa
     return Response.json({
       success:          true,
       message:          "Sincronización completada",
@@ -299,9 +418,16 @@ async function runSync() {
   }
 }
 
-// ─── Handlers HTTP ───────────────────────────────────────────────────────────
+// ─── Handlers HTTP (Endpoints de la API) ────────────────────────────────────
 
-/** GET: Vercel Cron Jobs */
+/**
+ * Handler GET: Invocado automaticamente por Vercel Cron Jobs.
+ * Valida el secreto CRON_SECRET en el header Authorization antes de ejecutar
+ * la sincronizacion. Retorna 401 si la autenticacion falla.
+ *
+ * @param {Request} request - Objeto Request de la peticion HTTP
+ * @returns {Promise<Response>} Resultado de la sincronizacion o error 401
+ */
 export async function GET(request) {
   if (!verifyCronSecret(request)) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
@@ -309,7 +435,12 @@ export async function GET(request) {
   return runSync();
 }
 
-/** POST: botón manual desde la UI */
+/**
+ * Handler POST: Invocado manualmente desde el boton de sincronizacion en la UI.
+ * No requiere autenticacion adicional (la UI ya esta protegida).
+ *
+ * @returns {Promise<Response>} Resultado de la sincronizacion
+ */
 export async function POST() {
   return runSync();
 }

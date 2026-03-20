@@ -1,3 +1,17 @@
+/**
+ * @file ReunionesTable.js
+ * @description Modulo completo de gestion de reuniones del proyecto. Incluye:
+ *   - Calendario mensual interactivo con reuniones programadas y tentativas
+ *   - Tabla paginada con filtros por sprint, tipo y busqueda de texto
+ *   - Modal de edicion/creacion de reuniones con formulario completo
+ *   - Modal de confirmacion de eliminacion
+ *   - Soporte para dos tipos: "Reunion con cliente" (flujo largo con correos) y "Reunion Interna"
+ *   - Gestion de fechas propuestas (multi-fecha) y confirmacion de fecha programada
+ *   - Selector de presentes (multi-select con nombres del equipo)
+ *   - Control de acceso por rol (viewers no pueden editar/crear/eliminar)
+ *
+ *   Los datos se persisten en la tabla "reuniones" de Supabase.
+ */
 "use client";
 
 import { useState, useMemo } from "react";
@@ -5,7 +19,8 @@ import { createPortal } from "react-dom";
 import { supabase } from "@/lib/supabase";
 import { useRole } from "@/app/dashboard/RoleContext";
 
-// ─── Constants ──────────────────────────────────────────────
+// ─── Constantes ─────────────────────────────────────────────
+/** Opciones de modulo/area funcional disponibles para las reuniones */
 const MODULO_OPTIONS = [
     "Fiscalización",
     "Proyecto Desacoplamiento",
@@ -18,6 +33,7 @@ const MODULO_OPTIONS = [
 
 const PRIORIDAD_OPTIONS = ["1.Baja", "2.Media", "3.Alta"];
 
+/** Estados posibles para reuniones con cliente (flujo completo con correos) */
 const ESTADO_CLIENTE = [
     "1.Tentativa",
     "2.Enviar correo",
@@ -29,6 +45,7 @@ const ESTADO_CLIENTE = [
     "Realizada",
 ];
 
+/** Estados posibles para reuniones internas (flujo simplificado) */
 const ESTADO_INTERNA = [
     "1.Tentativa",
     "2.Reunión programada",
@@ -39,6 +56,7 @@ const ESTADO_INTERNA = [
 
 const PAGE_SIZE = 10;
 
+/** Devuelve clases CSS de fondo y texto segun el estado de la reunion */
 function getEstadoColor(estado) {
     if (!estado) return { bg: "bg-gray-50", text: "text-gray-600" };
     const s = estado.toLowerCase();
@@ -52,6 +70,7 @@ function getEstadoColor(estado) {
     return { bg: "bg-gray-50", text: "text-gray-600" };
 }
 
+/** Devuelve clases CSS de fondo y texto segun la prioridad de la reunion */
 function getPrioridadColor(p) {
     if (!p) return { bg: "bg-gray-50", text: "text-gray-500" };
     if (p.includes("Alta")) return { bg: "bg-red-50", text: "text-red-600" };
@@ -62,14 +81,22 @@ function getPrioridadColor(p) {
 const DAYS_ES = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 const MONTHS_ES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
-// ─── Calendar Component ─────────────────────────────────────
+// ─── Componente de Calendario ───────────────────────────────────────────────
+
+/**
+ * Calendario mensual interactivo que muestra las reuniones programadas y opcionalmente
+ * las tentativas. Cada dia del calendario muestra las reuniones con hora y modulo/tema.
+ * Permite navegar entre meses y saltar al dia actual.
+ * @param {Object} props
+ * @param {Array}  props.reuniones - Todas las reuniones para construir el mapa de eventos
+ */
 function MeetingCalendar({ reuniones }) {
     const today = new Date();
     const [year, setYear] = useState(today.getFullYear());
     const [month, setMonth] = useState(today.getMonth());
     const [showTentativas, setShowTentativas] = useState(false);
 
-    // Filter to only scheduled meetings that have a fecha_programada
+    // Filtra solo reuniones con fecha_programada y estado "programada" o "realizada"
     const scheduled = useMemo(() => {
         return reuniones.filter((r) => {
             if (!r.fecha_programada) return false;
@@ -78,7 +105,7 @@ function MeetingCalendar({ reuniones }) {
         });
     }, [reuniones]);
 
-    // Tentative meetings (use fechas_propuestas)
+    // Reuniones tentativas (usan fechas_propuestas en vez de fecha_programada)
     const tentativas = useMemo(() => {
         return reuniones.filter((r) => {
             const e = (r.estado || "").toLowerCase();
@@ -86,7 +113,8 @@ function MeetingCalendar({ reuniones }) {
         });
     }, [reuniones]);
 
-    // Build events map: dateStr -> events[]
+    // Construye mapa de eventos por fecha: "YYYY-MM-DD" -> arreglo de eventos
+    // Combina reuniones programadas y tentativas (si estan habilitadas)
     const eventsMap = useMemo(() => {
         const map = {};
         scheduled.forEach((r) => {
@@ -108,7 +136,8 @@ function MeetingCalendar({ reuniones }) {
         return map;
     }, [scheduled, tentativas, showTentativas]);
 
-    // Build calendar grid
+    // ── Construccion de la grilla del calendario ──────────────────────────────
+    // Calcula los dias del mes y el desplazamiento del primer dia (Lun=0 ... Dom=6)
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
     const daysInMonth = lastDay.getDate();
@@ -207,7 +236,7 @@ function MeetingCalendar({ reuniones }) {
             <div className="grid grid-cols-7 gap-px bg-gray-100 rounded-lg overflow-hidden border border-gray-100">
                 {cells.map((day, i) => {
                     if (day === null) {
-                        return <div key={`empty-${i}`} className="bg-gray-50/50 min-h-[80px]" />;
+                        return <div key={`empty-${i}`} className="bg-gray-50/50 min-h-[100px]" />;
                     }
                     const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
                     const events = eventsMap[dateStr] || [];
@@ -216,13 +245,13 @@ function MeetingCalendar({ reuniones }) {
 
                     return (
                         <div key={dateStr}
-                            className={`min-h-[80px] p-1.5 ${isWeekend ? "bg-gray-50" : "bg-white"} transition-colors`}>
+                            className={`min-h-[100px] p-1.5 ${isWeekend ? "bg-gray-50" : "bg-white"} transition-colors`}>
                             <div className={`text-xs font-medium mb-1 w-6 h-6 flex items-center justify-center rounded-full
                                 ${isToday ? "bg-orange-500 text-white" : "text-gray-700"}`}>
                                 {day}
                             </div>
                             <div className="space-y-0.5">
-                                {events.slice(0, 3).map((ev, evIdx) => {
+                                {events.map((ev, evIdx) => {
                                     const isCliente = ev.tipo === "Reunión con cliente";
                                     const isTent = ev._tentativa;
                                     const hora = isTent ? (ev._hora || "") : (ev.fecha_programada?.split(" ")[1] || "");
@@ -239,9 +268,6 @@ function MeetingCalendar({ reuniones }) {
                                         </div>
                                     );
                                 })}
-                                {events.length > 3 && (
-                                    <div className="text-[10px] text-gray-400 px-1">+{events.length - 3} más</div>
-                                )}
                             </div>
                         </div>
                     );
@@ -251,7 +277,15 @@ function MeetingCalendar({ reuniones }) {
     );
 }
 
-// ─── Confirm Delete ─────────────────────────────────────────
+// ─── Modal de confirmacion de eliminacion ───────────────────────────────────
+
+/**
+ * Modal de confirmacion antes de eliminar una reunion. Usa createPortal
+ * para renderizar sobre toda la pagina.
+ * @param {Object}   props
+ * @param {Function} props.onConfirm - Callback al confirmar la eliminacion
+ * @param {Function} props.onCancel  - Callback al cancelar
+ */
 function ConfirmDeleteModal({ onConfirm, onCancel }) {
     return createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
@@ -273,7 +307,24 @@ function ConfirmDeleteModal({ onConfirm, onCancel }) {
     );
 }
 
-// ─── Edit / New Modal ───────────────────────────────────────
+// ─── Modal de edicion / creacion ─────────────────────────────────────────────
+
+/**
+ * Formulario modal para crear o editar una reunion. Gestiona:
+ * - Seleccion de sprint, tipo (interna/cliente), modulo (predefinido o personalizado)
+ * - Tema/objetivo de la reunion
+ * - Flujo de estados diferenciado para reuniones con cliente vs internas
+ * - Fechas propuestas (multi-fecha con hora) en estados tentativos
+ * - Confirmacion de fecha programada (radio buttons) en estados de programacion
+ * - Seleccion de presentes (multi-select con nombres del equipo)
+ * @param {Object}   props
+ * @param {Object}   props.row      - Datos de la reunion (existente o template vacio)
+ * @param {Array}    props.sprints   - Sprints disponibles para el dropdown
+ * @param {Array}    props.nombres   - Nombres del equipo para el selector de presentes
+ * @param {Function} props.onSave    - Callback para guardar (insert o update)
+ * @param {Function} props.onClose   - Callback para cerrar el modal
+ * @param {boolean}  props.isNew     - true si es una nueva reunion, false si es edicion
+ */
 function EditModal({ row, sprints, nombres, onSave, onClose, isNew }) {
     const [form, setForm] = useState({
         ...row,
@@ -300,9 +351,12 @@ function EditModal({ row, sprints, nombres, onSave, onClose, isNew }) {
         });
     }
 
+    // Selecciona la lista de estados segun el tipo de reunion
     const estadoOptions = form.tipo === "Reunión con cliente" ? ESTADO_CLIENTE : ESTADO_INTERNA;
 
-    // Determine when multi-date is allowed vs locked
+    // ── Logica de visibilidad de campos de fecha ────────────────────────────
+    // canAddDates: permite agregar/editar fechas propuestas (estados tentativos)
+    // showDatePicker: muestra radio buttons para confirmar una fecha (estados de programacion)
     const isClienteProposal =
         form.tipo === "Reunión con cliente" &&
         ["1.Tentativa", "2.Enviar correo", "3.Correo enviado", "4.Respuesta pendiente"].includes(form.estado);
@@ -316,6 +370,37 @@ function EditModal({ row, sprints, nombres, onSave, onClose, isNew }) {
     const isInternaConfirm =
         form.tipo !== "Reunión con cliente" && form.estado === "2.Reunión programada";
     const showDatePicker = isClienteConfirm || isInternaConfirm;
+
+    const HOURS = Array.from({ length: 15 }, (_, i) => i + 7); // 7..21
+    const MINUTES = [0, 15, 30, 45];
+
+    function TimeSelect({ value, onChange, className }) {
+        const [h, m] = (value || "").split(":").map(Number);
+        const hour = isNaN(h) ? "" : h;
+        const minute = isNaN(m) ? "" : m;
+        const emit = (newH, newM) => {
+            if (newH === "" || newM === "") {
+                onChange(newH !== "" && newM !== "" ? `${newH}:${String(newM).padStart(2, "0")}` : "");
+                return;
+            }
+            onChange(`${newH}:${String(newM).padStart(2, "0")}`);
+        };
+        return (
+            <div className={`flex items-center gap-1 ${className || ""}`}>
+                <select value={hour} onChange={(e) => emit(e.target.value === "" ? "" : Number(e.target.value), minute === "" ? 0 : minute)}
+                    className="px-2 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40 bg-white">
+                    <option value="">HH</option>
+                    {HOURS.map((hh) => <option key={hh} value={hh}>{hh}</option>)}
+                </select>
+                <span className="text-gray-400 font-medium">:</span>
+                <select value={minute} onChange={(e) => emit(hour === "" ? 7 : hour, e.target.value === "" ? "" : Number(e.target.value))}
+                    className="px-2 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40 bg-white">
+                    <option value="">MM</option>
+                    {MINUTES.map((mm) => <option key={mm} value={mm}>{String(mm).padStart(2, "0")}</option>)}
+                </select>
+            </div>
+        );
+    }
 
     function addProposedDate() {
         updateField("fechas_propuestas", [
@@ -458,8 +543,7 @@ function EditModal({ row, sprints, nombres, onSave, onClose, isNew }) {
                                     <div key={idx} className="flex items-center gap-2">
                                         <input type="date" value={fp.fecha || ""} onChange={(e) => updateProposedDate(idx, "fecha", e.target.value)}
                                             className="px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40" />
-                                        <input type="time" value={fp.hora || ""} onChange={(e) => updateProposedDate(idx, "hora", e.target.value)}
-                                            className="px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40" />
+                                        <TimeSelect value={fp.hora || ""} onChange={(val) => updateProposedDate(idx, "hora", val)} />
                                         <button onClick={() => removeProposedDate(idx)}
                                             className="p-1 rounded-lg text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors">
                                             <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -508,10 +592,9 @@ function EditModal({ row, sprints, nombres, onSave, onClose, isNew }) {
                                             setForm((f) => ({ ...f, _customDate: e.target.value, fecha_programada: `${e.target.value} ${f._customTime || ""}`.trim() }));
                                         }}
                                             className="px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40" />
-                                        <input type="time" value={form._customTime || ""} onChange={(e) => {
-                                            setForm((f) => ({ ...f, _customTime: e.target.value, fecha_programada: `${f._customDate || ""} ${e.target.value}`.trim() }));
-                                        }}
-                                            className="px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40" />
+                                        <TimeSelect value={form._customTime || ""} onChange={(val) => {
+                                            setForm((f) => ({ ...f, _customTime: val, fecha_programada: `${f._customDate || ""} ${val}`.trim() }));
+                                        }} />
                                     </div>
                                 )}
                             </div>
@@ -572,7 +655,16 @@ function EditModal({ row, sprints, nombres, onSave, onClose, isNew }) {
     );
 }
 
-// ─── Main Table ─────────────────────────────────────────────
+// ─── Componente principal ────────────────────────────────────────────────────
+
+/**
+ * Tabla principal de reuniones con calendario, filtros, paginacion y CRUD completo.
+ * @param {Object}   props
+ * @param {Array}    props.reuniones  - Arreglo de reuniones desde Supabase
+ * @param {Array}    props.sprints    - Lista de sprints disponibles para los dropdowns
+ * @param {Array}    props.nombres    - Nombres del equipo para el selector de presentes
+ * @param {Function} [props.onRefresh] - Callback para recargar datos despues de crear/editar/eliminar
+ */
 export default function ReunionesTable({ reuniones = [], sprints = [], nombres = [], onRefresh }) {
     const role = useRole();
     const [search, setSearch] = useState("");
@@ -582,6 +674,8 @@ export default function ReunionesTable({ reuniones = [], sprints = [], nombres =
     const [filterSprint, setFilterSprint] = useState("");
     const [filterTipo, setFilterTipo] = useState("");
 
+    // ── Filtrado ─────────────────────────────────────────────────────────────
+    // Aplica busqueda de texto (tema, modulo, sprint) y filtros de sprint y tipo
     const filtered = useMemo(() => {
         let result = reuniones;
         if (search.trim()) {
@@ -602,6 +696,7 @@ export default function ReunionesTable({ reuniones = [], sprints = [], nombres =
 
     const uniqueSprints = useMemo(() => [...new Set(reuniones.map((r) => r.sprint).filter(Boolean))].sort(), [reuniones]);
 
+    /** Guarda o crea una reunion en Supabase y recarga los datos */
     async function handleSave(data) {
         const { id, _customDate, _customTime, ...rest } = data;
         if (id) {
@@ -613,12 +708,14 @@ export default function ReunionesTable({ reuniones = [], sprints = [], nombres =
         onRefresh?.();
     }
 
+    /** Elimina una reunion de Supabase y recarga los datos */
     async function handleDelete(id) {
         await supabase.from("reuniones").delete().eq("id", id);
         setDeleteId(null);
         onRefresh?.();
     }
 
+    /** Abre el modal de creacion con un template de reunion vacio */
     function openNew() {
         setEditRow({
             sprint: "",

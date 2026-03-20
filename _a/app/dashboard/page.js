@@ -1,3 +1,23 @@
+/**
+ * @file dashboard/page.js - Página principal del dashboard (Vista General)
+ * @description Página de inicio del dashboard que muestra un resumen completo del proyecto:
+ *              - Widget del sprint actual con días restantes para el entregable
+ *              - Tarjetas KPI: total de tickets, pendientes, errores de certificación/desarrollo
+ *              - Tabla completa de todos los tickets sincronizados desde Jira
+ *              - Botón de sincronización manual con la API de Jira
+ *              - Historial de cambios de estado de los tickets
+ *
+ *              Los tickets se obtienen de Supabase con paginación (1000 por página)
+ *              y se clasifican en: historias, subtareas, épicas, errores de certificación
+ *              y errores de desarrollo según los vínculos en jira_ticket_links.
+ *
+ * @route /dashboard
+ * @requires supabase - Cliente de Supabase para consultar tickets, links e historial
+ * @requires TicketTable - Componente de tabla de tickets con filtros y búsqueda
+ * @requires Card - Componente de tarjeta UI para las KPIs
+ * @requires getCurrentSprint - Función que determina el sprint actual según la fecha
+ * @requires useRole - Hook del contexto de rol del usuario
+ */
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
@@ -8,17 +28,27 @@ import Card from "@/components/ui/Card";
 import { getCurrentSprint, formatCronogramaDate } from "@/lib/cronogramaData";
 import { useRole } from "@/app/dashboard/RoleContext";
 
+/**
+ * Componente principal del dashboard - Vista General.
+ * Gestiona la carga de datos, sincronización con Jira, cálculo de KPIs
+ * y renderizado del widget de sprint, tarjetas y tabla de tickets.
+ *
+ * @returns {JSX.Element} Dashboard completo con KPIs, sprint widget y tabla de tickets
+ */
 export default function DashboardPage() {
-  const [tickets, setTickets] = useState([]);
-  const [statusHistory, setStatusHistory] = useState({});
-  const [loading, setLoading] = useState(true);
-  const [syncing, setSyncing] = useState(false);
-  const [syncResult, setSyncResult] = useState(null);
-  const [syncVersion, setSyncVersion] = useState(0);
+  /* ─── Estados de datos ─── */
+  const [tickets, setTickets] = useState([]);           // Todos los tickets de Jira
+  const [statusHistory, setStatusHistory] = useState({}); // Historial de cambios de estado por ticket
+  const [loading, setLoading] = useState(true);          // Carga inicial de datos
+  const [syncing, setSyncing] = useState(false);         // Sincronización con Jira en curso
+  const [syncResult, setSyncResult] = useState(null);    // Resultado de la última sincronización
+  const [syncVersion, setSyncVersion] = useState(0);     // Contador para forzar refresco en TicketTable
   const router = useRouter();
   const role = useRole();
-  const [userEmail, setUserEmail] = useState("");
-  const [externalFilter, setExternalFilter] = useState("");
+  const [userEmail, setUserEmail] = useState("");        // Email del usuario autenticado
+  const [externalFilter, setExternalFilter] = useState(""); // Filtro externo por tipo de ticket (Historia, Subtarea, Epic)
+
+  /** Estadísticas KPI calculadas a partir de los tickets */
   const [stats, setStats] = useState({
     total: 0,
     historias: 0,
@@ -29,26 +59,25 @@ export default function DashboardPage() {
     desarrollo: { porHacer: 0, enCurso: 0, finalizada: 0 },
   });
 
-  // Sprint Widget State
-  const [currentSprint, setCurrentSprint] = useState(null);
-  const [daysLeft, setDaysLeft] = useState(null);
+  /* ─── Estado del widget de Sprint actual ─── */
+  const [currentSprint, setCurrentSprint] = useState(null);  // Datos del sprint en curso
+  const [daysLeft, setDaysLeft] = useState(null);             // Días restantes para el entregable
 
+  /* ─── Cálculo del sprint actual y días restantes ─── */
   useEffect(() => {
-    // Calculamos el sprint actual
+    // Determinar qué sprint está activo según la fecha de hoy
     const todayObject = new Date();
-    // Usa un desfase en el constructor si necesitas simular un día específico (ej. new Date("2026-03-12T00:00:00"))
     const cSprint = getCurrentSprint(todayObject);
     setCurrentSprint(cSprint);
 
     if (cSprint && cSprint.fechaMaxima) {
-        // Calculate days left to present deliverable
+        // Calcular días restantes hasta la fecha máxima de entrega del sprint
         const [y, m, d] = cSprint.fechaMaxima.split("-").map(Number);
-        // Date de la fecha maxima al final del dia
+        // Usar el final del día (23:59:59) de la fecha máxima para el cálculo
         const maximaDate = new Date(y, m - 1, d, 23, 59, 59, 999);
-        
-        // Difference in milliseconds
+
+        // Diferencia en milisegundos → convertir a días redondeando hacia arriba
         const diffMs = maximaDate - todayObject;
-        // Convert to days
         const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
         setDaysLeft(diffDays);
     } else {
@@ -56,13 +85,20 @@ export default function DashboardPage() {
     }
   }, []);
 
+  /**
+   * Función principal de carga de datos del dashboard.
+   * Obtiene todos los tickets de Jira (paginado), calcula estadísticas KPI,
+   * clasifica errores de certificación/desarrollo, y carga el historial de estados.
+   *
+   * Se usa useCallback para evitar recrear la función en cada render.
+   */
   const fetchData = useCallback(async () => {
-    // Session context needed for pending tickets if dev/qa
+    // Obtener sesión para identificar al usuario (necesario para "mis pendientes")
     const { data: { session } } = await supabase.auth.getSession();
     const email = session?.user?.email || "";
     setUserEmail(email);
 
-    // Supabase limita a 1000 filas por query — paginar para traer todo
+    /* ─── Paginación: Supabase limita a 1000 filas por query ─── */
     let allData = [];
     const pageSize = 1000;
     let from = 0;
@@ -82,25 +118,28 @@ export default function DashboardPage() {
 
       allData = [...allData, ...data];
       from += pageSize;
+      // Si recibimos exactamente pageSize registros, puede haber más
       hasMore = data.length === pageSize;
     }
 
     if (allData.length > 0) {
       setTickets(allData);
 
+      /* ─── Construir mapa de sprints para tickets PF3 (para clasificar errores) ─── */
       const pf3TicketMap = {};
       allData.filter(t => t.jira_key?.startsWith("PF3-")).forEach(t => {
         pf3TicketMap[t.jira_key] = t.sprint || "";
       });
 
-      // --- Errores classification via jira_ticket_links (tabla normalizada) ---
+      /* ─── Clasificación de errores mediante jira_ticket_links ─── */
+      // Filtrar bugs del tablero PF3QA en Sprint 2
       const bugsQA = allData.filter(t =>
         ["Bug", "Error", "Error Desarrollo", "Error Certificación", "Error en Certificación"].includes(t.issue_type) &&
         t.jira_key?.startsWith("PF3QA-") &&
         t.sprint === "Tablero Sprint 2"
       );
 
-      // Obtener links de los bugs desde la tabla relacional
+      // Consultar vínculos de los bugs con otros tickets
       const bugKeys = bugsQA.map(b => b.jira_key);
       const linksMap = {};
       if (bugKeys.length > 0) {
@@ -114,6 +153,7 @@ export default function DashboardPage() {
         }
       }
 
+      // Errores de CERTIFICACIÓN: historias vinculadas en sprints F3.01 o F3.02
       const certBugs = bugsQA.filter(bug => {
         const targets = linksMap[bug.jira_key] || [];
         return targets.some(tk => {
@@ -122,6 +162,7 @@ export default function DashboardPage() {
         });
       });
 
+      // Errores de DESARROLLO: historias vinculadas en sprints F3.03, F3.4 o F3.5
       const desBugs = bugsQA.filter(bug => {
         const targets = linksMap[bug.jira_key] || [];
         return targets.some(tk => {
@@ -130,6 +171,12 @@ export default function DashboardPage() {
         });
       });
 
+      /**
+       * Cuenta tickets por estado (Por hacer, En curso, Finalizada).
+       * Normaliza los nombres de estado de Jira a las tres categorías del dashboard.
+       * @param {Array} arr - Array de tickets a clasificar
+       * @returns {{ porHacer: number, enCurso: number, finalizada: number }}
+       */
       const countStatuses = (arr) => {
         const porHacer = arr.filter(t => ["por hacer", "tareas por hacer", "to do", "abierto", "open"].includes((t.status || "").toLowerCase())).length;
         const enCurso = arr.filter(t => ["en curso", "in progress", "en progreso"].includes((t.status || "").toLowerCase())).length;
@@ -137,16 +184,20 @@ export default function DashboardPage() {
         return { porHacer, enCurso, finalizada };
       };
 
+      /* ─── Cálculo de pendientes según el rol del usuario ─── */
       const isDevOrQA = role === "developer" || role === "qa";
       let misPendientesCount = 0;
       if (isDevOrQA) {
+        // Devs/QA ven solo SUS tickets asignados
         misPendientesCount = allData.filter(t => t.assignee_email === email).length;
       } else {
+        // Admins/viewers ven todos los tickets no finalizados
         misPendientesCount = allData.filter(
           (t) => !["Done", "Cerrado", "Terminada"].some((s) => (t.status || "").includes(s))
         ).length;
       }
 
+      /* ─── Actualizar estadísticas KPI ─── */
       setStats({
         total: allData.length,
         historias: allData.filter(t => t.issue_type === "Historia" || t.issue_type === "Story").length,
@@ -158,13 +209,14 @@ export default function DashboardPage() {
       });
     }
 
-    // Fetch status history for all tickets
+    /* ─── Historial de cambios de estado de tickets ─── */
     const { data: historyData } = await supabase
       .from("jira_ticket_status_history")
       .select("jira_key, old_status, new_status, changed_at")
       .order("changed_at", { ascending: true });
 
     if (historyData) {
+      // Agrupar historial por clave de ticket para acceso rápido
       const historyMap = {};
       for (const entry of historyData) {
         if (!historyMap[entry.jira_key]) {
@@ -182,7 +234,11 @@ export default function DashboardPage() {
     fetchData();
   }, [fetchData]);
 
-  // Sincronizar con Jira
+  /**
+   * Maneja la sincronización manual con la API de Jira.
+   * Llama al endpoint /api/sync-jira y tras completarse, refresca los datos del dashboard.
+   * Muestra un toast de éxito o error que se oculta automáticamente después de 5 segundos.
+   */
   async function handleSync() {
     setSyncing(true);
     setSyncResult(null);
@@ -213,6 +269,14 @@ export default function DashboardPage() {
     setTimeout(() => setSyncResult(null), 5000);
   }
 
+  /**
+   * Componente interno que muestra tres contadores de estado en columna:
+   * Por hacer | En curso | Finalizada
+   * Se usa dentro de las tarjetas KPI de errores de certificación y desarrollo.
+   *
+   * @param {Object} props
+   * @param {{ porHacer: number, enCurso: number, finalizada: number }} props.data
+   */
   const StatusCounters = ({ data }) => (
     <div className="flex items-center gap-2 lg:gap-3 mt-1.5 w-full">
       <div className="flex flex-col items-center flex-1">
@@ -232,6 +296,16 @@ export default function DashboardPage() {
     </div>
   );
 
+  /**
+   * Componente interno que muestra contadores clicables por tipo de ticket:
+   * Historias | Subtareas | Épicas
+   * Al hacer click, establece un filtro externo que se pasa a la TicketTable.
+   *
+   * @param {Object} props
+   * @param {number} props.historias - Cantidad de historias de usuario
+   * @param {number} props.subtareas - Cantidad de subtareas
+   * @param {number} props.epicas - Cantidad de épicas
+   */
   const TypeCounters = ({ historias, subtareas, epicas }) => (
     <div className="flex items-center gap-1.5 mt-2.5 w-full justify-between -mx-1">
       <div 
@@ -260,6 +334,7 @@ export default function DashboardPage() {
     </div>
   );
 
+  /** Configuración de las 4 tarjetas KPI que se muestran en el dashboard */
   const kpiCards = [
     {
       label: "Total Tickets",

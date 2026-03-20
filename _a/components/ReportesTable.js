@@ -1,3 +1,20 @@
+/**
+ * @file ReportesTable.js
+ * @description Pagina de reportes con tablas pivot que agrupan historias Jira por integrante del equipo.
+ *   Muestra dos tablas: una por cantidad de historias y otra por Story Points.
+ *   Cada tabla desglosa las historias por estado (Tareas por hacer, En curso, Listo para dev,
+ *   Control de calidad, Finalizada) e incluye conteo de subtareas de soporte e incidencias.
+ *
+ *   Componentes internos:
+ *   - TraceModal: Diagrama Gantt de trazabilidad con historial de transiciones de estado por historia
+ *   - SubtasksModal: Lista de subtareas de soporte e incidencias asignadas a un integrante
+ *
+ *   Funcionalidades:
+ *   - Selector de sprint con sincronizacion a URL params
+ *   - Exportacion a Excel con template (inyeccion de datos en hoja "Osi" con pivot cache)
+ *   - Resolucion de nombres mediante cadena de tablas (equipo_desarrollo, jira_persons, Nombres)
+ *   - Pivot de datos: agrupar tickets por nombre real y contar por estado
+ */
 "use client";
 
 import { useState, useMemo, useCallback, useEffect } from "react";
@@ -8,7 +25,10 @@ import { Download } from "lucide-react";
 import { getCurrentSprint } from "@/lib/cronogramaData";
 import { sortSprints } from "@/lib/utils";
 
-// Mapeo de estados internos de Jira → nombres de columna para el reporte
+/**
+ * Mapeo de estados internos de Jira a columnas del reporte.
+ * Cada entrada tiene una clave interna, un label legible y los estados Jira que agrupa.
+ */
 const STATUS_COLUMNS = [
     { key: "tareas_por_hacer", label: "1. Tareas por hacer", jiraStatuses: ["Tareas por hacer", "POR HACER"] },
     { key: "en_curso", label: "2. En curso", jiraStatuses: ["En curso"] },
@@ -53,12 +73,22 @@ function formatDateShort(dateStr) {
     return d.toLocaleDateString("es-PE", { day: "2-digit", month: "2-digit" });
 }
 
-// ─── Traceability Gantt Modal ────────────────────────────────
+// ─── Modal de trazabilidad (Gantt) ──────────────────────────────────────────
+
+/**
+ * Modal que muestra un diagrama Gantt con las transiciones de estado de cada historia.
+ * Consulta el historial de estados de Supabase y genera segmentos visuales por periodo.
+ * @param {Object}   props
+ * @param {string}   props.assigneeName - Nombre del integrante
+ * @param {Array}    props.stories      - Historias asignadas al integrante
+ * @param {Function} props.onClose      - Callback para cerrar el modal
+ */
 function TraceModal({ assigneeName, stories, onClose }) {
     const [historyData, setHistoryData] = useState(null);
     const [loading, setLoading] = useState(true);
 
-    // Fetch status history
+    // Carga el historial de estados de todas las historias en lotes de 50
+    // para evitar exceder los limites de query de Supabase
     const fetchHistory = useCallback(async () => {
         const keys = stories.map((s) => s.jira_key);
         if (keys.length === 0) { setHistoryData({}); setLoading(false); return; }
@@ -87,7 +117,8 @@ function TraceModal({ assigneeName, stories, onClose }) {
 
     useEffect(() => { fetchHistory(); }, [fetchHistory]);
 
-    // Build Gantt data: for each story, create segments [{ status, start, end }]
+    // Construye los datos del Gantt: para cada historia, crea segmentos [{ status, start, end }]
+    // donde cada segmento representa un periodo en un estado determinado
     const ganttData = useMemo(() => {
         if (!historyData) return [];
 
@@ -337,6 +368,14 @@ function TraceModal({ assigneeName, stories, onClose }) {
     );
 }
 
+/**
+ * Modal que muestra la lista de subtareas de soporte e incidencias asignadas a un integrante.
+ * Las claves tienen color verde si estan completadas, rojo si no.
+ * @param {Object}   props
+ * @param {string}   props.assigneeName - Nombre del integrante
+ * @param {Array}    props.subtasks     - Subtareas asignadas
+ * @param {Function} props.onClose      - Callback para cerrar el modal
+ */
 function SubtasksModal({ assigneeName, subtasks, onClose }) {
     return (
         <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -399,7 +438,14 @@ function SubtasksModal({ assigneeName, subtasks, onClose }) {
     );
 }
 
-// ─── Main Table ─────────────────────────────────────────────
+// ─── Componente principal ────────────────────────────────────────────────────
+
+/**
+ * Tabla principal de reportes con tablas pivot por integrante (historias y story points).
+ * @param {Object} props
+ * @param {Array}  props.tickets  - Todos los tickets Jira del proyecto
+ * @param {Array}  props.nombres  - Datos de la tabla "Nombres" para mapeo Programador -> Nombre
+ */
 export default function ReportesTable({ tickets = [], nombres = [] }) {
     const [selectedSprint, setSelectedSprint] = useState(() => getCurrentSprint(new Date())?.iteracion || "");
     const [persons, setPersons] = useState([]);
@@ -482,6 +528,8 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
     }, [historias]);
 
     // Detectar si el sprint seleccionado pertenece al tablero PF3QA
+    // (los sprints del tablero QA tienen formato "Tablero Sprint N")
+    // para ocultar la columna de soporte e incidencias
     const isPF3QA = /Tablero\s+Sprint/i.test(selectedSprint);
 
     // Filtrar por sprint
@@ -490,7 +538,9 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
         return historias.filter((t) => t.sprint === selectedSprint);
     }, [historias, selectedSprint]);
 
-    // Filtrar subtareas que corresponden al sprint Y que pertenecen a historias de PF3-1799
+    // ── Subtareas de soporte e incidencias ────────────────────────────────────
+    // Filtra subtareas que pertenecen a historias de la epica PF3-1799 (estabilizacion)
+    // y que coinciden con el sprint seleccionado
     const filteredSubtasks = useMemo(() => {
         const subtareas = tickets.filter(t => t.issue_type === "Subtarea");
 
@@ -577,7 +627,9 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
         return map;
     }, [nombres]);
 
-    // Pivotear: agrupar por nombre real, contar por estado
+    // ── Pivot: agrupar historias por integrante y contar por estado ────────────
+    // Crea una fila por cada integrante con el conteo de historias en cada estado
+    // y el total de subtareas de soporte. El puntaje total = historias + subtareas.
     const pivotData = useMemo(() => {
         const map = {};
 
@@ -627,7 +679,7 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
         return t;
     }, [pivotData]);
 
-    // ─── Story Points pivot ─────────────────────────────
+    // ── Pivot de Story Points: igual que pivotData pero sumando SP en vez de contar ──
     const pivotDataSP = useMemo(() => {
         const map = {};
 
@@ -696,6 +748,12 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
         setSubtasksModal({ assigneeName, subtasks: assigneeSubtasks });
     }
 
+    /**
+     * Exporta a Excel inyectando los datos en un template XLSX con tabla pivot.
+     * Proceso: genera una hoja "Osi" con todos los tickets, la inserta en el template
+     * via JSZip (manipulacion directa del XML del xlsx), y marca refreshOnLoad=1
+     * para que Excel recalcule la tabla pivot al abrir el archivo.
+     */
     const exportToExcel = async () => {
         try {
             const now = new Date();

@@ -1,16 +1,42 @@
+/**
+ * @file errores-certificacion/page.js - Página de errores en fase de certificación
+ * @description Muestra los bugs/errores del tablero PF3QA (Sprint 2) cuyas historias
+ *              vinculadas pertenecen a las iteraciones de certificación (F3.01 y F3.02).
+ *
+ *              Flujo de datos:
+ *              1. Consulta bugs tipo Error/Bug del proyecto PF3QA en Sprint 2
+ *              2. Obtiene los vínculos (links) entre bugs y tickets PF3 desde jira_ticket_links
+ *              3. Consulta los sprints de los tickets vinculados (historias de PF3)
+ *              4. Filtra solo los bugs cuyas historias vinculadas contienen "F3.01" o "F3.02"
+ *              5. Adjunta el sprint de la historia vinculada para mostrarlo en la tabla
+ *
+ * @route /dashboard/errores-certificacion
+ * @requires supabase - Cliente de Supabase para consultar tickets y vínculos
+ * @requires TicketTable - Componente de tabla reutilizable para mostrar tickets
+ */
 "use client";
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import TicketTable from "@/components/TicketTable";
 
+/**
+ * Componente de página que muestra errores clasificados como "de certificación".
+ * Un error pertenece a certificación si sus tickets vinculados están en sprints F3.01 o F3.02.
+ *
+ * @returns {JSX.Element} Tabla de errores en certificación con banner de conteo
+ */
 export default function ErroresCertificacionPage() {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    /**
+     * Obtiene y clasifica los errores de certificación mediante un flujo
+     * de múltiples consultas encadenadas a Supabase.
+     */
     async function fetchTickets() {
-      // 1. Fetch PF3QA bugs from active Sprint 2
+      // Paso 1: Obtener todos los bugs del tablero PF3QA en Sprint 2 activo
       const { data: bugsQA, error } = await supabase
         .from("jira_tickets")
         .select("jira_key, summary, status, issue_type, sprint, story_points, assignee_email, reporter_email, parent_key, created_at, updated_at, comentario, priority")
@@ -22,20 +48,20 @@ export default function ErroresCertificacionPage() {
       if (!error && bugsQA && bugsQA.length > 0) {
         const bugKeys = bugsQA.map(b => b.jira_key);
 
-        // 2. Obtener links desde jira_ticket_links (tabla normalizada)
+        // Paso 2: Obtener vínculos (relaciones) entre bugs y otros tickets desde la tabla normalizada
         const { data: linkRows } = await supabase
           .from("jira_ticket_links")
           .select("source_key, target_key")
           .in("source_key", bugKeys);
 
-        // Mapa: bugKey → [targetKeys]
+        // Construir mapa: clave del bug → [claves de tickets vinculados]
         const linksMap = {};
         for (const row of linkRows || []) {
           if (!linksMap[row.source_key]) linksMap[row.source_key] = [];
           linksMap[row.source_key].push(row.target_key);
         }
 
-        // 3. Obtener sprints de los tickets vinculados
+        // Paso 3: Consultar los sprints de los tickets vinculados (historias PF3)
         const allTargetKeys = Array.from(new Set(Object.values(linksMap).flat()));
         const linkedStoriesMap = {};
         if (allTargetKeys.length > 0) {
@@ -48,7 +74,8 @@ export default function ErroresCertificacionPage() {
           });
         }
 
-        // 4. Filtrar bugs que apuntan a Certificación (F3.01 y F3.02)
+        // Paso 4: Filtrar solo bugs cuyas historias vinculadas pertenecen a certificación
+        // Certificación = sprints que contienen "F3.01" (Sprint 1) o "F3.02" (Sprint 2)
         const certBugs = bugsQA.filter(bug => {
           const targets = linksMap[bug.jira_key] || [];
           return targets.some(tk => {
@@ -57,7 +84,8 @@ export default function ErroresCertificacionPage() {
           });
         });
 
-        // 5. Adjuntar storySprint para la tabla
+        // Paso 5: Adjuntar el sprint de la historia vinculada (storySprint) a cada bug
+        // para mostrarlo como columna adicional en la tabla
         const updatedTickets = certBugs.map(b => {
           const targets = linksMap[b.jira_key] || [];
           const sprints = [...new Set(targets.map(tk => linkedStoriesMap[tk]).filter(Boolean))];

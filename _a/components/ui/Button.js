@@ -1,3 +1,19 @@
+/**
+ * @file Button.js
+ * @description Componente de boton reutilizable con variantes de estilo (primary, secondary,
+ *   danger, ghost) y tamanios (sm, md, lg). Incluye estilos para estados disabled y transiciones.
+ */
+
+/**
+ * Boton reutilizable con variantes visuales y tamanios configurables.
+ * @param {Object}  props
+ * @param {React.ReactNode} props.children         - Contenido del boton
+ * @param {string}  [props.variant="primary"]      - Estilo visual: "primary" | "secondary" | "danger" | "ghost"
+ * @param {string}  [props.size="md"]              - Tamanio: "sm" | "md" | "lg"
+ * @param {boolean} [props.disabled=false]         - Si el boton esta deshabilitado
+ * @param {string}  [props.className=""]           - Clases CSS adicionales
+ * @param {Object}  props....props                 - Props adicionales pasados al elemento <button>
+ */
 export default function Button({
   children,
   variant = "primary",

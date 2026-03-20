@@ -1,5 +1,23 @@
+/**
+ * @file cronograma/page.js - Página de cronograma de sprints
+ * @description Muestra una tabla estática con el calendario oficial de iteraciones,
+ *              desarrollo y entregables del proyecto PF3. Los datos provienen de un
+ *              archivo de configuración local (cronogramaData) y no requieren consultas
+ *              a la base de datos. Cada fila muestra: número, etapa, iteración,
+ *              duración, fechas de inicio/fin del sprint, plazo y fecha máxima de entregable.
+ *
+ * @route /dashboard/cronograma
+ * @requires cronogramaData - Datos estáticos del cronograma de sprints
+ * @requires formatCronogramaDate - Función para formatear fechas del cronograma (YYYY-MM-DD → DD/MM/YYYY)
+ */
 import { cronogramaData, formatCronogramaDate } from "@/lib/cronogramaData";
 
+/**
+ * Componente de página que renderiza la tabla del cronograma de sprints.
+ * Es un Server Component (no usa "use client") ya que solo renderiza datos estáticos.
+ *
+ * @returns {JSX.Element} Tabla HTML con el cronograma completo de iteraciones
+ */
 export default function CronogramaPage() {
     return (
         <div className="space-y-6">
@@ -40,6 +58,7 @@ export default function CronogramaPage() {
                                     <td className="px-4 py-2.5 text-center border-r border-gray-200 text-gray-800">{formatCronogramaDate(row.fechaFin)}</td>
                                     <td className="px-4 py-2.5 text-center border-r border-gray-200 text-gray-800">{row.plazoPresentacion || ""}</td>
                                     <td className="px-4 py-2.5 text-center text-gray-800 font-medium">
+                                        {/* Convertir fecha máxima de formato YYYY-MM-DD a DD/MM/YYYY para visualización */}
                                         {row.fechaMaxima ? (
                                             (() => {
                                                 const [y, m, d] = row.fechaMaxima.split("-");

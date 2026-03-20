@@ -1,3 +1,17 @@
+/**
+ * @file reportes/page.js - Página de reportes y tablas dinámicas
+ * @description Muestra tablas dinámicas y resúmenes de las historias de usuario agrupadas
+ *              por integrante del equipo y estado. Incluye funcionalidad de sincronización
+ *              con Jira y muestra la fecha de última actualización.
+ *
+ *              Datos que consume:
+ *              - jira_tickets: Todos los tickets paginados (1000 por consulta)
+ *              - Nombres: Tabla de mapeo nombre clave → nombre completo del programador
+ *
+ * @route /dashboard/reportes
+ * @requires supabase - Cliente de Supabase para consultar tickets y nombres
+ * @requires ReportesTable - Componente que renderiza las tablas dinámicas de reportes
+ */
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
@@ -5,6 +19,18 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import ReportesTable from "@/components/ReportesTable";
 
+/**
+ * Componente de página de reportes con tablas dinámicas de tickets por integrante.
+ *
+ * @returns {JSX.Element} Página con header, botón de sincronización y tabla de reportes
+ *
+ * Estados locales:
+ * - tickets: Array con todos los tickets de Jira (paginados)
+ * - nombres: Array con mapeo Nombre ↔ Programador para resolución de nombres
+ * - loading: Estado de carga inicial
+ * - syncing: Indica si la sincronización con Jira está en curso
+ * - syncResult: Resultado de la última sincronización (éxito/error)
+ */
 export default function ReportesPage() {
     const [tickets, setTickets] = useState([]);
     const [nombres, setNombres] = useState([]);
@@ -13,7 +39,12 @@ export default function ReportesPage() {
     const [syncResult, setSyncResult] = useState(null);
     const router = useRouter();
 
+    /**
+     * Obtiene todos los tickets de Jira (con paginación) y la tabla de nombres.
+     * Supabase tiene un límite de 1000 filas por consulta, por lo que se pagina.
+     */
     const fetchData = useCallback(async () => {
+        /* ─── Paginación de tickets ─── */
         let allData = [];
         const pageSize = 1000;
         let from = 0;
@@ -34,7 +65,7 @@ export default function ReportesPage() {
 
         setTickets(allData);
 
-        // Fetch Nombres
+        /* ─── Tabla de nombres: mapeo nombre clave → nombre completo ─── */
         const { data: nombresData } = await supabase
             .from("Nombres")
             .select("Nombre, Programador");
@@ -47,7 +78,10 @@ export default function ReportesPage() {
         fetchData();
     }, [fetchData]);
 
-    // Sincronizar con Jira
+    /**
+     * Sincroniza tickets con la API de Jira.
+     * Muestra un toast temporal con el resultado (éxito o error).
+     */
     async function handleSync() {
         setSyncing(true);
         setSyncResult(null);
@@ -75,6 +109,11 @@ export default function ReportesPage() {
         setTimeout(() => setSyncResult(null), 5000);
     }
 
+    /**
+     * Calcula la fecha de última sincronización a partir del campo synced_at
+     * de todos los tickets. Busca la fecha más reciente.
+     * @returns {Date|null} Fecha de la última sincronización o null si no hay datos
+     */
     const lastUpdated = useMemo(() => {
         if (tickets.length === 0) return null;
         let max = null;

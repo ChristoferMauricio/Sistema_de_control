@@ -1,3 +1,15 @@
+/**
+ * @file IncidenciasTable.js
+ * @description Tabla de incidencias del proyecto Jira con filtrado por iteracion, busqueda
+ *   de texto, y modal de perfil GSM del reportante. Las incidencias son issues tipo "Incidencia"
+ *   extraidos de Jira con campos como clave, resumen, iteracion, asignado, estado y fecha.
+ *
+ *   Funcionalidades:
+ *   - Busqueda global por clave, resumen o asignado
+ *   - Filtro por iteracion (se auto-selecciona la iteracion actual del cronograma)
+ *   - Extraccion del nombre del reportante desde el campo "description" mediante regex
+ *   - Modal de perfil GSM al hacer clic en el nombre del reportante
+ */
 "use client";
 
 import { useState, useMemo } from "react";
@@ -6,13 +18,21 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { getCurrentSprint } from "@/lib/cronogramaData";
 
+/**
+ * Tabla de incidencias con busqueda, filtro por iteracion y modal de perfil GSM.
+ * @param {Object}  props
+ * @param {Array}   props.incidencias - Arreglo de incidencias con campos: id, clave, resumen, iteracion, asignado, estado, creado, description
+ * @param {string}  props.role        - Rol del usuario actual (admin, developer, qa, viewer)
+ * @param {Array}   [props.gsmData=[]] - Datos de GSM (Gestion de Servicios) para buscar perfiles de reportantes
+ */
 export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
   const [searchTerm, setSearchTerm] = useState("");
   
+  // Inicializa el filtro de iteracion con la iteracion actual del cronograma,
+  // convirtiendo el formato "Iteracion F3.06" -> "Iteracion 6"
   const [filterIteracion, setFilterIteracion] = useState(() => {
     const currentIter = getCurrentSprint(new Date())?.iteracion;
     if (currentIter) {
-      // Maps "Iteración F3.06" to "Iteración 6"
       const match = currentIter.match(/F3\.0?(\d+)/);
       if (match) return `Iteración ${match[1]}`;
     }
@@ -20,7 +40,7 @@ export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
   });
   const [selectedProfile, setSelectedProfile] = useState(null);
 
-  // Derive unique iterations from the data
+  // Extrae iteraciones unicas de los datos, ordenadas descendentemente (mas reciente primero)
   const iteraciones = useMemo(() => {
     const iters = [...new Set(incidencias.map((inc) => inc.iteracion))].sort((a, b) => {
       const numA = parseInt(a.match(/(\d+)/)?.[1]) || 0;
@@ -30,7 +50,8 @@ export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
     return ["Todas", ...iters];
   }, [incidencias]);
 
-  // Filter data
+  // ─── Filtrado ───────────────────────────────────────────────────────────────
+  // Aplica filtro de texto (clave, resumen, asignado) y filtro de iteracion
   const filteredIncidencias = useMemo(() => {
     return incidencias.filter((inc) => {
       // 1. Text Search
@@ -72,6 +93,13 @@ export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
     return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700">{status}</span>;
   };
 
+  /**
+   * Extrae el nombre del reportante desde el campo "description" del ticket Jira.
+   * Busca patrones como "Usuario reportante: Nombre" o "Usuario solicitante: Nombre"
+   * usando expresiones regulares que toleran formato Markdown (asteriscos, etc.).
+   * @param {string} description - Campo description del ticket Jira
+   * @returns {string|null} Nombre del reportante o null si no se encuentra
+   */
   const parseReporter = (description) => {
     if (!description) return null;
     
@@ -96,7 +124,11 @@ export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
     return null;
   };
 
-  // Manejar el clic sobre el solicitante
+  /**
+   * Busca el perfil GSM del reportante por nombre (coincidencia exacta o parcial).
+   * Si no lo encuentra, muestra un estado de error en el modal.
+   * @param {string} name - Nombre del reportante extraido de la descripcion
+   */
   const handleProfileClick = (name) => {
     if (!name) return;
     const lowerName = name.toLowerCase();

@@ -1,17 +1,46 @@
+/**
+ * @file reuniones/page.js - Página de gestión de reuniones
+ * @description Permite programar y hacer seguimiento de reuniones internas y con clientes.
+ *              Carga datos de tres fuentes:
+ *              - Tabla "reuniones": registros de reuniones existentes
+ *              - Tabla "Nombres": lista de integrantes del equipo
+ *              - Tabla "jira_tickets": sprints únicos (para asociar reuniones a sprints)
+ *
+ *              Los sprints se obtienen con paginación para superar el límite de 1000 filas.
+ *
+ * @route /dashboard/reuniones
+ * @requires supabase - Cliente de Supabase para consultar reuniones, nombres y sprints
+ * @requires ReunionesTable - Componente de tabla con CRUD de reuniones
+ */
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import ReunionesTable from "@/components/ReunionesTable";
 
+/**
+ * Componente de página de reuniones con carga de datos y tabla interactiva.
+ *
+ * @returns {JSX.Element} Página con header y tabla de reuniones
+ *
+ * Estados locales:
+ * - reuniones: Array de registros de reuniones desde Supabase
+ * - nombres: Array de integrantes del equipo (Nombre + Programador)
+ * - tickets: Array de objetos con campo sprint (para extraer sprints únicos)
+ * - loading: Estado de carga inicial
+ */
 export default function ReunionesPage() {
     const [reuniones, setReuniones] = useState([]);
     const [nombres, setNombres] = useState([]);
     const [tickets, setTickets] = useState([]);
     const [loading, setLoading] = useState(true);
 
+    /**
+     * Carga todos los datos necesarios para la página de reuniones.
+     * Se ejecuta al montar el componente.
+     */
     const fetchData = useCallback(async () => {
-        // Fetch reuniones
+        // Obtener registros de reuniones ordenados por ID descendente (más recientes primero)
         const { data: reunionesData } = await supabase
             .from("reuniones")
             .select("*")
@@ -19,7 +48,7 @@ export default function ReunionesPage() {
 
         if (reunionesData) setReuniones(reunionesData);
 
-        // Fetch nombres
+        // Obtener lista de integrantes del equipo ordenados alfabéticamente
         const { data: nombresData } = await supabase
             .from("Nombres")
             .select("*")
@@ -27,7 +56,7 @@ export default function ReunionesPage() {
 
         if (nombresData) setNombres(nombresData);
 
-        // Fetch all sprints (paginated to bypass 1000-row limit)
+        /* ─── Obtener sprints únicos (paginado para superar límite de 1000 filas) ─── */
         let allSprints = [];
         let from = 0;
         const pageSize = 1000;
@@ -52,7 +81,11 @@ export default function ReunionesPage() {
         fetchData();
     }, [fetchData]);
 
-    // Extract unique sprints from Jira tickets (raw names)
+    /**
+     * Extrae los nombres únicos de sprints de todos los tickets de Jira.
+     * Se memoriza para evitar recalcular en cada render.
+     * @returns {string[]} Array ordenado de nombres de sprints únicos
+     */
     const sprints = useMemo(() => {
         return [...new Set(tickets.map((t) => t.sprint).filter(Boolean))].sort();
     }, [tickets]);

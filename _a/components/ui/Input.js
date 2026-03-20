@@ -1,3 +1,18 @@
+/**
+ * @file Input.js
+ * @description Componente de campo de texto reutilizable con soporte para label, validacion
+ *   visual de errores y estilos consistentes del sistema de disenio.
+ */
+
+/**
+ * Campo de entrada de texto con label opcional y mensaje de error.
+ * @param {Object}  props
+ * @param {string}  [props.label]         - Texto del label asociado al input
+ * @param {string}  [props.id]            - ID del input (se vincula con el label via htmlFor)
+ * @param {string}  [props.error]         - Mensaje de error (resalta el borde en rojo y muestra el texto)
+ * @param {string}  [props.className=""]  - Clases CSS adicionales para el input
+ * @param {Object}  props....props        - Props adicionales pasados al elemento <input> (type, placeholder, value, onChange, etc.)
+ */
 export default function Input({
   label,
   id,

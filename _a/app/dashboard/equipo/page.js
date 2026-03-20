@@ -1,14 +1,40 @@
+/**
+ * @file equipo/page.js - Página del equipo de desarrollo
+ * @description Muestra una tabla con la información de contacto y roles de todos los
+ *              miembros del equipo de desarrollo del proyecto. Los datos se obtienen
+ *              de la tabla "equipo_desarrollo" en Supabase. Cada miembro tiene:
+ *              rol, nombre completo, nombre clave, correo PGIM y correo GCORP.
+ *              Los roles se muestran con badges de colores diferenciados
+ *              (Líder, Supervisor, Analista, Programador).
+ *
+ * @route /dashboard/equipo
+ * @requires supabase - Cliente de Supabase para consultar la tabla equipo_desarrollo
+ */
 "use client";
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
+/**
+ * Componente de página que muestra el directorio del equipo de desarrollo.
+ *
+ * @returns {JSX.Element} Tabla con información del equipo o estado de carga/error
+ *
+ * Estados locales:
+ * - equipo: Array de objetos con datos de cada miembro del equipo
+ * - loading: Indica si la consulta a Supabase está en curso
+ * - error: Mensaje de error si falla la consulta
+ */
 export default function EquipoDesarrolloPage() {
   const [equipo, setEquipo] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    /**
+     * Consulta la tabla "equipo_desarrollo" en Supabase y carga los datos.
+     * Ordena los resultados por ID ascendente.
+     */
     async function fetchEquipo() {
       try {
         const { data, error } = await supabase

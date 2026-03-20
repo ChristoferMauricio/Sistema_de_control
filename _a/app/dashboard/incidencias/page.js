@@ -1,3 +1,26 @@
+/**
+ * @file incidencias/page.js - Página de incidencias reportadas
+ * @description Muestra el listado de subtareas (incidencias) reportadas durante las
+ *              iteraciones de estabilización del sistema. Las incidencias son subtareas
+ *              de historias padre que representan iteraciones bajo la Épica PF3-1799.
+ *
+ *              Flujo de datos:
+ *              1. Busca historias padre con "Iteración" en su resumen
+ *              2. Obtiene las subtareas pertenecientes a esas historias
+ *              3. Carga datos del GSM para matching de descripciones
+ *              4. Resuelve nombres de asignados usando múltiples tablas de mapeo
+ *              5. Transforma y formatea los datos para el componente IncidenciasTable
+ *
+ *              Tablas de resolución de nombres (en orden de prioridad):
+ *              - equipo_desarrollo (por correo PGIM/GCORP)
+ *              - jira_persons (por email → display_name)
+ *              - Nombres (por nombre clave del programador)
+ *
+ * @route /dashboard/incidencias
+ * @requires supabase - Cliente de Supabase para consultas
+ * @requires IncidenciasTable - Componente de tabla especializado en incidencias
+ * @requires useRole - Hook para obtener el rol del usuario
+ */
 "use client";
 
 import { useEffect, useState } from "react";
@@ -5,16 +28,25 @@ import { supabase } from "@/lib/supabase";
 import IncidenciasTable from "@/components/IncidenciasTable";
 import { useRole } from "../RoleContext";
 
+/**
+ * Componente de página de incidencias con resolución de nombres y agrupación por iteración.
+ *
+ * @returns {JSX.Element} Tabla de incidencias con filtros por iteración y estado
+ */
 export default function IncidenciasPage() {
   const { role, loading: roleLoading } = useRole();
-  const [incidencias, setIncidencias] = useState([]);
-  const [gsmData, setGsmData] = useState([]);
+  const [incidencias, setIncidencias] = useState([]); // Datos formateados para la tabla
+  const [gsmData, setGsmData] = useState([]);          // Datos del personal GSM
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    /**
+     * Carga y transforma los datos de incidencias desde múltiples tablas de Supabase.
+     * Resuelve nombres de usuarios y clasifica incidencias por iteración.
+     */
     async function fetchData() {
-      // 1. Fetch parent stories that represent Iterations under Epic PF3-1799
-      // These stories have "Iteración" in their summary.
+      /* ─── Paso 1: Obtener historias padre que representan iteraciones ─── */
+      // Busca tickets cuyo resumen contiene "(Iteración N)" bajo la Épica PF3-1799
       const { data: parentStories, error: parentsError } = await supabase
         .from("jira_tickets")
         .select("jira_key, summary")
@@ -27,16 +59,16 @@ export default function IncidenciasPage() {
       }
 
       const parentKeys = parentStories.map((s) => s.jira_key);
-      
-      // Parse iteration name from summary for mapping later
+
+      // Extraer el número de iteración del resumen para mapeo posterior
+      // Ejemplo: "APRE. Acompañamiento... (iteración 6)" → "Iteración 6"
       const iterationMap = {};
       parentStories.forEach((s) => {
-        // e.g. "APRE. Acompañamiento y atención de incidencias en uso del sistema (iteración 6)"
         const match = s.summary.match(/\(Iteraci[oó]n (\d+)\)/i);
         iterationMap[s.jira_key] = match ? `Iteración ${Number(match[1])}` : "Iteración Desconocida";
       });
 
-      // 2. Fetch subtasks belonging to these stories
+      /* ─── Paso 2: Obtener subtareas de las historias padre ─── */
       const { data: subtasks, error: subtasksError } = await supabase
         .from("jira_tickets")
         .select("jira_key, summary, status, assignee_email, created_at, parent_key, description")
@@ -44,7 +76,7 @@ export default function IncidenciasPage() {
         .in("parent_key", parentKeys)
         .order("created_at", { ascending: false });
 
-      // Fetch GSM for description matching
+      // Cargar datos del GSM para matching de descripciones en la tabla
       const { data: gsm, error: gsmError } = await supabase
         .from("gsm")
         .select("id, nombre, modalidad, cargo, correo");
@@ -59,31 +91,39 @@ export default function IncidenciasPage() {
         return;
       }
 
-      // 3. Fetch name resolution tables
+      /* ─── Paso 3: Cargar tablas de resolución de nombres ─── */
+      // Se consultan 3 tablas en paralelo para resolver email → nombre completo
       const [nombresRes, equipoRes, personsRes] = await Promise.all([
         supabase.from("Nombres").select("Nombre, Programador"),
         supabase.from("equipo_desarrollo").select("correo_pgim, correo_gcorp, nombre_clave, nombre"),
         supabase.from("jira_persons").select("email, display_name"),
       ]);
 
+      // Construir mapas de resolución de nombres
       const nombreMap = {};
       (nombresRes.data || []).forEach((n) => {
         if (n.Programador) nombreMap[n.Programador.toLowerCase()] = n.Nombre;
       });
 
-      const equipoEmailMap = {};
-      const equipoKeyMap = {};
+      const equipoEmailMap = {};  // correo → nombre completo
+      const equipoKeyMap = {};    // nombre_clave → nombre completo
       (equipoRes.data || []).forEach((e) => {
         if (e.correo_pgim) equipoEmailMap[e.correo_pgim.toLowerCase()] = e.nombre;
         if (e.correo_gcorp) equipoEmailMap[e.correo_gcorp.toLowerCase()] = e.nombre;
         if (e.nombre_clave) equipoKeyMap[e.nombre_clave.toLowerCase()] = e.nombre;
       });
 
-      const personsMap = {};
+      const personsMap = {};  // email → display_name de Jira
       (personsRes.data || []).forEach((p) => {
         if (p.email && p.display_name) personsMap[p.email.toLowerCase()] = p.display_name;
       });
 
+      /**
+       * Resuelve un email de Jira a nombre completo del integrante.
+       * Prioridad: equipo_desarrollo (email) → jira_persons → Nombres → email original
+       * @param {string} email - Email del asignado en Jira
+       * @returns {string} Nombre resuelto o "Sin Asignar"
+       */
       function resolveName(email) {
         if (!email || email.trim() === "") return "Sin Asignar";
         const key = email.toLowerCase();
@@ -92,7 +132,7 @@ export default function IncidenciasPage() {
         return equipoKeyMap[displayName.toLowerCase()] || nombreMap[displayName.toLowerCase()] || displayName;
       }
 
-      // 4. Transform data for the table
+      /* ─── Paso 4: Transformar datos para la tabla de incidencias ─── */
       const formattedData = (subtasks || []).map((t) => {
         const resolvedName = resolveName(t.assignee_email);
 
@@ -102,13 +142,14 @@ export default function IncidenciasPage() {
           resumen: t.summary,
           estado: t.status,
           creado: t.created_at,
-          description: t.description, // Added description propagation
+          description: t.description,
           iteracion: iterationMap[t.parent_key] || "Iteración Desconocida",
           asignado: resolvedName,
-          asignado_original: t.assignee_email // Kept for debugging
+          asignado_original: t.assignee_email // Se mantiene para depuración
         };
       });
 
+      // Log de depuración para tickets específicos (desarrollo)
       console.log("DEBUG: Raw descriptions from Supabase:");
       formattedData.forEach(item => {
         if (item.clave.includes("3177") || item.clave.includes("3176") || item.clave.includes("3175")) {

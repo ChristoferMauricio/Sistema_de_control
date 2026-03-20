@@ -1,3 +1,16 @@
+/**
+ * @file Badge.js
+ * @description Componente de etiqueta (badge) reutilizable con variantes de color predefinidas.
+ *   Se usa para mostrar estados, categorias o etiquetas visuales en la interfaz.
+ */
+
+/**
+ * Etiqueta visual con soporte para multiples colores tematicos.
+ * @param {Object}  props
+ * @param {React.ReactNode} props.children   - Contenido de la etiqueta
+ * @param {string}  [props.color="default"]  - Variante de color: "default" | "primary" | "success" | "warning" | "danger" | "info" | "purple"
+ * @param {string}  [props.className=""]     - Clases CSS adicionales
+ */
 export default function Badge({ children, color = "default", className = "" }) {
   const colors = {
     default: "bg-gray-100 text-gray-600",
