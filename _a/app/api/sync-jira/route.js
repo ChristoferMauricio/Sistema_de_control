@@ -190,11 +190,9 @@ async function runSync() {
     const epicLinkFieldId = await getEpicLinkFieldId();
     const issues   = await searchJira(jql, epicLinkFieldId);
 
-    // DEBUG: capturar campos crudos de cualquier ticket PF3QA que no sea Épica/Epic
-    const debugIssue = issues.find(i =>
-      i.key?.startsWith("PF3QA") &&
-      !["Epic", "Épica", "épica"].includes(i.fields?.issuetype?.name)
-    );
+    // DEBUG: capturar info de PF3QA
+    const pf3qaIssues = issues.filter(i => i.key?.startsWith("PF3QA"));
+    const debugIssue = pf3qaIssues[0] ?? null;
     const debugFields = debugIssue ? {
       key: debugIssue.key,
       parent: debugIssue.fields?.parent,
@@ -305,6 +303,7 @@ async function runSync() {
       subtasks:         allSubtasks.length,
       links:            allLinks.length,
       epicLinkFieldId:  epicLinkFieldId,
+      debug_pf3qa_count: pf3qaIssues.length,
       debug_pf3qa:      debugFields,
       timestamp:        now,
     });
