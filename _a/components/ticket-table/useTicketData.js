@@ -98,14 +98,14 @@ export function useTicketData({ tickets = [], externalFilterType = "", defaultFi
     fetchPersonData();
   }, []);
 
-  // ── Fetch subtasks + links cuando cambia la lista de tickets ───────────────
+  // ── Fetch subtasks + links (carga completa, sin filtro por URL) ────────────
   useEffect(() => {
-    if (!tickets.length) return;
-    const keys = tickets.map((t) => t.jira_key);
-    Promise.all([
-      supabase.from("jira_ticket_subtasks").select("parent_key, child_key").in("parent_key", keys),
-      supabase.from("jira_ticket_links").select("source_key, target_key").in("source_key", keys),
-    ]).then(([subtasksRes, linksRes]) => {
+    async function fetchRelational() {
+      const [subtasksRes, linksRes] = await Promise.all([
+        supabase.from("jira_ticket_subtasks").select("parent_key, child_key"),
+        supabase.from("jira_ticket_links").select("source_key, target_key"),
+      ]);
+
       const sMap = {};
       for (const row of subtasksRes.data || []) {
         if (!sMap[row.parent_key]) sMap[row.parent_key] = [];
@@ -119,8 +119,9 @@ export function useTicketData({ tickets = [], externalFilterType = "", defaultFi
         lMap[row.source_key].push(row.target_key);
       }
       setLinksMap(lMap);
-    });
-  }, [tickets]);
+    }
+    fetchRelational();
+  }, []);
 
   // nameMap: jiraDisplayName.lower → Nombres.Nombre (alias personalizado)
   const nameMap = useMemo(() => {

@@ -111,7 +111,7 @@ export default function TicketRow({
         {/* ── Subtareas (no errores) ── */}
         {mode !== "errores" && (
           <td className="px-4 py-3">
-            {isStory(ticket.issue_type) && (subtasksMap[ticket.jira_key]?.length > 0) ? (
+            {(subtasksMap[ticket.jira_key]?.length > 0) ? (
               <div className="flex flex-wrap gap-1">
                 {subtasksMap[ticket.jira_key].map((sk) => (
                   <a
