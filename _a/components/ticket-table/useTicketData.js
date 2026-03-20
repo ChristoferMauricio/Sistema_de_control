@@ -40,8 +40,7 @@ export function useTicketData({ tickets = [], externalFilterType = "", defaultFi
 
   const [nombres, setNombres]   = useState([]);
   const [persons, setPersons]   = useState([]); // jira_persons: { email, display_name }
-  const [subtasksMap, setSubtasksMap] = useState({}); // parent_key → [child_keys]
-  const [linksMap, setLinksMap]       = useState({}); // source_key → [target_keys]
+  const [linksMap, setLinksMap] = useState({}); // source_key → [target_keys]
 
   // ── Sync con filtros externos (props) ──────────────────────────────────────
   useEffect(() => {
@@ -98,29 +97,33 @@ export function useTicketData({ tickets = [], externalFilterType = "", defaultFi
     fetchPersonData();
   }, []);
 
-  // ── Fetch subtasks + links (carga completa, sin filtro por URL) ────────────
-  useEffect(() => {
-    async function fetchRelational() {
-      const [subtasksRes, linksRes] = await Promise.all([
-        supabase.from("jira_ticket_subtasks").select("parent_key, child_key").limit(10000),
-        supabase.from("jira_ticket_links").select("source_key, target_key").limit(10000),
-      ]);
-
-      const sMap = {};
-      for (const row of subtasksRes.data || []) {
-        if (!sMap[row.parent_key]) sMap[row.parent_key] = [];
-        sMap[row.parent_key].push(row.child_key);
+  // ── subtasksMap: derivado de los tickets cargados (parent_key) ────────────
+  const subtasksMap = useMemo(() => {
+    const map = {};
+    tickets.forEach((t) => {
+      if (t.parent_key) {
+        if (!map[t.parent_key]) map[t.parent_key] = [];
+        map[t.parent_key].push(t.jira_key);
       }
-      setSubtasksMap(sMap);
+    });
+    return map;
+  }, [tickets]);
 
+  // ── Fetch links (tabla relacional, no derivable de tickets) ────────────────
+  useEffect(() => {
+    async function fetchLinks() {
+      const { data } = await supabase
+        .from("jira_ticket_links")
+        .select("source_key, target_key")
+        .limit(10000);
       const lMap = {};
-      for (const row of linksRes.data || []) {
+      for (const row of data || []) {
         if (!lMap[row.source_key]) lMap[row.source_key] = [];
         lMap[row.source_key].push(row.target_key);
       }
       setLinksMap(lMap);
     }
-    fetchRelational();
+    fetchLinks();
   }, []);
 
   // nameMap: jiraDisplayName.lower → Nombres.Nombre (alias personalizado)
@@ -333,7 +336,7 @@ export function useTicketData({ tickets = [], externalFilterType = "", defaultFi
     resolveName, resolveEpic,
     // Opciones para dropdowns
     uniqueTypes, uniqueSprints, uniqueStatuses, uniqueAssignees, uniqueReporters,
-    // Datos relacionales
+    // Relacional
     subtasksMap, linksMap,
   };
 }

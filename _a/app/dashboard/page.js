@@ -197,8 +197,9 @@ export default function DashboardPage() {
           type: "success",
           message: `${data.synced} tickets sincronizados, ${data.statusChanges} cambio(s) de estado`,
         });
-        // Refrescar datos del dashboard
+        // Refrescar datos del dashboard y limpiar caché del router
         await fetchData();
+        router.refresh();
       }
     } catch (err) {
       setSyncResult({ type: "error", message: "Error de conexión con el servidor" });

@@ -63,8 +63,9 @@ export default function ReportesPage() {
                     type: "success",
                     message: `${data.synced} tickets sincronizados, ${data.statusChanges} cambio(s) de estado`,
                 });
-                // Refrescar datos
+                // Refrescar datos y limpiar caché del router
                 await fetchData();
+                router.refresh();
             }
         } catch (err) {
             setSyncResult({ type: "error", message: "Error de conexión con el servidor" });
