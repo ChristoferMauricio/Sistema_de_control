@@ -185,28 +185,6 @@ export function useTicketData({ tickets = [], externalFilterType = "", defaultFi
     [ticketMap]
   );
 
-  // ── Valores únicos para dropdowns ──────────────────────────────────────────
-  const uniqueTypes = useMemo(
-    () => [...new Set(tickets.map((t) => t.issue_type).filter(Boolean))].sort(),
-    [tickets]
-  );
-  const uniqueSprints = useMemo(
-    () => [...new Set(tickets.map((t) => t.sprint).filter(Boolean))].sort(),
-    [tickets]
-  );
-  const uniqueStatuses = useMemo(
-    () => [...new Set(tickets.map((t) => t.status).filter(Boolean))].sort(),
-    [tickets]
-  );
-  const uniqueAssignees = useMemo(() => {
-    const resolved = tickets.map((t) => resolveName(t.assignee_email)).filter((v) => v && v !== "—");
-    return [...new Set(resolved)].sort();
-  }, [tickets, resolveName]);
-  const uniqueReporters = useMemo(() => {
-    const resolved = tickets.map((t) => resolveName(t.reporter_email)).filter((v) => v && v !== "—");
-    return [...new Set(resolved)].sort();
-  }, [tickets, resolveName]);
-
   const activeFilterCount = [
     filterType, filterSprint, filterStatus, filterAssignee, filterReporter,
     filterKey.length     >= 3 ? filterKey      : "",
@@ -216,77 +194,89 @@ export function useTicketData({ tickets = [], externalFilterType = "", defaultFi
     filterComentario.length >= 3 ? filterComentario : "",
   ].filter(Boolean).length;
 
-  // ── Filtrado + ordenamiento ────────────────────────────────────────────────
-  const filtered = useMemo(() => {
-    let result = tickets;
+  // ── Filtrado + opciones en cascada ─────────────────────────────────────────
+  // `base(exclude)` aplica todos los filtros activos excepto el indicado,
+  // para que cada dropdown solo muestre valores válidos dado el resto de filtros.
+  const { filtered, uniqueTypes, uniqueSprints, uniqueStatuses, uniqueAssignees, uniqueReporters } =
+    useMemo(() => {
+      const base = (exclude) => {
+        let r = tickets;
 
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      result = result.filter(
-        (t) =>
-          t.jira_key?.toLowerCase().includes(q) ||
-          t.summary?.toLowerCase().includes(q) ||
-          resolveName(t.assignee_email)?.toLowerCase().includes(q) ||
-          t.status?.toLowerCase().includes(q) ||
-          t.issue_type?.toLowerCase().includes(q) ||
-          t.sprint?.toLowerCase().includes(q)
-      );
-    }
+        if (search.trim()) {
+          const q = search.toLowerCase();
+          r = r.filter((t) =>
+            t.jira_key?.toLowerCase().includes(q) ||
+            t.summary?.toLowerCase().includes(q) ||
+            resolveName(t.assignee_email)?.toLowerCase().includes(q) ||
+            t.status?.toLowerCase().includes(q) ||
+            t.issue_type?.toLowerCase().includes(q) ||
+            t.sprint?.toLowerCase().includes(q)
+          );
+        }
 
-    if (filterType)                   result = result.filter((t) => t.issue_type === filterType);
-    if (filterKey.length >= 3)        result = result.filter((t) => t.jira_key?.toLowerCase().includes(filterKey.toLowerCase()));
-    if (filterSummary.length >= 3)    result = result.filter((t) => t.summary?.toLowerCase().includes(filterSummary.toLowerCase()));
-    if (filterSprint)                 result = result.filter((t) => t.sprint === filterSprint);
-    if (filterStatus)                 result = result.filter((t) => t.status === filterStatus);
-    if (filterPrincipal.length >= 3)  result = result.filter((t) => t.parent_key?.toLowerCase().includes(filterPrincipal.toLowerCase()));
+        if (exclude !== "type" && filterType)       r = r.filter((t) => t.issue_type === filterType);
+        if (filterKey.length >= 3)                  r = r.filter((t) => t.jira_key?.toLowerCase().includes(filterKey.toLowerCase()));
+        if (filterSummary.length >= 3)              r = r.filter((t) => t.summary?.toLowerCase().includes(filterSummary.toLowerCase()));
+        if (exclude !== "sprint" && filterSprint)   r = r.filter((t) => t.sprint === filterSprint);
+        if (exclude !== "status" && filterStatus)   r = r.filter((t) => t.status === filterStatus);
+        if (filterPrincipal.length >= 3)            r = r.filter((t) => t.parent_key?.toLowerCase().includes(filterPrincipal.toLowerCase()));
 
-    if (filterEpic.length >= 3) {
-      const qs = filterEpic.toLowerCase();
-      result = result.filter((t) => {
-        const epicObj = resolveEpic(t);
-        return epicObj && epicObj.summary.toLowerCase().includes(qs);
+        if (filterEpic.length >= 3) {
+          const qs = filterEpic.toLowerCase();
+          r = r.filter((t) => {
+            const epicObj = resolveEpic(t);
+            return epicObj && epicObj.summary.toLowerCase().includes(qs);
+          });
+        }
+
+        if (filterComentario.length >= 3) {
+          const qc = filterComentario.toLowerCase();
+          r = r.filter((t) => {
+            const c = localComments[t.jira_key] !== undefined ? localComments[t.jira_key] : t.comentario;
+            return c?.toLowerCase().includes(qc);
+          });
+        }
+
+        if (exclude !== "assignee" && filterAssignee) r = r.filter((t) => resolveName(t.assignee_email) === filterAssignee);
+        if (exclude !== "reporter" && filterReporter) r = r.filter((t) => resolveName(t.reporter_email) === filterReporter);
+
+        return r;
+      };
+
+      // Resultado completo ordenado (para la tabla)
+      const result = base(null);
+      result.sort((a, b) => {
+        let aVal = a[sortField] || "";
+        let bVal = b[sortField] || "";
+        if (sortField === "assignee_name") {
+          aVal = resolveName(a.assignee_email);
+          bVal = resolveName(b.assignee_email);
+        } else if (sortField === "epic") {
+          aVal = resolveEpic(a)?.summary ?? "";
+          bVal = resolveEpic(b)?.summary ?? "";
+        } else if (sortField === "comentario") {
+          aVal = localComments[a.jira_key] !== undefined ? localComments[a.jira_key] : (a.comentario || "");
+          bVal = localComments[b.jira_key] !== undefined ? localComments[b.jira_key] : (b.comentario || "");
+        }
+        if (sortDir === "asc") return aVal > bVal ? 1 : -1;
+        return aVal < bVal ? 1 : -1;
       });
-    }
 
-    if (filterComentario.length >= 3) {
-      const qc = filterComentario.toLowerCase();
-      result = result.filter((t) => {
-        const c = localComments[t.jira_key] !== undefined ? localComments[t.jira_key] : t.comentario;
-        return c?.toLowerCase().includes(qc);
-      });
-    }
-
-    if (filterAssignee) result = result.filter((t) => resolveName(t.assignee_email) === filterAssignee);
-    if (filterReporter) result = result.filter((t) => resolveName(t.reporter_email) === filterReporter);
-
-    result.sort((a, b) => {
-      let aVal = a[sortField] || "";
-      let bVal = b[sortField] || "";
-
-      if (sortField === "assignee_name") {
-        aVal = resolveName(a.assignee_email);
-        bVal = resolveName(b.assignee_email);
-      } else if (sortField === "epic") {
-        const epicA = resolveEpic(a);
-        const epicB = resolveEpic(b);
-        aVal = epicA ? epicA.summary : "";
-        bVal = epicB ? epicB.summary : "";
-      } else if (sortField === "comentario") {
-        aVal = localComments[a.jira_key] !== undefined ? localComments[a.jira_key] : (a.comentario || "");
-        bVal = localComments[b.jira_key] !== undefined ? localComments[b.jira_key] : (b.comentario || "");
-      }
-
-      if (sortDir === "asc") return aVal > bVal ? 1 : -1;
-      return aVal < bVal ? 1 : -1;
-    });
-
-    return result;
-  }, [
-    tickets, search, sortField, sortDir,
-    filterType, filterKey, filterSummary, filterPrincipal, filterEpic, filterComentario,
-    filterSprint, filterStatus, filterAssignee, filterReporter,
-    resolveName, resolveEpic, localComments,
-  ]);
+      // Opciones en cascada: cada dropdown excluye su propio filtro
+      return {
+        filtered: result,
+        uniqueTypes:    [...new Set(base("type").map((t) => t.issue_type).filter(Boolean))].sort(),
+        uniqueSprints:  [...new Set(base("sprint").map((t) => t.sprint).filter(Boolean))].sort(),
+        uniqueStatuses: [...new Set(base("status").map((t) => t.status).filter(Boolean))].sort(),
+        uniqueAssignees:[...new Set(base("assignee").map((t) => resolveName(t.assignee_email)).filter((v) => v && v !== "—"))].sort(),
+        uniqueReporters:[...new Set(base("reporter").map((t) => resolveName(t.reporter_email)).filter((v) => v && v !== "—"))].sort(),
+      };
+    }, [
+      tickets, search, sortField, sortDir,
+      filterType, filterKey, filterSummary, filterPrincipal, filterEpic, filterComentario,
+      filterSprint, filterStatus, filterAssignee, filterReporter,
+      resolveName, resolveEpic, localComments,
+    ]);
 
   // ── Paginación ─────────────────────────────────────────────────────────────
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));

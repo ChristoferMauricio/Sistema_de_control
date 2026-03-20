@@ -482,7 +482,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Tickets Table */}
-      <TicketTable tickets={tickets} title="Todos los Tickets" statusHistory={statusHistory} externalFilterType={externalFilter} defaultFilterSprint={currentSprint?.iteracion || ""} />
+      <TicketTable tickets={tickets} title="Todos los Tickets" statusHistory={statusHistory} externalFilterType={externalFilter} defaultFilterSprint="" />
     </div>
   );
 }
