@@ -25,6 +25,8 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { sortSprints } from "@/lib/utils";
+import XLSX from "xlsx-js-style";
+import { Download } from "lucide-react";
 
 /* ═══════════════════════════════════════════════════════════════════
    CONSTANTES Y CONFIGURACIÓN
@@ -700,6 +702,222 @@ export default function ErroresEstadisticasPage() {
   const isPF3QA = /Tablero\s+Sprint/i.test(selectedSprint || "");
   const visibleStatuses = isPF3QA ? ["por_hacer", "en_curso", "finalizada"] : null;
 
+  /* ═══════════════════════════════════════════════════════════════════
+     EXPORTAR A EXCEL
+     ═══════════════════════════════════════════════════════════════════ */
+
+  const exportToExcel = useCallback(() => {
+    try {
+      const statusDefs = visibleStatuses
+        ? STATUS_DEFS.filter((sd) => visibleStatuses.includes(sd.key))
+        : STATUS_DEFS;
+      const showExcl = activeFilters.has("Excluido");
+      const nS = statusDefs.length;
+      // Columnas: Integrante + nS(Hist) + SubH + nS(Err) + SubE + (Excl?) + TOTAL
+      const totalCols = 1 + nS + 1 + nS + 1 + (showExcl ? 1 : 0) + 1;
+
+      /* ── Estilos ── */
+      const thin = { style: "thin", color: { rgb: "D1D5DB" } };
+      const bdr = { top: thin, bottom: thin, left: thin, right: thin };
+      const ctr = { horizontal: "center", vertical: "center" };
+
+      const titleSt = { font: { bold: true, sz: 13, color: { rgb: "111827" } }, alignment: { horizontal: "left", vertical: "center" } };
+      const subtSt = { font: { sz: 10, italic: true, color: { rgb: "6B7280" } }, alignment: { horizontal: "left" } };
+
+      const darkHeader = { font: { bold: true, sz: 9, color: { rgb: "FFFFFF" } }, fill: { fgColor: { rgb: "4B5563" } }, border: bdr, alignment: ctr };
+      const histHeader = { font: { bold: true, sz: 9, color: { rgb: "0369A1" } }, fill: { fgColor: { rgb: "E0F2FE" } }, border: bdr, alignment: ctr };
+      const errHeader = { font: { bold: true, sz: 9, color: { rgb: "DC2626" } }, fill: { fgColor: { rgb: "FEE2E2" } }, border: bdr, alignment: ctr };
+      const exclHeader = { font: { bold: true, sz: 9, color: { rgb: "92400E" } }, fill: { fgColor: { rgb: "FEF3C7" } }, border: bdr, alignment: ctr };
+      const totalHeader = { font: { bold: true, sz: 9, color: { rgb: "9A3412" } }, fill: { fgColor: { rgb: "FFF7ED" } }, border: bdr, alignment: ctr };
+
+      const statusSt = {
+        por_hacer: { font: { bold: true, sz: 9, color: { rgb: "374151" } }, fill: { fgColor: { rgb: "F3F4F6" } }, border: bdr, alignment: ctr },
+        en_curso: { font: { bold: true, sz: 9, color: { rgb: "1E40AF" } }, fill: { fgColor: { rgb: "DBEAFE" } }, border: bdr, alignment: ctr },
+        listo_dev: { font: { bold: true, sz: 9, color: { rgb: "0E7490" } }, fill: { fgColor: { rgb: "CFFAFE" } }, border: bdr, alignment: ctr },
+        qa: { font: { bold: true, sz: 9, color: { rgb: "92400E" } }, fill: { fgColor: { rgb: "FEF3C7" } }, border: bdr, alignment: ctr },
+        finalizada: { font: { bold: true, sz: 9, color: { rgb: "065F46" } }, fill: { fgColor: { rgb: "D1FAE5" } }, border: bdr, alignment: ctr },
+      };
+
+      const nameSt = { font: { sz: 10, color: { rgb: "1F2937" } }, border: bdr, alignment: { horizontal: "left", vertical: "center" } };
+      const numSt = { font: { sz: 10, color: { rgb: "374151" } }, border: bdr, alignment: ctr };
+      const subHistSt = { font: { bold: true, sz: 10, color: { rgb: "0369A1" } }, fill: { fgColor: { rgb: "F0F9FF" } }, border: bdr, alignment: ctr };
+      const subErrSt = { font: { bold: true, sz: 10, color: { rgb: "DC2626" } }, fill: { fgColor: { rgb: "FFF1F2" } }, border: bdr, alignment: ctr };
+      const subExclSt = { font: { bold: true, sz: 10, color: { rgb: "92400E" } }, fill: { fgColor: { rgb: "FFFBEB" } }, border: bdr, alignment: ctr };
+      const totalCellSt = { font: { bold: true, sz: 10, color: { rgb: "9A3412" } }, fill: { fgColor: { rgb: "FFF7ED" } }, border: bdr, alignment: ctr };
+
+      const totRowNameSt = { font: { bold: true, sz: 10, color: { rgb: "111827" } }, fill: { fgColor: { rgb: "F3F4F6" } }, border: bdr, alignment: { horizontal: "left", vertical: "center" } };
+      const totRowNumSt = (base) => ({ ...base, font: { ...base.font, bold: true }, fill: { ...base.fill } });
+
+      const empty = { v: "", t: "s" };
+      const emptyBdr = { v: "", t: "s", s: { border: bdr } };
+
+      /* ── Función para construir una tabla ── */
+      const aoa = [];
+      const merges = [];
+
+      function addTable(title, subtitle, data) {
+        const r0 = aoa.length;
+
+        // Fila título
+        const titleRow = Array(totalCols).fill(null).map(() => ({ ...empty }));
+        titleRow[0] = { v: title, t: "s", s: titleSt };
+        aoa.push(titleRow);
+        if (totalCols > 1) merges.push({ s: { r: r0, c: 0 }, e: { r: r0, c: totalCols - 1 } });
+
+        // Fila subtítulo
+        const subRow = Array(totalCols).fill(null).map(() => ({ ...empty }));
+        subRow[0] = { v: subtitle, t: "s", s: subtSt };
+        aoa.push(subRow);
+        if (totalCols > 1) merges.push({ s: { r: r0 + 1, c: 0 }, e: { r: r0 + 1, c: totalCols - 1 } });
+
+        // Fila vacía
+        aoa.push(Array(totalCols).fill(null).map(() => ({ ...empty })));
+
+        // ── Header fila 1 ──
+        const h1Row = aoa.length;
+        const h1 = [];
+        h1.push({ v: "Integrante", t: "s", s: darkHeader });
+
+        // "Historias" merge
+        for (let i = 0; i < nS; i++) h1.push({ v: i === 0 ? "Historias" : "", t: "s", s: histHeader });
+        if (nS > 1) merges.push({ s: { r: h1Row, c: 1 }, e: { r: h1Row, c: nS } });
+
+        h1.push({ v: "Sub", t: "s", s: subHistSt });
+
+        // "Errores" merge
+        const errStart = 1 + nS + 1;
+        for (let i = 0; i < nS; i++) h1.push({ v: i === 0 ? "Errores" : "", t: "s", s: errHeader });
+        if (nS > 1) merges.push({ s: { r: h1Row, c: errStart }, e: { r: h1Row, c: errStart + nS - 1 } });
+
+        h1.push({ v: "Sub", t: "s", s: subErrSt });
+        if (showExcl) h1.push({ v: "Excl.", t: "s", s: exclHeader });
+        h1.push({ v: "TOTAL", t: "s", s: totalHeader });
+        aoa.push(h1);
+
+        // ── Header fila 2 (etiquetas de estado) ──
+        const h2 = [];
+        h2.push({ v: "", t: "s", s: darkHeader });
+        statusDefs.forEach((sd) => h2.push({ v: sd.label.replace("Listo para dev", "Dev").replace("Por hacer", "P.Hacer"), t: "s", s: statusSt[sd.key] }));
+        h2.push({ v: "", t: "s", s: subHistSt });
+        statusDefs.forEach((sd) => h2.push({ v: sd.label.replace("Listo para dev", "Dev").replace("Por hacer", "P.Hacer"), t: "s", s: statusSt[sd.key] }));
+        h2.push({ v: "", t: "s", s: subErrSt });
+        if (showExcl) h2.push({ v: "", t: "s", s: exclHeader });
+        h2.push({ v: "", t: "s", s: totalHeader });
+        aoa.push(h2);
+
+        // ── Filas de datos ──
+        const totals = { historias: 0, errores: 0, excluidos: 0, historiasStatus: {}, erroresStatus: {} };
+        statusDefs.forEach((sd) => { totals.historiasStatus[sd.key] = 0; totals.erroresStatus[sd.key] = 0; });
+
+        data.forEach((row) => {
+          const r = [];
+          r.push({ v: row.name, t: "s", s: nameSt });
+          statusDefs.forEach((sd) => {
+            const val = row.historiasStatus[sd.key] || 0;
+            r.push({ v: val, t: "n", s: val > 0 ? statusSt[sd.key] : numSt });
+          });
+          r.push({ v: row.historias, t: "n", s: row.historias > 0 ? subHistSt : numSt });
+          statusDefs.forEach((sd) => {
+            const val = row.erroresStatus[sd.key] || 0;
+            r.push({ v: val, t: "n", s: val > 0 ? statusSt[sd.key] : numSt });
+          });
+          r.push({ v: row.errores, t: "n", s: row.errores > 0 ? subErrSt : numSt });
+          if (showExcl) r.push({ v: row.excluidos, t: "n", s: row.excluidos > 0 ? subExclSt : numSt });
+          r.push({ v: row.historias + row.errores + row.excluidos, t: "n", s: totalCellSt });
+          aoa.push(r);
+
+          totals.historias += row.historias;
+          totals.errores += row.errores;
+          totals.excluidos += row.excluidos;
+          statusDefs.forEach((sd) => {
+            totals.historiasStatus[sd.key] += (row.historiasStatus[sd.key] || 0);
+            totals.erroresStatus[sd.key] += (row.erroresStatus[sd.key] || 0);
+          });
+        });
+
+        // ── Fila TOTAL ──
+        const grandTotal = totals.historias + totals.errores + totals.excluidos;
+        const tr = [];
+        tr.push({ v: "TOTAL", t: "s", s: totRowNameSt });
+        statusDefs.forEach((sd) => {
+          const val = totals.historiasStatus[sd.key];
+          const pct = totals.historias > 0 ? Math.round(val / totals.historias * 100) : 0;
+          tr.push({ v: `${val} (${pct}%)`, t: "s", s: totRowNumSt(statusSt[sd.key]) });
+        });
+        tr.push({ v: totals.historias, t: "n", s: totRowNumSt(subHistSt) });
+        statusDefs.forEach((sd) => {
+          const val = totals.erroresStatus[sd.key];
+          const pct = totals.errores > 0 ? Math.round(val / totals.errores * 100) : 0;
+          tr.push({ v: `${val} (${pct}%)`, t: "s", s: totRowNumSt(statusSt[sd.key]) });
+        });
+        tr.push({ v: totals.errores, t: "n", s: totRowNumSt(subErrSt) });
+        if (showExcl) tr.push({ v: totals.excluidos, t: "n", s: totRowNumSt(subExclSt) });
+        tr.push({ v: grandTotal, t: "n", s: totRowNumSt(totalCellSt) });
+        aoa.push(tr);
+      }
+
+      // ── Construir ambas tablas ──
+      addTable(
+        "Tickets creados por Informador",
+        `${reporterData.length} informador${reporterData.length !== 1 ? "es" : ""} · Sprint: ${selectedSprint || "Todos"}`,
+        reporterData
+      );
+      aoa.push(Array(totalCols).fill(null).map(() => ({ ...empty })));
+      aoa.push(Array(totalCols).fill(null).map(() => ({ ...empty })));
+      addTable(
+        "Tickets asignados por Integrante",
+        `${assigneeData.length} integrante${assigneeData.length !== 1 ? "s" : ""} · Sprint: ${selectedSprint || "Todos"}`,
+        assigneeData
+      );
+
+      // ── Crear hoja "Reporte QA" ──
+      const wsQA = XLSX.utils.aoa_to_sheet(aoa);
+      wsQA["!merges"] = merges;
+      wsQA["!cols"] = [
+        { wch: 24 },
+        ...statusDefs.map(() => ({ wch: 10 })),
+        { wch: 7 },
+        ...statusDefs.map(() => ({ wch: 10 })),
+        { wch: 7 },
+        ...(showExcl ? [{ wch: 7 }] : []),
+        { wch: 9 },
+      ];
+
+      // ── Crear hoja "Datos QA" ──
+      const dataHeaders = ["Tipo", "Clave", "Resumen", "Sprint", "Persona asignada", "Estado", "Informador"];
+      const styledHeaders = dataHeaders.map((h) => ({
+        v: h, t: "s", s: darkHeader,
+      }));
+      const dataRows = validTickets.map((t) => [
+        { v: t.issue_type || "", t: "s", s: { border: bdr } },
+        { v: t.jira_key || "", t: "s", s: { font: { color: { rgb: "1D4ED8" } }, border: bdr } },
+        { v: t.summary || "", t: "s", s: { border: bdr } },
+        { v: t.sprint || "", t: "s", s: { border: bdr } },
+        { v: resolveName(t.assignee_email) || "Sin asignar", t: "s", s: { border: bdr } },
+        { v: t.status || "", t: "s", s: { border: bdr } },
+        { v: resolveName(t.reporter_email) || "Sin asignar", t: "s", s: { border: bdr } },
+      ]);
+      const wsData = XLSX.utils.aoa_to_sheet([styledHeaders, ...dataRows]);
+      wsData["!cols"] = [
+        { wch: 18 }, { wch: 12 }, { wch: 55 }, { wch: 22 }, { wch: 24 }, { wch: 18 }, { wch: 24 },
+      ];
+      wsData["!autofilter"] = {
+        ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: dataRows.length, c: dataHeaders.length - 1 } }),
+      };
+
+      // ── Crear workbook y descargar ──
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, wsQA, "Reporte QA");
+      XLSX.utils.book_append_sheet(wb, wsData, "Datos QA");
+
+      const dateStr = new Date().toLocaleDateString("es-PE").replace(/\//g, "-");
+      XLSX.writeFile(wb, `Reporte_QA_${selectedSprint ? selectedSprint.replace(/\s+/g, "_") : "Todos"}_${dateStr}.xlsx`);
+    } catch (err) {
+      console.error("Error al exportar Excel:", err);
+      alert("Error al generar el Excel. Ver consola para detalles.");
+    }
+  }, [reporterData, assigneeData, validTickets, visibleStatuses, activeFilters, selectedSprint, resolveName]);
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -737,8 +955,8 @@ export default function ErroresEstadisticasPage() {
         </p>
       </div>
 
-      {/* Sprint filter */}
-      <div className="animate-fade-in">
+      {/* Sprint filter + Export */}
+      <div className="flex items-center gap-3 animate-fade-in">
         <select
           value={selectedSprint || ""}
           onChange={(e) => setSelectedSprint(e.target.value)}
@@ -749,6 +967,14 @@ export default function ErroresEstadisticasPage() {
             <option key={s} value={s}>{s}</option>
           ))}
         </select>
+        <button
+          onClick={exportToExcel}
+          className="flex items-center gap-1.5 px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-xl shadow-sm transition-colors dark:bg-green-700 dark:hover:bg-green-600"
+          title="Descargar Reporte QA en formato Excel"
+        >
+          <Download className="w-4 h-4" />
+          <span className="hidden sm:inline">Exportar Excel</span>
+        </button>
       </div>
 
       {/* Stats banner - clickeable toggle filters */}
