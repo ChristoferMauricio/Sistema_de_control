@@ -194,24 +194,22 @@ function DetailModal({ title, personName, items, linksMap, allTicketMap, onClose
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   COMPONENTE: Gráfico de Barras Horizontales
+   COMPONENTE: Tabla de Estadísticas
    ═══════════════════════════════════════════════════════════════════ */
 
 /**
- * Componente de gráfico de barras horizontales que muestra historias y errores
- * por integrante. Cada persona tiene hasta 3 barras: historias (azul), errores (rojo)
- * y excluidos (amarillo). Las barras son clicables para abrir el modal de detalle.
- * Debajo de cada barra se muestran pills con el desglose por estado.
+ * Tabla que muestra historias y errores por integrante con desglose por estado.
+ * Columnas: Integrante | [Estados...] | Historias | Errores | Excluidos | TOTAL
+ * Las celdas de Historias/Errores/Excluidos son clicables para abrir el modal.
  *
  * @param {Object} props
- * @param {string} props.title - Título del gráfico
+ * @param {string} props.title - Título de la tabla
  * @param {string} [props.subtitle] - Subtítulo opcional
- * @param {Array} props.data - Datos agrupados por persona ({name, historias, errores, excluidos, ...Status})
- * @param {number} props.maxValue - Valor máximo para escalar las barras (100% = maxValue)
- * @param {Function} props.onBarClick - Callback al hacer click en una barra: (personName, type) => void
- * @returns {JSX.Element} Gráfico con leyenda y barras interactivas
+ * @param {Array} props.data - Datos agrupados por persona
+ * @param {Function} props.onBarClick - Callback: (personName, type) => void
+ * @param {boolean} props.showExcluidos - Si mostrar la columna de excluidos
  */
-function BarChart({ title, subtitle, data, maxValue, onBarClick }) {
+function StatsTable({ title, subtitle, data, onBarClick, showExcluidos }) {
   if (!data.length) {
     return (
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
@@ -224,6 +222,20 @@ function BarChart({ title, subtitle, data, maxValue, onBarClick }) {
     );
   }
 
+  // Totales
+  const totals = { historias: 0, errores: 0, excluidos: 0, historiasStatus: {}, erroresStatus: {} };
+  STATUS_DEFS.forEach((sd) => { totals.historiasStatus[sd.key] = 0; totals.erroresStatus[sd.key] = 0; });
+  data.forEach((row) => {
+    totals.historias += row.historias;
+    totals.errores += row.errores;
+    totals.excluidos += row.excluidos;
+    STATUS_DEFS.forEach((sd) => {
+      totals.historiasStatus[sd.key] += (row.historiasStatus[sd.key] || 0);
+      totals.erroresStatus[sd.key] += (row.erroresStatus[sd.key] || 0);
+    });
+  });
+  const grandTotal = totals.historias + totals.errores + totals.excluidos;
+
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden animate-fade-in">
       <div className="px-6 py-4 border-b border-gray-100">
@@ -231,153 +243,182 @@ function BarChart({ title, subtitle, data, maxValue, onBarClick }) {
         {subtitle && <p className="text-xs text-gray-400 mt-0.5">{subtitle}</p>}
       </div>
 
-      {/* Legend */}
-      <div className="px-6 pt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-gray-500">
-        <div className="flex items-center gap-1.5">
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-sky-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-          </svg>
-          <span>Historias</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <span>Errores</span>
-        </div>
-        {data.some((r) => r.excluidos > 0) && (
-          <div className="flex items-center gap-1.5">
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878l4.242 4.242M21 21l-4.879-4.879" />
-            </svg>
-            <span>Excluidos</span>
-          </div>
-        )}
-        <span className="border-l border-gray-200 pl-4 flex items-center gap-2 flex-wrap">
-          {STATUS_DEFS.map((sd) => (
-            <span key={sd.key} className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold ${sd.color}`}>
-              {sd.label}
-            </span>
-          ))}
-        </span>
-        <span className="text-gray-300 ml-auto">Click en una barra para ver detalle</span>
-      </div>
-
-      <div className="px-6 py-4 space-y-5">
-        {data.map((row) => (
-          <div key={row.name} className="flex items-start gap-3">
-            {/* Name label */}
-            <div className="w-36 shrink-0 text-sm font-medium text-gray-700 pt-1 truncate" title={row.name}>
-              {row.name}
-            </div>
-
-            {/* Bars */}
-            <div className="flex-1 space-y-1 min-w-0">
-              {/* Historias bar + status pills */}
-              <button
-                className="w-full flex items-center gap-2 group"
-                onClick={() => row.historias > 0 && onBarClick(row.name, "Historia")}
-                disabled={row.historias === 0}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-sky-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                </svg>
-                <div className="flex-1 bg-gray-100 rounded-full h-6 overflow-hidden">
-                  <div
-                    className={`h-full bg-sky-400 rounded-full flex items-center transition-all duration-500 ${row.historias > 0 ? "group-hover:bg-sky-500 cursor-pointer" : ""}`}
-                    style={{ width: maxValue > 0 ? `${Math.max((row.historias / maxValue) * 100, row.historias > 0 ? 4 : 0)}%` : "0%" }}
-                  >
-                    {row.historias > 0 && (
-                      <span className="ml-auto mr-2 text-[11px] font-bold text-white drop-shadow-sm">
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b-2 border-gray-200 bg-gray-50/80">
+              <th className="text-left px-4 py-2 font-semibold text-gray-700" style={{ minWidth: "150px" }}>Integrante</th>
+              {/* Columnas de estado para Historias */}
+              <th colSpan={STATUS_DEFS.length} className="text-center px-2 py-1 border-l border-gray-200">
+                <div className="flex items-center justify-center gap-1.5 text-sky-600">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                  </svg>
+                  <span className="text-xs font-semibold">Historias</span>
+                </div>
+              </th>
+              <th className="text-center px-2 py-2 border-l border-gray-200 font-semibold text-sky-700 bg-sky-50/50" style={{ minWidth: "50px" }}>
+                <span className="text-xs">Sub</span>
+              </th>
+              {/* Columnas de estado para Errores */}
+              <th colSpan={STATUS_DEFS.length} className="text-center px-2 py-1 border-l border-gray-200">
+                <div className="flex items-center justify-center gap-1.5 text-red-500">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className="text-xs font-semibold">Errores</span>
+                </div>
+              </th>
+              <th className="text-center px-2 py-2 border-l border-gray-200 font-semibold text-red-600 bg-red-50/50" style={{ minWidth: "50px" }}>
+                <span className="text-xs">Sub</span>
+              </th>
+              {showExcluidos && (
+                <th className="text-center px-2 py-2 border-l border-gray-200 font-semibold text-amber-600" style={{ minWidth: "50px" }}>
+                  <span className="text-xs">Excl.</span>
+                </th>
+              )}
+              <th className="text-center px-3 py-2 border-l border-gray-200 font-bold text-gray-900 bg-orange-50/50" style={{ minWidth: "55px" }}>TOTAL</th>
+            </tr>
+            {/* Sub-header: status labels */}
+            <tr className="border-b border-gray-200 bg-gray-50/40">
+              <th />
+              {STATUS_DEFS.map((sd) => (
+                <th key={`h-${sd.key}`} className="text-center px-1 py-1 border-l border-gray-100">
+                  <span className={`inline-flex items-center px-1 py-0.5 rounded text-[8px] font-bold ${sd.color}`}>
+                    {sd.label.replace("Listo para dev", "Dev").replace("Por hacer", "P.Hacer")}
+                  </span>
+                </th>
+              ))}
+              <th className="border-l border-gray-200" />
+              {STATUS_DEFS.map((sd) => (
+                <th key={`e-${sd.key}`} className="text-center px-1 py-1 border-l border-gray-100">
+                  <span className={`inline-flex items-center px-1 py-0.5 rounded text-[8px] font-bold ${sd.color}`}>
+                    {sd.label.replace("Listo para dev", "Dev").replace("Por hacer", "P.Hacer")}
+                  </span>
+                </th>
+              ))}
+              <th className="border-l border-gray-200" />
+              {showExcluidos && <th className="border-l border-gray-200" />}
+              <th className="border-l border-gray-200" />
+            </tr>
+          </thead>
+          <tbody>
+            {data.map((row) => {
+              const rowTotal = row.historias + row.errores + row.excluidos;
+              return (
+                <tr key={row.name} className="border-b border-gray-200 hover:bg-gray-50/50 transition-colors">
+                  <td className="px-4 py-2 font-medium text-gray-800 whitespace-nowrap">{row.name}</td>
+                  {/* Historias por estado */}
+                  {STATUS_DEFS.map((sd) => {
+                    const count = row.historiasStatus[sd.key] || 0;
+                    return (
+                      <td key={`h-${sd.key}`} className="px-1 py-2 text-center border-l border-gray-100">
+                        {count > 0 ? (
+                          <span className={`inline-flex items-center justify-center min-w-[22px] px-1 py-0.5 rounded text-[10px] font-bold ${sd.color}`}>
+                            {count}
+                          </span>
+                        ) : (
+                          <span className="text-gray-200 text-xs">0</span>
+                        )}
+                      </td>
+                    );
+                  })}
+                  {/* Subtotal Historias */}
+                  <td className="px-2 py-2 text-center border-l border-gray-200 bg-sky-50/30">
+                    {row.historias > 0 ? (
+                      <button onClick={() => onBarClick(row.name, "Historia")} className="inline-flex items-center justify-center min-w-[26px] px-1.5 py-0.5 rounded-lg text-xs font-bold bg-sky-100 text-sky-700 border border-sky-200 hover:bg-sky-200 transition-colors cursor-pointer">
                         {row.historias}
-                      </span>
+                      </button>
+                    ) : (
+                      <span className="text-gray-200 text-xs">0</span>
                     )}
-                  </div>
-                </div>
-                {row.historias === 0 && <span className="text-xs text-gray-300 w-4">0</span>}
-              </button>
-              {row.historias > 0 && (
-                <div className="flex items-center gap-1 pl-6 flex-wrap">
+                  </td>
+                  {/* Errores por estado */}
                   {STATUS_DEFS.map((sd) => {
-                    const count = row.historiasStatus[sd.key];
-                    return count > 0 ? (
-                      <span key={sd.key} className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold ${sd.color}`}>
-                        {sd.label}: {count}
-                      </span>
-                    ) : null;
+                    const count = row.erroresStatus[sd.key] || 0;
+                    return (
+                      <td key={`e-${sd.key}`} className="px-1 py-2 text-center border-l border-gray-100">
+                        {count > 0 ? (
+                          <span className={`inline-flex items-center justify-center min-w-[22px] px-1 py-0.5 rounded text-[10px] font-bold ${sd.color}`}>
+                            {count}
+                          </span>
+                        ) : (
+                          <span className="text-gray-200 text-xs">0</span>
+                        )}
+                      </td>
+                    );
                   })}
-                </div>
-              )}
-
-              {/* Errores bar + status pills */}
-              <button
-                className="w-full flex items-center gap-2 group mt-1"
-                onClick={() => row.errores > 0 && onBarClick(row.name, "Error")}
-                disabled={row.errores === 0}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-red-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <div className="flex-1 bg-gray-100 rounded-full h-6 overflow-hidden">
-                  <div
-                    className={`h-full bg-red-400/80 rounded-full flex items-center transition-all duration-500 ${row.errores > 0 ? "group-hover:bg-red-500/80 cursor-pointer" : ""}`}
-                    style={{ width: maxValue > 0 ? `${Math.max((row.errores / maxValue) * 100, row.errores > 0 ? 4 : 0)}%` : "0%" }}
-                  >
-                    {row.errores > 0 && (
-                      <span className="ml-auto mr-2 text-[11px] font-bold text-white drop-shadow-sm">
+                  {/* Subtotal Errores */}
+                  <td className="px-2 py-2 text-center border-l border-gray-200 bg-red-50/30">
+                    {row.errores > 0 ? (
+                      <button onClick={() => onBarClick(row.name, "Error")} className="inline-flex items-center justify-center min-w-[26px] px-1.5 py-0.5 rounded-lg text-xs font-bold bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 transition-colors cursor-pointer">
                         {row.errores}
-                      </span>
+                      </button>
+                    ) : (
+                      <span className="text-gray-200 text-xs">0</span>
                     )}
-                  </div>
-                </div>
-                {row.errores === 0 && <span className="text-xs text-gray-300 w-4">0</span>}
-              </button>
-              {row.errores > 0 && (
-                <div className="flex items-center gap-1 pl-6 flex-wrap">
-                  {STATUS_DEFS.map((sd) => {
-                    const count = row.erroresStatus[sd.key];
-                    return count > 0 ? (
-                      <span key={sd.key} className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold ${sd.color}`}>
-                        {sd.label}: {count}
-                      </span>
-                    ) : null;
-                  })}
-                </div>
-              )}
-
-              {/* Excluidos bar */}
-              {row.excluidos > 0 && (
-                <>
-                  <button
-                    className="w-full flex items-center gap-2 group mt-1"
-                    onClick={() => onBarClick(row.name, "Excluido")}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-amber-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878l4.242 4.242M21 21l-4.879-4.879" />
-                    </svg>
-                    <div className="flex-1 bg-gray-100 rounded-full h-6 overflow-hidden">
-                      <div
-                        className="h-full bg-amber-300/80 rounded-full flex items-center transition-all duration-500 group-hover:bg-amber-400/80 cursor-pointer"
-                        style={{ width: maxValue > 0 ? `${Math.max((row.excluidos / maxValue) * 100, 4)}%` : "0%" }}
-                      >
-                        <span className="ml-auto mr-2 text-[11px] font-bold text-amber-800 drop-shadow-sm">
+                  </td>
+                  {/* Excluidos */}
+                  {showExcluidos && (
+                    <td className="px-2 py-2 text-center border-l border-gray-200">
+                      {row.excluidos > 0 ? (
+                        <button onClick={() => onBarClick(row.name, "Excluido")} className="inline-flex items-center justify-center min-w-[26px] px-1.5 py-0.5 rounded-lg text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors cursor-pointer">
                           {row.excluidos}
-                        </span>
-                      </div>
-                    </div>
-                  </button>
-                </>
+                        </button>
+                      ) : (
+                        <span className="text-gray-200 text-xs">0</span>
+                      )}
+                    </td>
+                  )}
+                  {/* TOTAL */}
+                  <td className="px-3 py-2 text-center border-l border-gray-200 bg-gray-50/50">
+                    <span className="inline-flex items-center justify-center min-w-[28px] px-1.5 py-0.5 rounded-lg text-xs font-bold text-gray-800">
+                      {rowTotal}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+            {/* Fila TOTAL */}
+            <tr className="border-t-2 border-gray-300 bg-gray-50/80 font-semibold">
+              <td className="px-4 py-2 text-gray-700">TOTAL</td>
+              {STATUS_DEFS.map((sd) => (
+                <td key={`th-${sd.key}`} className="px-1 py-2 text-center border-l border-gray-100">
+                  <div className="flex flex-col items-center">
+                    <span className={`inline-flex items-center justify-center min-w-[22px] px-1 py-0.5 rounded text-[10px] font-bold ${sd.color}`}>
+                      {totals.historiasStatus[sd.key]}
+                    </span>
+                    <span className="text-[9px] text-gray-400">{totals.historias > 0 ? Math.round(totals.historiasStatus[sd.key] / totals.historias * 100) : 0}%</span>
+                  </div>
+                </td>
+              ))}
+              <td className="px-2 py-2 text-center border-l border-gray-200 bg-sky-50/30">
+                <span className="inline-flex items-center justify-center min-w-[26px] px-1.5 py-0.5 rounded-lg text-xs font-bold bg-sky-200 text-sky-800">{totals.historias}</span>
+              </td>
+              {STATUS_DEFS.map((sd) => (
+                <td key={`te-${sd.key}`} className="px-1 py-2 text-center border-l border-gray-100">
+                  <div className="flex flex-col items-center">
+                    <span className={`inline-flex items-center justify-center min-w-[22px] px-1 py-0.5 rounded text-[10px] font-bold ${sd.color}`}>
+                      {totals.erroresStatus[sd.key]}
+                    </span>
+                    <span className="text-[9px] text-gray-400">{totals.errores > 0 ? Math.round(totals.erroresStatus[sd.key] / totals.errores * 100) : 0}%</span>
+                  </div>
+                </td>
+              ))}
+              <td className="px-2 py-2 text-center border-l border-gray-200 bg-red-50/30">
+                <span className="inline-flex items-center justify-center min-w-[26px] px-1.5 py-0.5 rounded-lg text-xs font-bold bg-red-100 text-red-700">{totals.errores}</span>
+              </td>
+              {showExcluidos && (
+                <td className="px-2 py-2 text-center border-l border-gray-200">
+                  <span className="inline-flex items-center justify-center min-w-[26px] px-1.5 py-0.5 rounded-lg text-xs font-bold bg-amber-100 text-amber-700">{totals.excluidos}</span>
+                </td>
               )}
-            </div>
-
-            {/* Total */}
-            <div className="w-10 shrink-0 text-center pt-2">
-              <span className="inline-flex items-center justify-center min-w-[28px] px-1.5 py-0.5 rounded-lg text-xs font-bold bg-gray-100 text-gray-700 border border-gray-200">
-                {row.historias + row.errores + row.excluidos}
-              </span>
-            </div>
-          </div>
-        ))}
+              <td className="px-3 py-2 text-center border-l border-gray-200 bg-gray-100">
+                <span className="inline-flex items-center justify-center min-w-[30px] px-2 py-0.5 rounded-lg text-sm font-bold text-gray-900">{grandTotal}</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   );
@@ -613,10 +654,6 @@ export default function ErroresEstadisticasPage() {
       .sort((a, b) => (b.historias + b.errores + b.excluidos) - (a.historias + a.errores + a.excluidos));
   }, [validTickets, resolveName, classifyTicket]);
 
-  /* ─── Valores máximos para escalar las barras del gráfico (100% = maxValue) ─── */
-  const maxReporter = useMemo(() => Math.max(...reporterData.map((r) => Math.max(r.historias, r.errores, r.excluidos)), 1), [reporterData]);
-  const maxAssignee = useMemo(() => Math.max(...assigneeData.map((r) => Math.max(r.historias, r.errores, r.excluidos)), 1), [assigneeData]);
-
   /** Tickets filtrados solo por sprint (sin filtro de tipo) para mostrar conteos en badges */
   const sprintTickets = useMemo(() => {
     return tickets.filter((t) => {
@@ -759,22 +796,22 @@ export default function ErroresEstadisticasPage() {
         </button>
       </div>
 
-      {/* Chart 1: Reporters */}
-      <BarChart
+      {/* Tabla 1: Reporters */}
+      <StatsTable
         title="Tickets creados por Informador"
         subtitle={`${reporterData.length} informador${reporterData.length !== 1 ? "es" : ""}`}
         data={reporterData}
-        maxValue={maxReporter}
         onBarClick={handleBarClick("reporter_email")}
+        showExcluidos={activeFilters.has("Excluido")}
       />
 
-      {/* Chart 2: Assignees */}
-      <BarChart
+      {/* Tabla 2: Assignees */}
+      <StatsTable
         title="Tickets asignados por Integrante"
         subtitle={`${assigneeData.length} integrante${assigneeData.length !== 1 ? "s" : ""}`}
         data={assigneeData}
-        maxValue={maxAssignee}
         onBarClick={handleBarClick("assignee_email")}
+        showExcluidos={activeFilters.has("Excluido")}
       />
 
       {/* Detail Modal */}
