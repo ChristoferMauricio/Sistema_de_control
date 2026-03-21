@@ -85,6 +85,15 @@ const navItems = [
         ),
       },
       {
+        label: "Revisión QA",
+        href: "/dashboard/errores-revision",
+        icon: (
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        ),
+      },
+      {
         label: "Estadísticas",
         href: "/dashboard/errores-estadisticas",
         icon: (
@@ -209,17 +218,16 @@ export default function DashboardNav({ user, role }) {
     async function fetchCounts() {
       try {
         const [
-          { data: bugsQA },
+          { data: ticketsPF3QA },
           { data: obsData }
         ] = await Promise.all([
-          // 1. Bugs del tablero PF3QA en Sprint 2 activo
+          // 1. Tickets PF3QA (Historias + Errores)
           supabase
             .from("jira_tickets")
-            .select("jira_key, linked_keys")
-            .in("issue_type", ["Bug", "Error", "Error Desarrollo", "Error Certificación", "Error en Certificación"])
-            .like("jira_key", "PF3QA-%")
-            .eq("sprint", "Tablero Sprint 2"),
-          
+            .select("jira_key, parent_key")
+            .in("issue_type", ["Historia", "Bug", "Error", "Error Desarrollo", "Error Certificación", "Error en Certificación"])
+            .like("jira_key", "PF3QA-%"),
+
           // 2. Fetch Supervisor Observations
           supabase
             .from("jira_tickets")
@@ -230,50 +238,58 @@ export default function DashboardNav({ user, role }) {
 
         const countObs = (obsData || []).filter(t => t.comentario && t.comentario.trim().length > 0).length;
 
-        // 3. Clasificar bugs en Certificacion o Desarrollo segun el sprint de sus historias vinculadas
+        // 3. Clasificar tickets usando épica + actividades vinculadas
         let countCert = 0;
         let countDes = 0;
+        let countRevision = 0;
 
-        if (bugsQA && bugsQA.length > 0) {
-          // Extract all unique linked keys to query their sprints in one go
-          const allLinkedKeys = Array.from(new Set(
-            bugsQA.flatMap(bug => (Array.isArray(bug.linked_keys) ? bug.linked_keys : []))
-          ));
+        if (ticketsPF3QA && ticketsPF3QA.length > 0) {
+          const keys = ticketsPF3QA.map(t => t.jira_key);
 
-          let linkedStoriesMap = {};
-          
-          if (allLinkedKeys.length > 0) {
-            // Fetch the linked stories from Supabase to check their Sprint
+          // Obtener links desde jira_ticket_links (no linked_keys legacy)
+          const { data: linkRows } = await supabase
+            .from("jira_ticket_links")
+            .select("source_key, target_key")
+            .in("source_key", keys);
+
+          const linksMap = {};
+          for (const row of linkRows || []) {
+            if (!linksMap[row.source_key]) linksMap[row.source_key] = [];
+            linksMap[row.source_key].push(row.target_key);
+          }
+
+          // Obtener sprints de tickets vinculados
+          const allTargetKeys = [...new Set(Object.values(linksMap).flat())];
+          const linkedSprintMap = {};
+          if (allTargetKeys.length > 0) {
             const { data: linkedStories } = await supabase
               .from("jira_tickets")
               .select("jira_key, sprint")
-              .in("jira_key", allLinkedKeys);
-              
-            if (linkedStories) {
-              linkedStories.forEach(st => {
-                linkedStoriesMap[st.jira_key] = st.sprint;
-              });
-            }
+              .in("jira_key", allTargetKeys);
+            (linkedStories || []).forEach(st => {
+              linkedSprintMap[st.jira_key] = st.sprint || "";
+            });
           }
 
-          // Distribute bugs based on linked PF3 story sprints
-          bugsQA.forEach(bug => {
-            const links = Array.isArray(bug.linked_keys) ? bug.linked_keys : [];
-            let isCert = false;
-            let isDes = false;
+          ticketsPF3QA.forEach(ticket => {
+            // Por épica
+            if (ticket.parent_key === "PF3QA-50") { countDes++; return; }
+            if (ticket.parent_key === "PF3QA-49") { countCert++; return; }
 
-            links.forEach(linkKey => {
-              const sprintStr = linkedStoriesMap[linkKey] || "";
-              if (sprintStr.includes("F3.01") || sprintStr.includes("F3.02")) {
-                isCert = true;
-              } else if (sprintStr.includes("F3.03") || sprintStr.includes("F3.4") || sprintStr.includes("F3.5")) {
-                isDes = true;
-              }
+            // Por sprint de actividad vinculada
+            const targets = linksMap[ticket.jira_key] || [];
+            const hasDes = targets.some(tk => {
+              const s = linkedSprintMap[tk] || "";
+              return s.includes("F3.03") || s.includes("F3.4") || s.includes("F3.5");
+            });
+            const hasCert = targets.some(tk => {
+              const s = linkedSprintMap[tk] || "";
+              return s.includes("F3.01") || s.includes("F3.02");
             });
 
-            // If a bug somehow maps to both, we log it to both to be safe, or just one if priority is needed.
-            if (isCert) countCert++;
-            if (isDes) countDes++;
+            if (hasDes) { countDes++; return; }
+            if (hasCert) { countCert++; return; }
+            countRevision++;
           });
         }
 
@@ -311,6 +327,7 @@ export default function DashboardNav({ user, role }) {
         setCounts({
           certificacion: countCert || 0,
           desarrollo: countDes || 0,
+          revision: countRevision || 0,
           observaciones: countObs || 0,
           misChanges: countMisChanges,
         });
@@ -425,8 +442,9 @@ export default function DashboardNav({ user, role }) {
               if (item.label === "Errores") {
                 const hasCert = counts.certificacion > 0;
                 const hasDes = counts.desarrollo > 0;
-                
-                if (hasCert || hasDes) {
+                const hasRev = counts.revision > 0;
+
+                if (hasCert || hasDes || hasRev) {
                   parentBadges = (
                     <div className="flex gap-1.5">
                       {hasCert && (
@@ -438,9 +456,16 @@ export default function DashboardNav({ user, role }) {
                       )}
                       {hasDes && (
                         <span className={`px-1.5 py-0.5 text-[9px] font-bold uppercase rounded border ${
-                          isActive ? "bg-amber-100 text-amber-700 border-amber-200" : "bg-amber-50 text-amber-600 border-amber-100"
+                          isActive ? "bg-orange-100 text-orange-700 border-orange-200" : "bg-orange-50 text-orange-600 border-orange-100"
                         }`}>
                           Desa {counts.desarrollo}
+                        </span>
+                      )}
+                      {hasRev && (
+                        <span className={`px-1.5 py-0.5 text-[9px] font-bold uppercase rounded border ${
+                          isActive ? "bg-amber-100 text-amber-700 border-amber-200" : "bg-amber-50 text-amber-600 border-amber-100"
+                        }`}>
+                          Rev {counts.revision}
                         </span>
                       )}
                     </div>
@@ -484,6 +509,7 @@ export default function DashboardNav({ user, role }) {
                         let subBadgeCount = null;
                         if (sub.label === "Errores Certificación") subBadgeCount = counts.certificacion;
                         if (sub.label === "Errores Desarrollo") subBadgeCount = counts.desarrollo;
+                        if (sub.label === "Revisión QA") subBadgeCount = counts.revision;
 
                         return (
                           <a
@@ -511,9 +537,13 @@ export default function DashboardNav({ user, role }) {
                             
                             {subBadgeCount !== null && subBadgeCount > 0 && (
                               <span className={`px-2 py-0.5 text-xs font-bold rounded-md border ${
-                                isSubActive 
-                                  ? (sub.label === "Errores Certificación" ? "bg-red-100 text-red-700 border-red-200" : "bg-amber-100 text-amber-700 border-amber-200")
-                                  : (sub.label === "Errores Certificación" ? "bg-red-50 text-red-600 border-red-100" : "bg-amber-50 text-amber-600 border-amber-100")
+                                isSubActive
+                                  ? (sub.label === "Errores Certificación" ? "bg-red-100 text-red-700 border-red-200"
+                                    : sub.label === "Revisión QA" ? "bg-amber-100 text-amber-700 border-amber-200"
+                                    : "bg-orange-100 text-orange-700 border-orange-200")
+                                  : (sub.label === "Errores Certificación" ? "bg-red-50 text-red-600 border-red-100"
+                                    : sub.label === "Revisión QA" ? "bg-amber-50 text-amber-600 border-amber-100"
+                                    : "bg-orange-50 text-orange-600 border-orange-100")
                               }`}>
                                 {subBadgeCount}
                               </span>
