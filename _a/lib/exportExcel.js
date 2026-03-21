@@ -92,81 +92,29 @@ export async function exportUnifiedExcel(selectedSprint) {
     }
 
     /* ═══════════════════════════════════════════════════════════════
-       3. ESTILOS PARA HOJAS DE DATOS
+       3. CONSTRUIR HOJAS DE DATOS (formato plano, sin estilos custom)
        ═══════════════════════════════════════════════════════════════ */
-    const thinBorder = { style: "thin", color: { rgb: "B4C6E7" } };
-    const bdr = { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder };
-
-    // Encabezado Osi: azul oscuro
-    const osiHdr = {
-      font: { bold: true, sz: 11, color: { rgb: "FFFFFF" } },
-      fill: { fgColor: { rgb: "1F4E79" } },
-      border: bdr,
-      alignment: { horizontal: "center", vertical: "center", wrapText: true },
-    };
-    // Encabezado Datos QA: azul medio
-    const qaHdr = {
-      font: { bold: true, sz: 11, color: { rgb: "FFFFFF" } },
-      fill: { fgColor: { rgb: "2E75B6" } },
-      border: bdr,
-      alignment: { horizontal: "center", vertical: "center", wrapText: true },
-    };
-    // Celda de dato genérica
-    const dataCell = {
-      font: { sz: 10, color: { rgb: "1F2937" } },
-      border: bdr,
-      alignment: { vertical: "center", wrapText: true },
-    };
-    const dataCellCenter = { ...dataCell, alignment: { horizontal: "center", vertical: "center" } };
-    // Celda clave (azul, link-like)
-    const claveCell = {
-      font: { sz: 10, color: { rgb: "1F4E79" }, bold: true },
-      border: bdr,
-      alignment: { vertical: "center" },
-    };
-    // Filas alternas
-    const dataEven = {
-      font: { sz: 10, color: { rgb: "1F2937" } },
-      fill: { fgColor: { rgb: "D6E4F0" } },
-      border: bdr,
-      alignment: { vertical: "center", wrapText: true },
-    };
-    const dataEvenCenter = { ...dataEven, alignment: { horizontal: "center", vertical: "center" } };
-    const claveEven = { ...claveCell, fill: { fgColor: { rgb: "D6E4F0" } } };
-
-    /* ═══════════════════════════════════════════════════════════════
-       4. CONSTRUIR HOJA "Osi" CON ESTILO
-       ═══════════════════════════════════════════════════════════════ */
+    // --- Hoja "Osi" ---
     const headersOsi = [
       "Tipo", "Clave", "Resumen", "Subtareas", "Principal",
       "Épica", "Sprint", "Persona asignada", "Story Points",
       "Estado", "Informador", "Creada",
     ];
-    const osiHeaderRow = headersOsi.map((h) => ({ v: h, t: "s", s: osiHdr }));
-
-    const osiDataRows = allTickets.map((t, i) => {
-      const even = i % 2 === 1;
-      const cs = even ? dataEven : dataCell;
-      const cc = even ? dataEvenCenter : dataCellCenter;
-      const ck = even ? claveEven : claveCell;
-      const sp = t.story_points;
-      return [
-        { v: t.issue_type || "", t: "s", s: cc },
-        { v: t.jira_key || "", t: "s", s: ck },
-        { v: t.summary || "", t: "s", s: cs },
-        { v: t.subtask_keys?.join(", ") || "", t: "s", s: cs },
-        { v: t.parent_key || "", t: "s", s: cc },
-        { v: resolveEpic(t)?.summary || "", t: "s", s: cs },
-        { v: t.sprint || "", t: "s", s: cc },
-        { v: resolveName(t.assignee_email), t: "s", s: cs },
-        sp != null && sp !== "" ? { v: Number(sp), t: "n", s: cc } : { v: "", t: "s", s: cc },
-        { v: t.status || "", t: "s", s: cc },
-        { v: resolveName(t.reporter_email), t: "s", s: cs },
-        { v: t.created_at ? formatDate(t.created_at) : "", t: "s", s: cc },
-      ];
-    });
-
-    const wsOsi = XLSX.utils.aoa_to_sheet([osiHeaderRow, ...osiDataRows]);
+    const rowsOsi = allTickets.map((t) => ({
+      Tipo: t.issue_type || "",
+      Clave: t.jira_key || "",
+      Resumen: t.summary || "",
+      Subtareas: t.subtask_keys?.join(", ") || "",
+      Principal: t.parent_key || "",
+      "Épica": resolveEpic(t)?.summary || "",
+      Sprint: t.sprint || "",
+      "Persona asignada": resolveName(t.assignee_email),
+      "Story Points": t.story_points != null && t.story_points !== "" ? Number(t.story_points) : "",
+      Estado: t.status || "",
+      Informador: resolveName(t.reporter_email),
+      Creada: t.created_at ? formatDate(t.created_at) : "",
+    }));
+    const wsOsi = XLSX.utils.json_to_sheet(rowsOsi, { header: headersOsi });
     wsOsi["!cols"] = [
       { wch: 16 }, { wch: 13 }, { wch: 52 }, { wch: 20 }, { wch: 13 },
       { wch: 32 }, { wch: 22 }, { wch: 24 }, { wch: 13 }, { wch: 20 },
@@ -176,30 +124,19 @@ export async function exportUnifiedExcel(selectedSprint) {
       ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: allTickets.length, c: 11 } }),
     };
 
-    /* ═══════════════════════════════════════════════════════════════
-       5. CONSTRUIR HOJA "Datos QA" CON ESTILO
-       ═══════════════════════════════════════════════════════════════ */
+    // --- Hoja "Datos QA" ---
     const headersQA = ["Tipo", "Clave", "Resumen", "Sprint", "Persona asignada", "Estado", "Informador"];
     const pf3qaTickets = allTickets.filter((t) => t.jira_key?.startsWith("PF3QA-"));
-
-    const qaHeaderRow = headersQA.map((h) => ({ v: h, t: "s", s: qaHdr }));
-    const qaDataRows = pf3qaTickets.map((t, i) => {
-      const even = i % 2 === 1;
-      const cs = even ? dataEven : dataCell;
-      const cc = even ? dataEvenCenter : dataCellCenter;
-      const ck = even ? claveEven : claveCell;
-      return [
-        { v: t.issue_type || "", t: "s", s: cc },
-        { v: t.jira_key || "", t: "s", s: ck },
-        { v: t.summary || "", t: "s", s: cs },
-        { v: t.sprint || "", t: "s", s: cc },
-        { v: resolveName(t.assignee_email), t: "s", s: cs },
-        { v: t.status || "", t: "s", s: cc },
-        { v: resolveName(t.reporter_email), t: "s", s: cs },
-      ];
-    });
-
-    const wsQA = XLSX.utils.aoa_to_sheet([qaHeaderRow, ...qaDataRows]);
+    const rowsQASheet = pf3qaTickets.map((t) => ({
+      Tipo: t.issue_type || "",
+      Clave: t.jira_key || "",
+      Resumen: t.summary || "",
+      Sprint: t.sprint || "",
+      "Persona asignada": resolveName(t.assignee_email),
+      Estado: t.status || "",
+      Informador: resolveName(t.reporter_email),
+    }));
+    const wsQA = XLSX.utils.json_to_sheet(rowsQASheet, { header: headersQA });
     wsQA["!cols"] = [
       { wch: 16 }, { wch: 13 }, { wch: 52 }, { wch: 22 }, { wch: 24 }, { wch: 20 }, { wch: 24 },
     ];
@@ -208,7 +145,7 @@ export async function exportUnifiedExcel(selectedSprint) {
     };
 
     /* ═══════════════════════════════════════════════════════════════
-       6. GENERAR XML DE LAS HOJAS ESTILIZADAS
+       4. GENERAR XML DE LAS HOJAS DE DATOS
        ═══════════════════════════════════════════════════════════════ */
     const wbTemp = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wbTemp, wsOsi, "Osi");
@@ -219,10 +156,9 @@ export async function exportUnifiedExcel(selectedSprint) {
     const osiSheetXml = await tempZip.file("xl/worksheets/sheet1.xml").async("string");
     const qaSheetXml = await tempZip.file("xl/worksheets/sheet2.xml").async("string");
     const sharedStrXml = await tempZip.file("xl/sharedStrings.xml")?.async("string");
-    const stylesXml = await tempZip.file("xl/styles.xml")?.async("string");
 
     /* ═══════════════════════════════════════════════════════════════
-       7. CONSTRUIR PIVOT CACHE 2 Y PIVOT TABLES DINÁMICAMENTE
+       5. CONSTRUIR PIVOT CACHE 2 Y PIVOT TABLES DINÁMICAMENTE
        ═══════════════════════════════════════════════════════════════ */
 
     // Datos QA como objetos simples para construir el cache
@@ -448,17 +384,16 @@ export async function exportUnifiedExcel(selectedSprint) {
       "</pivotTableDefinition>";
 
     /* ═══════════════════════════════════════════════════════════════
-       8. CARGAR TEMPLATE E INYECTAR TODO
+       6. CARGAR TEMPLATE E INYECTAR TODO
        ═══════════════════════════════════════════════════════════════ */
     const templateRes = await fetch("/templates/reporte_template.xlsx");
     const templateBuf = await templateRes.arrayBuffer();
     const zip = await JSZip.loadAsync(templateBuf);
 
-    // Hojas de datos estilizadas
+    // Hojas de datos (formato plano, preservando styles.xml del template)
     zip.file("xl/worksheets/sheet2.xml", osiSheetXml);    // Osi
     zip.file("xl/worksheets/sheet4.xml", qaSheetXml);     // Datos QA
     if (sharedStrXml) zip.file("xl/sharedStrings.xml", sharedStrXml);
-    if (stylesXml) zip.file("xl/styles.xml", stylesXml);
 
     // Cache 1 (Osi) — refreshOnLoad + recordCount
     let cacheDef1 = await zip.file("xl/pivotCache/pivotCacheDefinition1.xml").async("string");
@@ -484,7 +419,7 @@ export async function exportUnifiedExcel(selectedSprint) {
     zip.file("xl/pivotTables/pivotTable5.xml", pt5Xml);
 
     /* ═══════════════════════════════════════════════════════════════
-       9. DESCARGAR
+       7. DESCARGAR
        ═══════════════════════════════════════════════════════════════ */
     const blob = await zip.generateAsync({ type: "blob" });
     const url = URL.createObjectURL(blob);
