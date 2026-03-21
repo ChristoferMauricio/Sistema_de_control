@@ -27,6 +27,7 @@ import TicketTable from "@/components/TicketTable";
 import Card from "@/components/ui/Card";
 import { getCurrentSprint, formatCronogramaDate } from "@/lib/cronogramaData";
 import { useRole } from "@/app/dashboard/RoleContext";
+import { fetchAndClassify } from "@/lib/clasificarErrores";
 
 /**
  * Componente principal del dashboard - Vista General.
@@ -125,51 +126,11 @@ export default function DashboardPage() {
     if (allData.length > 0) {
       setTickets(allData);
 
-      /* ─── Construir mapa de sprints para tickets PF3 (para clasificar errores) ─── */
-      const pf3TicketMap = {};
-      allData.filter(t => t.jira_key?.startsWith("PF3-")).forEach(t => {
-        pf3TicketMap[t.jira_key] = t.sprint || "";
-      });
-
-      /* ─── Clasificación de errores mediante jira_ticket_links ─── */
-      // Filtrar bugs del tablero PF3QA en Sprint 2
-      const bugsQA = allData.filter(t =>
-        ["Bug", "Error", "Error Desarrollo", "Error Certificación", "Error en Certificación"].includes(t.issue_type) &&
-        t.jira_key?.startsWith("PF3QA-") &&
-        t.sprint === "Tablero Sprint 2"
-      );
-
-      // Consultar vínculos de los bugs con otros tickets
-      const bugKeys = bugsQA.map(b => b.jira_key);
-      const linksMap = {};
-      if (bugKeys.length > 0) {
-        const { data: linkRows } = await supabase
-          .from("jira_ticket_links")
-          .select("source_key, target_key")
-          .in("source_key", bugKeys);
-        for (const row of linkRows || []) {
-          if (!linksMap[row.source_key]) linksMap[row.source_key] = [];
-          linksMap[row.source_key].push(row.target_key);
-        }
-      }
-
-      // Errores de CERTIFICACIÓN: historias vinculadas en sprints F3.01 o F3.02
-      const certBugs = bugsQA.filter(bug => {
-        const targets = linksMap[bug.jira_key] || [];
-        return targets.some(tk => {
-          const s = pf3TicketMap[tk] || "";
-          return s.includes("F3.01") || s.includes("F3.02");
-        });
-      });
-
-      // Errores de DESARROLLO: historias vinculadas en sprints F3.03, F3.4 o F3.5
-      const desBugs = bugsQA.filter(bug => {
-        const targets = linksMap[bug.jira_key] || [];
-        return targets.some(tk => {
-          const s = pf3TicketMap[tk] || "";
-          return s.includes("F3.03") || s.includes("F3.4") || s.includes("F3.5");
-        });
-      });
+      /* ─── Clasificación de errores usando fetchAndClassify (misma lógica que pestañas) ─── */
+      const classifyResult = await fetchAndClassify();
+      const currentQASprint = classifyResult.defaultSprint;
+      const certBugs = classifyResult.certificacion.filter(t => t.sprint === currentQASprint);
+      const desBugs = classifyResult.desarrollo.filter(t => t.sprint === currentQASprint);
 
       /**
        * Cuenta tickets por estado (Por hacer, En curso, Finalizada).
