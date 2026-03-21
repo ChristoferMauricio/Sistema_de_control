@@ -209,7 +209,8 @@ function DetailModal({ title, personName, items, linksMap, allTicketMap, onClose
  * @param {Function} props.onBarClick - Callback: (personName, type) => void
  * @param {boolean} props.showExcluidos - Si mostrar la columna de excluidos
  */
-function StatsTable({ title, subtitle, data, onBarClick, showExcluidos }) {
+function StatsTable({ title, subtitle, data, onBarClick, onStatusClick, showExcluidos, visibleStatuses }) {
+  const statusDefs = visibleStatuses ? STATUS_DEFS.filter((sd) => visibleStatuses.includes(sd.key)) : STATUS_DEFS;
   if (!data.length) {
     return (
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
@@ -224,17 +225,31 @@ function StatsTable({ title, subtitle, data, onBarClick, showExcluidos }) {
 
   // Totales
   const totals = { historias: 0, errores: 0, excluidos: 0, historiasStatus: {}, erroresStatus: {} };
-  STATUS_DEFS.forEach((sd) => { totals.historiasStatus[sd.key] = 0; totals.erroresStatus[sd.key] = 0; });
+  statusDefs.forEach((sd) => { totals.historiasStatus[sd.key] = 0; totals.erroresStatus[sd.key] = 0; });
   data.forEach((row) => {
     totals.historias += row.historias;
     totals.errores += row.errores;
     totals.excluidos += row.excluidos;
-    STATUS_DEFS.forEach((sd) => {
+    statusDefs.forEach((sd) => {
       totals.historiasStatus[sd.key] += (row.historiasStatus[sd.key] || 0);
       totals.erroresStatus[sd.key] += (row.erroresStatus[sd.key] || 0);
     });
   });
   const grandTotal = totals.historias + totals.errores + totals.excluidos;
+
+  /** Renderiza una celda de estado clicable */
+  const StatusCell = ({ count, statusKey, personName, type }) => {
+    if (count <= 0) return <span className="text-gray-200 text-xs">0</span>;
+    const sd = statusDefs.find((s) => s.key === statusKey);
+    return (
+      <button
+        onClick={() => onStatusClick && onStatusClick(personName, type, statusKey)}
+        className={`inline-flex items-center justify-center min-w-[22px] px-1 py-0.5 rounded text-[10px] font-bold ${sd?.color || ""} hover:ring-2 hover:ring-offset-1 hover:ring-gray-300 transition-all cursor-pointer`}
+      >
+        {count}
+      </button>
+    );
+  };
 
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden animate-fade-in">
@@ -248,8 +263,7 @@ function StatsTable({ title, subtitle, data, onBarClick, showExcluidos }) {
           <thead>
             <tr className="border-b-2 border-gray-200 bg-gray-50/80">
               <th className="text-left px-4 py-2 font-semibold text-gray-700" style={{ minWidth: "150px" }}>Integrante</th>
-              {/* Columnas de estado para Historias */}
-              <th colSpan={STATUS_DEFS.length} className="text-center px-2 py-1 border-l border-gray-200">
+              <th colSpan={statusDefs.length} className="text-center px-2 py-1 border-l border-gray-200">
                 <div className="flex items-center justify-center gap-1.5 text-sky-600">
                   <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
@@ -260,8 +274,7 @@ function StatsTable({ title, subtitle, data, onBarClick, showExcluidos }) {
               <th className="text-center px-2 py-2 border-l border-gray-200 font-semibold text-sky-700 bg-sky-50/50" style={{ minWidth: "50px" }}>
                 <span className="text-xs">Sub</span>
               </th>
-              {/* Columnas de estado para Errores */}
-              <th colSpan={STATUS_DEFS.length} className="text-center px-2 py-1 border-l border-gray-200">
+              <th colSpan={statusDefs.length} className="text-center px-2 py-1 border-l border-gray-200">
                 <div className="flex items-center justify-center gap-1.5 text-red-500">
                   <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -279,10 +292,9 @@ function StatsTable({ title, subtitle, data, onBarClick, showExcluidos }) {
               )}
               <th className="text-center px-3 py-2 border-l border-gray-200 font-bold text-gray-900 bg-orange-50/50" style={{ minWidth: "55px" }}>TOTAL</th>
             </tr>
-            {/* Sub-header: status labels */}
             <tr className="border-b border-gray-200 bg-gray-50/40">
               <th />
-              {STATUS_DEFS.map((sd) => (
+              {statusDefs.map((sd) => (
                 <th key={`h-${sd.key}`} className="text-center px-1 py-1 border-l border-gray-100">
                   <span className={`inline-flex items-center px-1 py-0.5 rounded text-[8px] font-bold ${sd.color}`}>
                     {sd.label.replace("Listo para dev", "Dev").replace("Por hacer", "P.Hacer")}
@@ -290,7 +302,7 @@ function StatsTable({ title, subtitle, data, onBarClick, showExcluidos }) {
                 </th>
               ))}
               <th className="border-l border-gray-200" />
-              {STATUS_DEFS.map((sd) => (
+              {statusDefs.map((sd) => (
                 <th key={`e-${sd.key}`} className="text-center px-1 py-1 border-l border-gray-100">
                   <span className={`inline-flex items-center px-1 py-0.5 rounded text-[8px] font-bold ${sd.color}`}>
                     {sd.label.replace("Listo para dev", "Dev").replace("Por hacer", "P.Hacer")}
@@ -308,22 +320,11 @@ function StatsTable({ title, subtitle, data, onBarClick, showExcluidos }) {
               return (
                 <tr key={row.name} className="border-b border-gray-200 hover:bg-gray-50/50 transition-colors">
                   <td className="px-4 py-2 font-medium text-gray-800 whitespace-nowrap">{row.name}</td>
-                  {/* Historias por estado */}
-                  {STATUS_DEFS.map((sd) => {
-                    const count = row.historiasStatus[sd.key] || 0;
-                    return (
-                      <td key={`h-${sd.key}`} className="px-1 py-2 text-center border-l border-gray-100">
-                        {count > 0 ? (
-                          <span className={`inline-flex items-center justify-center min-w-[22px] px-1 py-0.5 rounded text-[10px] font-bold ${sd.color}`}>
-                            {count}
-                          </span>
-                        ) : (
-                          <span className="text-gray-200 text-xs">0</span>
-                        )}
-                      </td>
-                    );
-                  })}
-                  {/* Subtotal Historias */}
+                  {statusDefs.map((sd) => (
+                    <td key={`h-${sd.key}`} className="px-1 py-2 text-center border-l border-gray-100">
+                      <StatusCell count={row.historiasStatus[sd.key] || 0} statusKey={sd.key} personName={row.name} type="Historia" />
+                    </td>
+                  ))}
                   <td className="px-2 py-2 text-center border-l border-gray-200 bg-sky-50/30">
                     {row.historias > 0 ? (
                       <button onClick={() => onBarClick(row.name, "Historia")} className="inline-flex items-center justify-center min-w-[26px] px-1.5 py-0.5 rounded-lg text-xs font-bold bg-sky-100 text-sky-700 border border-sky-200 hover:bg-sky-200 transition-colors cursor-pointer">
@@ -333,22 +334,11 @@ function StatsTable({ title, subtitle, data, onBarClick, showExcluidos }) {
                       <span className="text-gray-200 text-xs">0</span>
                     )}
                   </td>
-                  {/* Errores por estado */}
-                  {STATUS_DEFS.map((sd) => {
-                    const count = row.erroresStatus[sd.key] || 0;
-                    return (
-                      <td key={`e-${sd.key}`} className="px-1 py-2 text-center border-l border-gray-100">
-                        {count > 0 ? (
-                          <span className={`inline-flex items-center justify-center min-w-[22px] px-1 py-0.5 rounded text-[10px] font-bold ${sd.color}`}>
-                            {count}
-                          </span>
-                        ) : (
-                          <span className="text-gray-200 text-xs">0</span>
-                        )}
-                      </td>
-                    );
-                  })}
-                  {/* Subtotal Errores */}
+                  {statusDefs.map((sd) => (
+                    <td key={`e-${sd.key}`} className="px-1 py-2 text-center border-l border-gray-100">
+                      <StatusCell count={row.erroresStatus[sd.key] || 0} statusKey={sd.key} personName={row.name} type="Error" />
+                    </td>
+                  ))}
                   <td className="px-2 py-2 text-center border-l border-gray-200 bg-red-50/30">
                     {row.errores > 0 ? (
                       <button onClick={() => onBarClick(row.name, "Error")} className="inline-flex items-center justify-center min-w-[26px] px-1.5 py-0.5 rounded-lg text-xs font-bold bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 transition-colors cursor-pointer">
@@ -358,7 +348,6 @@ function StatsTable({ title, subtitle, data, onBarClick, showExcluidos }) {
                       <span className="text-gray-200 text-xs">0</span>
                     )}
                   </td>
-                  {/* Excluidos */}
                   {showExcluidos && (
                     <td className="px-2 py-2 text-center border-l border-gray-200">
                       {row.excluidos > 0 ? (
@@ -370,11 +359,8 @@ function StatsTable({ title, subtitle, data, onBarClick, showExcluidos }) {
                       )}
                     </td>
                   )}
-                  {/* TOTAL */}
                   <td className="px-3 py-2 text-center border-l border-gray-200 bg-gray-50/50">
-                    <span className="inline-flex items-center justify-center min-w-[28px] px-1.5 py-0.5 rounded-lg text-xs font-bold text-gray-800">
-                      {rowTotal}
-                    </span>
+                    <span className="inline-flex items-center justify-center min-w-[28px] px-1.5 py-0.5 rounded-lg text-xs font-bold text-gray-800">{rowTotal}</span>
                   </td>
                 </tr>
               );
@@ -382,7 +368,7 @@ function StatsTable({ title, subtitle, data, onBarClick, showExcluidos }) {
             {/* Fila TOTAL */}
             <tr className="border-t-2 border-gray-300 bg-gray-50/80 font-semibold">
               <td className="px-4 py-2 text-gray-700">TOTAL</td>
-              {STATUS_DEFS.map((sd) => (
+              {statusDefs.map((sd) => (
                 <td key={`th-${sd.key}`} className="px-1 py-2 text-center border-l border-gray-100">
                   <div className="flex flex-col items-center">
                     <span className={`inline-flex items-center justify-center min-w-[22px] px-1 py-0.5 rounded text-[10px] font-bold ${sd.color}`}>
@@ -395,7 +381,7 @@ function StatsTable({ title, subtitle, data, onBarClick, showExcluidos }) {
               <td className="px-2 py-2 text-center border-l border-gray-200 bg-sky-50/30">
                 <span className="inline-flex items-center justify-center min-w-[26px] px-1.5 py-0.5 rounded-lg text-xs font-bold bg-sky-200 text-sky-800">{totals.historias}</span>
               </td>
-              {STATUS_DEFS.map((sd) => (
+              {statusDefs.map((sd) => (
                 <td key={`te-${sd.key}`} className="px-1 py-2 text-center border-l border-gray-100">
                   <div className="flex flex-col items-center">
                     <span className={`inline-flex items-center justify-center min-w-[22px] px-1 py-0.5 rounded text-[10px] font-bold ${sd.color}`}>
@@ -690,6 +676,30 @@ export default function ErroresEstadisticasPage() {
     });
   }, [validTickets, resolveName]);
 
+  /**
+   * Manejador de click en celdas de estado. Abre el modal con tickets filtrados
+   * por persona, tipo (Historia/Error) y estado específico.
+   */
+  const handleStatusClick = useCallback((field) => (personName, type, statusKey) => {
+    const statusDef = STATUS_DEFS.find((sd) => sd.key === statusKey);
+    const items = validTickets.filter((t) => {
+      const name = resolveName(t[field]);
+      if (name !== personName) return false;
+      if (classifyStatus(t.status) !== statusKey) return false;
+      if (type === "Error") return ERROR_TYPES.includes(t.issue_type) && !EXCLUDE_PATTERN.test(t.summary || "");
+      return t.issue_type === "Historia" && !EXCLUDE_PATTERN.test(t.summary || "");
+    });
+    setModal({
+      title: `${type === "Error" ? "Errores" : "Historias"} — ${statusDef?.label || statusKey}`,
+      personName,
+      items,
+    });
+  }, [validTickets, resolveName]);
+
+  /** Detecta si el sprint seleccionado es del tablero PF3QA */
+  const isPF3QA = /Tablero\s+Sprint/i.test(selectedSprint || "");
+  const visibleStatuses = isPF3QA ? ["por_hacer", "en_curso", "finalizada"] : null;
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -802,7 +812,9 @@ export default function ErroresEstadisticasPage() {
         subtitle={`${reporterData.length} informador${reporterData.length !== 1 ? "es" : ""}`}
         data={reporterData}
         onBarClick={handleBarClick("reporter_email")}
+        onStatusClick={handleStatusClick("reporter_email")}
         showExcluidos={activeFilters.has("Excluido")}
+        visibleStatuses={visibleStatuses}
       />
 
       {/* Tabla 2: Assignees */}
@@ -811,7 +823,9 @@ export default function ErroresEstadisticasPage() {
         subtitle={`${assigneeData.length} integrante${assigneeData.length !== 1 ? "s" : ""}`}
         data={assigneeData}
         onBarClick={handleBarClick("assignee_email")}
+        onStatusClick={handleStatusClick("assignee_email")}
         showExcluidos={activeFilters.has("Excluido")}
+        visibleStatuses={visibleStatuses}
       />
 
       {/* Detail Modal */}
