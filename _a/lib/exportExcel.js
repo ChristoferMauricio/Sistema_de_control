@@ -229,7 +229,7 @@ export async function exportUnifiedExcel(selectedSprint) {
     while (hasMore) {
       const { data, error } = await supabase
         .from("jira_tickets")
-        .select("jira_key, summary, status, issue_type, sprint, story_points, assignee_email, reporter_email, parent_key, created_at, updated_at, subtask_keys, comentario, priority")
+        .select("jira_key, summary, status, issue_type, sprint, story_points, assignee_email, reporter_email, parent_key, created_at, updated_at, comentario, priority")
         .order("updated_at", { ascending: false })
         .range(from, from + pageSize - 1);
       if (error) { console.error("[exportExcel] Supabase error:", error); hasMore = false; break; }
@@ -239,6 +239,17 @@ export async function exportUnifiedExcel(selectedSprint) {
       from += pageSize;
       hasMore = data.length === pageSize;
     }
+
+    // Obtener subtareas desde tabla relacional (reemplaza columna subtask_keys eliminada)
+    const { data: subtaskRows } = await supabase
+      .from("jira_ticket_subtasks")
+      .select("parent_key, child_key");
+    const subtaskMap = {};
+    (subtaskRows || []).forEach((r) => {
+      if (!subtaskMap[r.parent_key]) subtaskMap[r.parent_key] = [];
+      subtaskMap[r.parent_key].push(r.child_key);
+    });
+    console.log(`[exportExcel] ✅ Subtareas: ${(subtaskRows || []).length} relaciones`);
 
     const equipo = equipoRes.data || [];
     const persons = personsRes.data || [];
@@ -326,7 +337,7 @@ export async function exportUnifiedExcel(selectedSprint) {
       Tipo: t.issue_type || "",
       Clave: t.jira_key || "",
       Resumen: t.summary || "",
-      Subtareas: t.subtask_keys?.join(", ") || "",
+      Subtareas: (subtaskMap[t.jira_key] || []).join(", "),
       Principal: t.parent_key || "",
       "Épica": resolveEpic(t)?.summary || "",
       Sprint: t.sprint || "",
