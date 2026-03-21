@@ -217,16 +217,27 @@ export default function DashboardNav({ user, role }) {
   useEffect(() => {
     async function fetchCounts() {
       try {
+        // Determinar el sprint Tablero más alto para filtrar contadores
+        const { data: sprintRows } = await supabase
+          .from("jira_tickets")
+          .select("sprint")
+          .like("jira_key", "PF3QA-%")
+          .like("sprint", "Tablero Sprint%");
+        const tabNums = (sprintRows || []).map(r => parseInt(r.sprint?.match(/(\d+)/)?.[1]) || 0);
+        const maxTab = tabNums.length > 0 ? Math.max(...tabNums) : 2;
+        const currentSprint = `Tablero Sprint ${maxTab}`;
+
         const [
           { data: ticketsPF3QA },
           { data: obsData }
         ] = await Promise.all([
-          // 1. Tickets PF3QA (Historias + Errores)
+          // 1. Tickets PF3QA (Historias + Errores) del sprint actual
           supabase
             .from("jira_tickets")
             .select("jira_key, parent_key")
             .in("issue_type", ["Historia", "Bug", "Error", "Error Desarrollo", "Error Certificación", "Error en Certificación"])
-            .like("jira_key", "PF3QA-%"),
+            .like("jira_key", "PF3QA-%")
+            .eq("sprint", currentSprint),
 
           // 2. Fetch Supervisor Observations
           supabase

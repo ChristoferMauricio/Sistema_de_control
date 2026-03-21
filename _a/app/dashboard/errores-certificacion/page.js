@@ -24,7 +24,7 @@ export default function ErroresCertificacionPage() {
       setAllTickets(result.certificacion);
       setSprints(result.sprints);
       // Default: sprint más alto (primero en la lista ordenada descendente)
-      if (result.sprints.length > 0) setFilterSprint(result.sprints[0]);
+      if (result.defaultSprint) setFilterSprint(result.defaultSprint);
       setLoading(false);
     }
     load();

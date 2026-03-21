@@ -26,7 +26,7 @@ export async function fetchAndClassify() {
     .order("updated_at", { ascending: false });
 
   if (!ticketsPF3QA || ticketsPF3QA.length === 0) {
-    return { certificacion: [], desarrollo: [], revision: [], sprints: [] };
+    return { certificacion: [], desarrollo: [], revision: [], sprints: [], defaultSprint: "" };
   }
 
   // 2. Obtener links desde jira_ticket_links
@@ -55,9 +55,18 @@ export async function fetchAndClassify() {
     });
   }
 
-  // 4. Sprints disponibles (ordenados: Tablero Sprint 2 primero)
+  // 4. Sprints disponibles (ordenados) + determinar el sprint más alto tipo Tablero
   const sprintSet = new Set(ticketsPF3QA.map((t) => t.sprint).filter(Boolean));
   const sprints = sortSprints([...sprintSet]);
+  // El sprint default es el Tablero Sprint más alto (mayor número)
+  const tableroSprints = sprints.filter((s) => /Tablero\s+Sprint/i.test(s));
+  const defaultSprint = tableroSprints.length > 0
+    ? tableroSprints.reduce((a, b) => {
+        const numA = parseInt(a.match(/(\d+)/)?.[1]) || 0;
+        const numB = parseInt(b.match(/(\d+)/)?.[1]) || 0;
+        return numA > numB ? a : b;
+      })
+    : sprints[0] || "";
 
   // 5. Clasificar cada ticket
   const certificacion = [];
@@ -90,5 +99,5 @@ export async function fetchAndClassify() {
     revision.push(enriched);
   });
 
-  return { certificacion, desarrollo, revision, sprints };
+  return { certificacion, desarrollo, revision, sprints, defaultSprint };
 }

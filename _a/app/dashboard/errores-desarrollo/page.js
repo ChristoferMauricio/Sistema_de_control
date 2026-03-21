@@ -23,7 +23,7 @@ export default function ErroresDesarrolloPage() {
       const result = await fetchAndClassify();
       setAllTickets(result.desarrollo);
       setSprints(result.sprints);
-      if (result.sprints.length > 0) setFilterSprint(result.sprints[0]);
+      if (result.defaultSprint) setFilterSprint(result.defaultSprint);
       setLoading(false);
     }
     load();
