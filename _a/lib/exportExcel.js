@@ -10,7 +10,6 @@
  * Usado por: ReportesTable.js y errores-estadisticas/page.js
  */
 
-import XLSX from "xlsx-js-style";
 import JSZip from "jszip";
 import { supabase } from "@/lib/supabase";
 import { sortSprints } from "@/lib/utils";
@@ -108,14 +107,16 @@ export async function exportUnifiedExcel(selectedSprint) {
     }
 
     /* ═══════════════════════════════════════════════════════════════
-       3. CONSTRUIR HOJAS DE DATOS (formato plano, sin estilos custom)
+       3. CONSTRUIR DATOS DE HOJAS
        ═══════════════════════════════════════════════════════════════ */
-    // --- Hoja "Osi" ---
+    // --- Datos "Osi" ---
     const headersOsi = [
       "Tipo", "Clave", "Resumen", "Subtareas", "Principal",
       "Épica", "Sprint", "Persona asignada", "Story Points",
       "Estado", "Informador", "Creada",
     ];
+    const colWidthsOsi = [16, 13, 52, 20, 13, 32, 22, 24, 13, 20, 24, 18];
+
     const rowsOsi = allTickets.map((t) => ({
       Tipo: t.issue_type || "",
       Clave: t.jira_key || "",
@@ -130,20 +131,81 @@ export async function exportUnifiedExcel(selectedSprint) {
       Informador: resolveName(t.reporter_email),
       Creada: t.created_at ? formatDate(t.created_at) : "",
     }));
-    const wsOsi = XLSX.utils.json_to_sheet(rowsOsi, { header: headersOsi });
-    wsOsi["!cols"] = [
-      { wch: 16 }, { wch: 13 }, { wch: 52 }, { wch: 20 }, { wch: 13 },
-      { wch: 32 }, { wch: 22 }, { wch: 24 }, { wch: 13 }, { wch: 20 },
-      { wch: 24 }, { wch: 18 },
-    ];
-    wsOsi["!autofilter"] = {
-      ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: allTickets.length, c: 11 } }),
-    };
 
-    // --- Hoja "Datos QA" ---
+    // --- Datos "Datos QA" ---
     const headersQA = ["Tipo", "Clave", "Resumen", "Sprint", "Persona asignada", "Estado", "Informador"];
+    const colWidthsQA = [16, 13, 52, 22, 24, 20, 24];
     const pf3qaTickets = allTickets.filter((t) => t.jira_key?.startsWith("PF3QA-"));
-    const rowsQASheet = pf3qaTickets.map((t) => ({
+
+    /* ═══════════════════════════════════════════════════════════════
+       4. GENERAR XML DE LAS HOJAS CON INLINE STRINGS (sin sharedStrings)
+       ═══════════════════════════════════════════════════════════════ */
+    // Helper: convertir índice de columna a letra Excel (0→A, 1→B, ..., 25→Z, 26→AA)
+    function colLetter(idx) {
+      let s = "";
+      let n = idx;
+      while (n >= 0) {
+        s = String.fromCharCode(65 + (n % 26)) + s;
+        n = Math.floor(n / 26) - 1;
+      }
+      return s;
+    }
+
+    // Helper: generar XML de worksheet completo con inline strings
+    function buildWorksheetXml(headers, rows, colWidths) {
+      let xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+      xml += '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">';
+
+      // Columnas con ancho personalizado
+      if (colWidths.length > 0) {
+        xml += "<cols>";
+        colWidths.forEach((w, i) => {
+          xml += `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`;
+        });
+        xml += "</cols>";
+      }
+
+      xml += "<sheetData>";
+
+      // Fila de encabezado
+      xml += '<row r="1">';
+      headers.forEach((h, c) => {
+        xml += `<c r="${colLetter(c)}1" t="inlineStr"><is><t>${escXml(h)}</t></is></c>`;
+      });
+      xml += "</row>";
+
+      // Filas de datos
+      rows.forEach((row, ri) => {
+        const r = ri + 2;
+        xml += `<row r="${r}">`;
+        headers.forEach((h, c) => {
+          const ref = `${colLetter(c)}${r}`;
+          const val = row[h];
+          if (val === "" || val == null) {
+            // Celda vacía con inline string vacío
+            xml += `<c r="${ref}" t="inlineStr"><is><t></t></is></c>`;
+          } else if (typeof val === "number") {
+            xml += `<c r="${ref}"><v>${val}</v></c>`;
+          } else {
+            xml += `<c r="${ref}" t="inlineStr"><is><t>${escXml(String(val))}</t></is></c>`;
+          }
+        });
+        xml += "</row>";
+      });
+
+      xml += "</sheetData>";
+
+      // AutoFilter
+      const lastCol = colLetter(headers.length - 1);
+      const lastRow = rows.length + 1;
+      xml += `<autoFilter ref="A1:${lastCol}${lastRow}"/>`;
+
+      xml += "</worksheet>";
+      return xml;
+    }
+
+    const osiSheetXml = buildWorksheetXml(headersOsi, rowsOsi, colWidthsOsi);
+    const qaSheetXml = buildWorksheetXml(headersQA, pf3qaTickets.map((t) => ({
       Tipo: t.issue_type || "",
       Clave: t.jira_key || "",
       Resumen: t.summary || "",
@@ -151,27 +213,7 @@ export async function exportUnifiedExcel(selectedSprint) {
       "Persona asignada": resolveName(t.assignee_email),
       Estado: t.status || "",
       Informador: resolveName(t.reporter_email),
-    }));
-    const wsQA = XLSX.utils.json_to_sheet(rowsQASheet, { header: headersQA });
-    wsQA["!cols"] = [
-      { wch: 16 }, { wch: 13 }, { wch: 52 }, { wch: 22 }, { wch: 24 }, { wch: 20 }, { wch: 24 },
-    ];
-    wsQA["!autofilter"] = {
-      ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: pf3qaTickets.length, c: 6 } }),
-    };
-
-    /* ═══════════════════════════════════════════════════════════════
-       4. GENERAR XML DE LAS HOJAS DE DATOS
-       ═══════════════════════════════════════════════════════════════ */
-    const wbTemp = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wbTemp, wsOsi, "Osi");
-    XLSX.utils.book_append_sheet(wbTemp, wsQA, "DatosQA");
-    const tempBuf = XLSX.write(wbTemp, { bookType: "xlsx", type: "array" });
-    const tempZip = await JSZip.loadAsync(tempBuf);
-
-    const osiSheetXml = await tempZip.file("xl/worksheets/sheet1.xml").async("string");
-    const qaSheetXml = await tempZip.file("xl/worksheets/sheet2.xml").async("string");
-    const sharedStrXml = await tempZip.file("xl/sharedStrings.xml")?.async("string");
+    })), colWidthsQA);
 
     /* ═══════════════════════════════════════════════════════════════
        5. CONSTRUIR PIVOT CACHE 2 Y PIVOT TABLES DINÁMICAMENTE
@@ -406,10 +448,9 @@ export async function exportUnifiedExcel(selectedSprint) {
     const templateBuf = await templateRes.arrayBuffer();
     const zip = await JSZip.loadAsync(templateBuf);
 
-    // Hojas de datos (formato plano, preservando styles.xml del template)
+    // Hojas de datos (inline strings, no reemplaza sharedStrings.xml del template)
     zip.file("xl/worksheets/sheet2.xml", osiSheetXml);    // Osi
     zip.file("xl/worksheets/sheet4.xml", qaSheetXml);     // Datos QA
-    if (sharedStrXml) zip.file("xl/sharedStrings.xml", sharedStrXml);
 
     // Cache 1 (Osi) — records completos para que pivots se muestren sin refresh manual
     // Campos Osi: 0=Tipo, 1=Clave, 2=Resumen, 3=Subtareas, 4=Principal,
