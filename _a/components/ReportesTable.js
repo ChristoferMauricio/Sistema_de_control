@@ -19,11 +19,10 @@
 
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
-import * as XLSX from "xlsx-js-style";
-import JSZip from "jszip";
 import { Download } from "lucide-react";
 import { getCurrentSprint } from "@/lib/cronogramaData";
 import { sortSprints } from "@/lib/utils";
+import { exportUnifiedExcel } from "@/lib/exportExcel";
 
 /**
  * Mapeo de estados internos de Jira a columnas del reporte.
@@ -749,82 +748,10 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
     }
 
     /**
-     * Exporta a Excel inyectando los datos en un template XLSX con tabla pivot.
-     * Proceso: genera una hoja "Osi" con todos los tickets, la inserta en el template
-     * via JSZip (manipulacion directa del XML del xlsx), y marca refreshOnLoad=1
-     * para que Excel recalcule la tabla pivot al abrir el archivo.
+     * Exporta a Excel unificado con tablas dinámicas (Osi + Datos QA).
+     * Delega al módulo compartido exportExcel.js
      */
-    const exportToExcel = async () => {
-        try {
-            const now = new Date();
-            const dateStr = now.toLocaleDateString("es-PE").replace(/\//g, "-");
-
-            // ── Hoja "Osi": todos los tickets (sin filtrar) para que los filtros del pivot funcionen
-            const headersOsi = ["Tipo", "Clave", "Resumen", "Subtareas", "Principal", "Épica", "Sprint", "Persona asignada", "Story Points", "Estado", "Informador", "Creada"];
-            const rowsOsi = tickets.map(t => ({
-                "Tipo": t.issue_type || "",
-                "Clave": t.jira_key || "",
-                "Resumen": t.summary || "",
-                "Subtareas": t.subtask_keys?.join(", ") || "",
-                "Principal": t.parent_key || "",
-                "Épica": resolveEpic(t)?.summary || "",
-                "Sprint": t.sprint || "",
-                "Persona asignada": resolveName(t.assignee_email),
-                "Story Points": t.story_points ?? "",
-                "Estado": t.status || "",
-                "Informador": resolveName(t.reporter_email),
-                "Creada": t.created_at ? formatDate(t.created_at) : "",
-            }));
-
-            // 1. Generar mini-xlsx con solo la hoja Osi para extraer el XML
-            const wsOsi = XLSX.utils.json_to_sheet(rowsOsi, { header: headersOsi });
-            const wbOsi = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wbOsi, wsOsi, "Osi");
-            const osiBuf = XLSX.write(wbOsi, { bookType: "xlsx", type: "array" });
-            const osiZip = await JSZip.loadAsync(osiBuf);
-            const osiSheetXml = await osiZip.file("xl/worksheets/sheet1.xml").async("string");
-            const osiSharedStr = osiZip.file("xl/sharedStrings.xml");
-            const osiSharedStrXml = osiSharedStr ? await osiSharedStr.async("string") : null;
-
-            // 2. Cargar template
-            const templateRes = await fetch("/templates/reporte_template.xlsx");
-            const templateBuf = await templateRes.arrayBuffer();
-            const zip = await JSZip.loadAsync(templateBuf);
-
-            // 3. Reemplazar hoja "Osi" (sheet2.xml) y sharedStrings
-            zip.file("xl/worksheets/sheet2.xml", osiSheetXml);
-            if (osiSharedStrXml) {
-                zip.file("xl/sharedStrings.xml", osiSharedStrXml);
-            }
-
-            // 4. Parchear pivotCacheDefinition: refreshOnLoad="1" y actualizar recordCount
-            let cacheDef = await zip.file("xl/pivotCache/pivotCacheDefinition1.xml").async("string");
-            if (!cacheDef.includes("refreshOnLoad")) {
-                cacheDef = cacheDef.replace("<pivotCacheDefinition ", '<pivotCacheDefinition refreshOnLoad="1" ');
-            }
-            cacheDef = cacheDef.replace(/recordCount="\d+"/, `recordCount="${rowsOsi.length}"`);
-            zip.file("xl/pivotCache/pivotCacheDefinition1.xml", cacheDef);
-
-            // 5. Vaciar cache records (Excel los reconstruye al abrir con refreshOnLoad=1)
-            zip.file("xl/pivotCache/pivotCacheRecords1.xml",
-                '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-                '<pivotCacheRecords xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="0"/>');
-
-            // 6. Descargar
-            const blob = await zip.generateAsync({ type: "blob" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = `Reporte_Jira_${selectedSprint ? selectedSprint.replace(/\s+/g, "_") : "Todos"}_${dateStr}.xlsx`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        } catch (err) {
-            console.error("Error al exportar Excel:", err);
-            alert("Error al generar el Excel. Ver consola para detalles.");
-        }
-    };
+    const exportToExcel = () => exportUnifiedExcel(selectedSprint);
 
     return (
         <>
