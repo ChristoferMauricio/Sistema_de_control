@@ -2,13 +2,15 @@
  * @file lib/exportExcel.js - Módulo compartido de exportación a Excel
  * @description Genera un Excel unificado con 5 hojas usando shared strings (t="s").
  *
+ * Hojas (orden final): Reporte Sprint, Reporte por Épica, Osi, Reporte QA, Datos QA
+ *
  * Estrategia:
  *   1. Leer sharedStrings.xml original COMO TEXTO (sin parsear entries)
  *   2. Construir datos de sheet2 (Osi) y sheet4 (Datos QA)
  *   3. Buscar strings nuevos en el SST original; si no existen, añadirlos al final
- *   4. Generar sheet XML con t="s" references y s="1" para headers
+ *   4. Generar sheet XML con t="s" references y s="6" para headers estilizados
  *   5. Inyectar sheet2, sheet4 y sharedStrings actualizado
- *   6. NO tocar: styles.xml, pivotTables, pivotCaches (refreshOnLoad reconstruye)
+ *   6. Personalizar template: renombrar hojas, reordenar, estilos, pivot azul
  *
  * Usado por: ReportesTable.js y errores-estadisticas/page.js
  */
@@ -17,6 +19,10 @@ import JSZip from "jszip";
 import { supabase } from "@/lib/supabase";
 
 const NAME_OVERRIDES = { "miguel castillo": "Supervisor de Servicio" };
+
+/* ═══════════════════════════════════════════════════════════════════════
+   UTILIDADES
+   ═══════════════════════════════════════════════════════════════════════ */
 
 /** Escapa caracteres XML */
 function escXml(s) {
@@ -39,6 +45,10 @@ function colLetter(idx) {
   return s;
 }
 
+/* ═══════════════════════════════════════════════════════════════════════
+   SHARED STRING TABLE
+   ═══════════════════════════════════════════════════════════════════════ */
+
 /**
  * Gestiona el Shared String Table preservando el XML original intacto.
  * Solo busca strings existentes por texto plano y añade nuevos al final.
@@ -47,20 +57,15 @@ class SharedStrings {
   constructor(originalXml) {
     this.originalXml = originalXml || "";
 
-    // Extraer uniqueCount del original
     const ucMatch = this.originalXml.match(/uniqueCount="(\d+)"/);
     this.originalUniqueCount = ucMatch ? parseInt(ucMatch[1]) : 0;
 
-    // Construir mapa de texto → índice buscando en el XML
-    // Matcheamos cada <si>...</si> completo para obtener el índice
     this.textToIndex = new Map();
     let idx = 0;
     const siRegex = /<si>([\s\S]*?)<\/si>/g;
     let match;
     while ((match = siRegex.exec(this.originalXml)) !== null) {
-      // Extraer texto plano del contenido del <si>
       const siContent = match[1];
-      // Puede ser <t>VALUE</t> o <t/> o rich text <r><t>...</t></r>
       const textParts = [];
       const tRegex = /<t[^>]*>([\s\S]*?)<\/t>|<t\/>/g;
       let tMatch;
@@ -73,10 +78,8 @@ class SharedStrings {
             .replace(/&quot;/g, '"')
             .replace(/&apos;/g, "'"));
         }
-        // <t/> = empty string, textParts stays empty or gets ""
       }
       const plainText = textParts.join("");
-      // Solo guardar primera ocurrencia
       if (!this.textToIndex.has(plainText)) {
         this.textToIndex.set(plainText, idx);
       }
@@ -84,26 +87,21 @@ class SharedStrings {
     }
     this.parsedCount = idx;
 
-    // Nuevos strings que se añadirán al final
-    this.newEntries = []; // array of escaped XML strings
-    this.newEntriesMap = new Map(); // text → index
+    this.newEntries = [];
+    this.newEntriesMap = new Map();
     this.totalNewRefs = 0;
   }
 
-  /** Obtiene índice de un string. Si no existe, lo añade al final. */
   getIndex(val) {
     const str = String(val ?? "");
     this.totalNewRefs++;
 
-    // Buscar en el SST original
     const existingIdx = this.textToIndex.get(str);
     if (existingIdx !== undefined) return existingIdx;
 
-    // Buscar en los nuevos
     const newIdx = this.newEntriesMap.get(str);
     if (newIdx !== undefined) return newIdx;
 
-    // Añadir nuevo
     const idx = this.parsedCount + this.newEntries.length;
     if (str === "") {
       this.newEntries.push("<si><t/></si>");
@@ -114,52 +112,48 @@ class SharedStrings {
     return idx;
   }
 
-  /** Genera el XML final, preservando entries originales + añadiendo nuevos */
   toXml() {
     const totalUnique = this.parsedCount + this.newEntries.length;
-
-    // Contar refs de sheets originales (1,3,5) que no modificamos
-    // Las contamos de forma conservadora usando totalNewRefs + refs existentes
     const countMatch = this.originalXml.match(/count="(\d+)"/);
     const origCount = countMatch ? parseInt(countMatch[1]) : 0;
-    // El count final = refs originales de sheets no tocadas + nuestras nuevas refs
-    // Pero no podemos saber exactamente cuántas refs tenían sheet2 y sheet4 originales
-    // Solución: usar un count generoso (no afecta funcionalidad)
     const totalCount = this.totalNewRefs + origCount;
 
-    // Reemplazar count y uniqueCount en el tag <sst>
     let xml = this.originalXml;
+    xml = xml.replace(/uniqueCount="\d+"/, `uniqueCount="${totalUnique}"`);
+    xml = xml.replace(/count="\d+"/, `count="${totalCount}"`);
 
-    // Actualizar uniqueCount
-    xml = xml.replace(
-      /uniqueCount="\d+"/,
-      `uniqueCount="${totalUnique}"`
-    );
-    // Actualizar count
-    xml = xml.replace(
-      /count="\d+"/,
-      `count="${totalCount}"`
-    );
-
-    // Insertar nuevos entries antes del cierre </sst>
     if (this.newEntries.length > 0) {
       xml = xml.replace("</sst>", this.newEntries.join("") + "</sst>");
     }
-
     return xml;
   }
 }
 
+/* ═══════════════════════════════════════════════════════════════════════
+   GENERADOR DE HOJAS
+   ═══════════════════════════════════════════════════════════════════════ */
+
 /**
  * Genera XML de worksheet usando shared string references (t="s").
+ * @param {string} headerStyle - Índice de estilo para headers (default "6")
  */
-function buildSheetXml(headers, rows, colWidths, sst) {
+function buildSheetXml(headers, rows, colWidths, sst, headerStyle = "6") {
   const lastCol = colLetter(headers.length - 1);
   const lastRow = rows.length + 1;
 
   let xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
   xml += '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">';
   xml += `<dimension ref="A1:${lastCol}${lastRow}"/>`;
+
+  // Vistas: congelar fila de encabezados
+  xml += "<sheetViews>";
+  xml += '<sheetView workbookViewId="0">';
+  xml += '<pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/>';
+  xml += '<selection pane="bottomLeft" activeCell="A2" sqref="A2"/>';
+  xml += "</sheetView>";
+  xml += "</sheetViews>";
+
+  xml += '<sheetFormatPr defaultRowHeight="15"/>';
 
   if (colWidths.length > 0) {
     xml += "<cols>";
@@ -171,11 +165,11 @@ function buildSheetXml(headers, rows, colWidths, sst) {
 
   xml += "<sheetData>";
 
-  // Header row (s="1" = bold colored header, same as original template)
-  xml += '<row r="1">';
+  // Header row con estilo personalizado
+  xml += '<row r="1" ht="22" customHeight="1">';
   headers.forEach((h, c) => {
     const idx = sst.getIndex(h);
-    xml += `<c r="${colLetter(c)}1" s="1" t="s"><v>${idx}</v></c>`;
+    xml += `<c r="${colLetter(c)}1" s="${headerStyle}" t="s"><v>${idx}</v></c>`;
   });
   xml += "</row>";
 
@@ -203,6 +197,111 @@ function buildSheetXml(headers, rows, colWidths, sst) {
   xml += "</worksheet>";
   return xml;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PERSONALIZACIÓN DEL TEMPLATE
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Aplica todas las personalizaciones al template:
+ * - Renombrar "Tabla dinámica" → "Reporte Sprint"
+ * - Reordenar hojas
+ * - Agregar estilo de encabezado mejorado (azul, texto blanco, centrado)
+ * - Cambiar pivot tables de Reporte QA a estilo azul (PivotStyleMedium2)
+ */
+async function customizeTemplate(zip) {
+  // ─── A) Renombrar y reordenar hojas ────────────────────────────────
+  let wbXml = await zip.file("xl/workbook.xml").async("string");
+
+  // Reemplazar bloque <sheets> completo con nuevo orden y nombre
+  wbXml = wbXml.replace(
+    /<sheets>[\s\S]*?<\/sheets>/,
+    "<sheets>" +
+      '<sheet name="Reporte Sprint" sheetId="3" r:id="rId1"/>' +
+      '<sheet name="Reporte por Épica" sheetId="4" r:id="rId8"/>' +
+      '<sheet name="Osi" sheetId="1" r:id="rId2"/>' +
+      '<sheet name="Reporte QA" sheetId="6" r:id="rId10"/>' +
+      '<sheet name="Datos QA" sheetId="5" r:id="rId9"/>' +
+    "</sheets>"
+  );
+
+  // Activar primera pestaña
+  wbXml = wbXml.replace(/activeTab="\d+"/, 'activeTab="0"');
+
+  // Osi ahora está en posición 2 (0-based), actualizar localSheetId del filtro
+  wbXml = wbXml.replace(/localSheetId="1"/, 'localSheetId="2"');
+
+  zip.file("xl/workbook.xml", wbXml);
+
+  // ─── B) Mejorar estilo de encabezados ──────────────────────────────
+  let stylesXml = await zip.file("xl/styles.xml").async("string");
+
+  // Agregar fuente: blanca, negrita, 11pt (fontId=3)
+  stylesXml = stylesXml.replace(
+    '<fonts count="3"',
+    '<fonts count="4"'
+  );
+  stylesXml = stylesXml.replace(
+    "</fonts>",
+    '<font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/><family val="2"/><scheme val="minor"/></font></fonts>'
+  );
+
+  // Agregar relleno: azul corporativo (fillId=3)
+  stylesXml = stylesXml.replace(
+    '<fills count="3"',
+    '<fills count="4"'
+  );
+  stylesXml = stylesXml.replace(
+    "</fills>",
+    '<fill><patternFill patternType="solid"><fgColor rgb="FF4472C4"/><bgColor indexed="64"/></patternFill></fill></fills>'
+  );
+
+  // Agregar borde: línea delgada en los 4 lados (borderId=1)
+  stylesXml = stylesXml.replace(
+    '<borders count="1"',
+    '<borders count="2"'
+  );
+  stylesXml = stylesXml.replace(
+    "</borders>",
+    "<border>" +
+      '<left style="thin"><color indexed="64"/></left>' +
+      '<right style="thin"><color indexed="64"/></right>' +
+      '<top style="thin"><color indexed="64"/></top>' +
+      '<bottom style="thin"><color indexed="64"/></bottom>' +
+      "<diagonal/>" +
+    "</border></borders>"
+  );
+
+  // Agregar cellXf para encabezados: azul + blanco + centrado + borde (xfId=6)
+  stylesXml = stylesXml.replace(
+    '<cellXfs count="6"',
+    '<cellXfs count="7"'
+  );
+  stylesXml = stylesXml.replace(
+    "</cellXfs>",
+    '<xf numFmtId="0" fontId="3" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1">' +
+      '<alignment horizontal="center" vertical="center" wrapText="1"/>' +
+    "</xf></cellXfs>"
+  );
+
+  zip.file("xl/styles.xml", stylesXml);
+
+  // ─── C) Cambiar pivot tables de Reporte QA a estilo azul ──────────
+  for (const ptFile of [
+    "xl/pivotTables/pivotTable4.xml",
+    "xl/pivotTables/pivotTable5.xml",
+  ]) {
+    let ptXml = await zip.file(ptFile).async("string");
+    ptXml = ptXml.replace(/PivotStyleMedium4/g, "PivotStyleMedium2");
+    zip.file(ptFile, ptXml);
+  }
+
+  console.log("[exportExcel] ✅ Template personalizado: hojas renombradas/reordenadas, estilos y pivot azul");
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   FUNCIÓN PRINCIPAL DE EXPORTACIÓN
+   ═══════════════════════════════════════════════════════════════════════ */
 
 /**
  * Exporta un Excel unificado con todos los datos y tablas dinámicas.
@@ -240,7 +339,7 @@ export async function exportUnifiedExcel(selectedSprint) {
       hasMore = data.length === pageSize;
     }
 
-    // Obtener subtareas desde tabla relacional (reemplaza columna subtask_keys eliminada)
+    // Obtener subtareas desde tabla relacional
     const { data: subtaskRows } = await supabase
       .from("jira_ticket_subtasks")
       .select("parent_key, child_key");
@@ -249,7 +348,6 @@ export async function exportUnifiedExcel(selectedSprint) {
       if (!subtaskMap[r.parent_key]) subtaskMap[r.parent_key] = [];
       subtaskMap[r.parent_key].push(r.child_key);
     });
-    console.log(`[exportExcel] ✅ Subtareas: ${(subtaskRows || []).length} relaciones`);
 
     const equipo = equipoRes.data || [];
     const persons = personsRes.data || [];
@@ -328,6 +426,8 @@ export async function exportUnifiedExcel(selectedSprint) {
     /* ═══════════════════════════════════════════════════════════════
        4. CONSTRUIR HOJAS DE DATOS
        ═══════════════════════════════════════════════════════════════ */
+
+    // ─── Hoja "Osi" (sheet2) — todos los tickets ────────────────────
     const headersOsi = [
       "Tipo", "Clave", "Resumen", "Subtareas", "Principal",
       "Épica", "Sprint", "Persona asignada", "Story Points",
@@ -349,11 +449,29 @@ export async function exportUnifiedExcel(selectedSprint) {
     }));
     const osiXml = buildSheetXml(headersOsi, rowsOsi,
       [16, 13, 52, 20, 13, 32, 22, 24, 13, 20, 24, 18], sst);
-    console.log(`[exportExcel] ✅ Hoja Osi: ${rowsOsi.length} filas, XML ${osiXml.length} chars`);
+    console.log(`[exportExcel] ✅ Hoja Osi: ${rowsOsi.length} filas`);
 
+    // ─── Hoja "Datos QA" (sheet4) — tickets PF3QA filtrados ─────────
     const headersQA = ["Tipo", "Clave", "Resumen", "Sprint", "Persona asignada", "Estado", "Informador"];
-    const pf3qaTickets = allTickets.filter((t) => t.jira_key?.startsWith("PF3QA-"));
-    const rowsQA = pf3qaTickets.map((t) => ({
+    const allPf3qaTickets = allTickets.filter((t) => t.jira_key?.startsWith("PF3QA-"));
+
+    // Determinar sprint más reciente entre los QA tickets
+    const qaSprints = [...new Set(allPf3qaTickets.map((t) => t.sprint).filter(Boolean))];
+    const latestQaSprint = qaSprints.sort((a, b) => {
+      const numA = parseInt(a.match(/(\d+)\s*$/)?.[1] || "0");
+      const numB = parseInt(b.match(/(\d+)\s*$/)?.[1] || "0");
+      return numB - numA;
+    })[0] || "";
+    console.log(`[exportExcel] Sprint QA más reciente: "${latestQaSprint}"`);
+
+    // Filtrar: solo Historia y Error, solo sprint más reciente
+    const QA_TYPES = new Set(["Historia", "Error"]);
+    const pf3qaFiltered = allPf3qaTickets.filter(
+      (t) => QA_TYPES.has(t.issue_type) && t.sprint === latestQaSprint
+    );
+    console.log(`[exportExcel] ✅ Datos QA: ${allPf3qaTickets.length} total → ${pf3qaFiltered.length} filtrados (${[...QA_TYPES].join("/")} en "${latestQaSprint}")`);
+
+    const rowsQA = pf3qaFiltered.map((t) => ({
       Tipo: t.issue_type || "",
       Clave: t.jira_key || "",
       Resumen: t.summary || "",
@@ -364,25 +482,17 @@ export async function exportUnifiedExcel(selectedSprint) {
     }));
     const qaXml = buildSheetXml(headersQA, rowsQA,
       [16, 13, 52, 22, 24, 20, 24], sst);
-    console.log(`[exportExcel] ✅ Hoja QA: ${rowsQA.length} filas, XML ${qaXml.length} chars`);
 
     /* ═══════════════════════════════════════════════════════════════
-       5. INYECTAR EN TEMPLATE
+       5. INYECTAR DATOS Y PERSONALIZAR TEMPLATE
        ═══════════════════════════════════════════════════════════════ */
     zip.file("xl/worksheets/sheet2.xml", osiXml);
     zip.file("xl/worksheets/sheet4.xml", qaXml);
-    const sstFinalXml = sst.toXml();
-    zip.file("xl/sharedStrings.xml", sstFinalXml);
+    zip.file("xl/sharedStrings.xml", sst.toXml());
     console.log(`[exportExcel] ✅ SST final: ${sst.parsedCount + sst.newEntries.length} unique (${sst.newEntries.length} nuevos)`);
 
-    // Verificar que los archivos se inyectaron correctamente
-    const verifySheet2 = await zip.file("xl/worksheets/sheet2.xml")?.async("string");
-    const verifySheet4 = await zip.file("xl/worksheets/sheet4.xml")?.async("string");
-    console.log(`[exportExcel] ✅ Verificación sheet2: ${verifySheet2?.length} chars, tiene datos: ${verifySheet2?.includes('<row r="2">')}`);
-    console.log(`[exportExcel] ✅ Verificación sheet4: ${verifySheet4?.length} chars, tiene datos: ${verifySheet4?.includes('<row r="2">')}`);
-
-    // NO se toca: styles.xml, pivotCaches, pivotTables
-    // refreshOnLoad="1" en ambos caches reconstruye al abrir
+    // Personalizar template: renombrar, reordenar, estilos, pivot azul
+    await customizeTemplate(zip);
 
     /* ═══════════════════════════════════════════════════════════════
        6. DESCARGAR
