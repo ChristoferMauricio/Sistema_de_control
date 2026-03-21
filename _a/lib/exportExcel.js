@@ -209,6 +209,8 @@ function buildSheetXml(headers, rows, colWidths, sst) {
  */
 export async function exportUnifiedExcel(selectedSprint) {
   try {
+    console.log("[exportExcel] ▶ Iniciando exportación...");
+
     /* ═══════════════════════════════════════════════════════════════
        1. OBTENER DATOS DE SUPABASE
        ═══════════════════════════════════════════════════════════════ */
@@ -216,6 +218,9 @@ export async function exportUnifiedExcel(selectedSprint) {
       supabase.from("equipo_desarrollo").select("correo_pgim, correo_gcorp, nombre_clave, nombre"),
       supabase.from("jira_persons").select("email, display_name"),
     ]);
+
+    if (equipoRes.error) console.error("[exportExcel] Error equipo:", equipoRes.error);
+    if (personsRes.error) console.error("[exportExcel] Error persons:", personsRes.error);
 
     let allTickets = [];
     const pageSize = 1000;
@@ -227,14 +232,22 @@ export async function exportUnifiedExcel(selectedSprint) {
         .select("jira_key, summary, status, issue_type, sprint, story_points, assignee_email, reporter_email, parent_key, created_at, updated_at, subtask_keys, comentario, priority")
         .order("updated_at", { ascending: false })
         .range(from, from + pageSize - 1);
-      if (error || !data) { hasMore = false; break; }
+      if (error) { console.error("[exportExcel] Supabase error:", error); hasMore = false; break; }
+      if (!data || data.length === 0) { hasMore = false; break; }
       allTickets = [...allTickets, ...data];
+      console.log(`[exportExcel] Batch ${from}-${from + data.length}: ${data.length} tickets`);
       from += pageSize;
       hasMore = data.length === pageSize;
     }
 
     const equipo = equipoRes.data || [];
     const persons = personsRes.data || [];
+    console.log(`[exportExcel] ✅ Datos: ${allTickets.length} tickets, ${equipo.length} equipo, ${persons.length} persons`);
+
+    if (allTickets.length === 0) {
+      alert("No se encontraron tickets en la base de datos.");
+      return;
+    }
 
     /* ═══════════════════════════════════════════════════════════════
        2. FUNCIONES AUXILIARES
@@ -285,12 +298,21 @@ export async function exportUnifiedExcel(selectedSprint) {
     /* ═══════════════════════════════════════════════════════════════
        3. CARGAR TEMPLATE Y PREPARAR SHARED STRINGS
        ═══════════════════════════════════════════════════════════════ */
-    const templateRes = await fetch("/templates/reporte_template.xlsx");
+    const templateRes = await fetch("/templates/reporte_template.xlsx?t=" + Date.now());
+    if (!templateRes.ok) {
+      throw new Error(`Template fetch failed: ${templateRes.status} ${templateRes.statusText}`);
+    }
     const templateBuf = await templateRes.arrayBuffer();
+    console.log(`[exportExcel] ✅ Template cargado: ${templateBuf.byteLength} bytes`);
+
     const zip = await JSZip.loadAsync(templateBuf);
 
     const origSstXml = await zip.file("xl/sharedStrings.xml")?.async("string");
+    if (!origSstXml) {
+      throw new Error("sharedStrings.xml not found in template");
+    }
     const sst = new SharedStrings(origSstXml);
+    console.log(`[exportExcel] ✅ SST parseado: ${sst.parsedCount} entries originales`);
 
     /* ═══════════════════════════════════════════════════════════════
        4. CONSTRUIR HOJAS DE DATOS
@@ -316,6 +338,7 @@ export async function exportUnifiedExcel(selectedSprint) {
     }));
     const osiXml = buildSheetXml(headersOsi, rowsOsi,
       [16, 13, 52, 20, 13, 32, 22, 24, 13, 20, 24, 18], sst);
+    console.log(`[exportExcel] ✅ Hoja Osi: ${rowsOsi.length} filas, XML ${osiXml.length} chars`);
 
     const headersQA = ["Tipo", "Clave", "Resumen", "Sprint", "Persona asignada", "Estado", "Informador"];
     const pf3qaTickets = allTickets.filter((t) => t.jira_key?.startsWith("PF3QA-"));
@@ -330,13 +353,22 @@ export async function exportUnifiedExcel(selectedSprint) {
     }));
     const qaXml = buildSheetXml(headersQA, rowsQA,
       [16, 13, 52, 22, 24, 20, 24], sst);
+    console.log(`[exportExcel] ✅ Hoja QA: ${rowsQA.length} filas, XML ${qaXml.length} chars`);
 
     /* ═══════════════════════════════════════════════════════════════
        5. INYECTAR EN TEMPLATE
        ═══════════════════════════════════════════════════════════════ */
     zip.file("xl/worksheets/sheet2.xml", osiXml);
     zip.file("xl/worksheets/sheet4.xml", qaXml);
-    zip.file("xl/sharedStrings.xml", sst.toXml());
+    const sstFinalXml = sst.toXml();
+    zip.file("xl/sharedStrings.xml", sstFinalXml);
+    console.log(`[exportExcel] ✅ SST final: ${sst.parsedCount + sst.newEntries.length} unique (${sst.newEntries.length} nuevos)`);
+
+    // Verificar que los archivos se inyectaron correctamente
+    const verifySheet2 = await zip.file("xl/worksheets/sheet2.xml")?.async("string");
+    const verifySheet4 = await zip.file("xl/worksheets/sheet4.xml")?.async("string");
+    console.log(`[exportExcel] ✅ Verificación sheet2: ${verifySheet2?.length} chars, tiene datos: ${verifySheet2?.includes('<row r="2">')}`);
+    console.log(`[exportExcel] ✅ Verificación sheet4: ${verifySheet4?.length} chars, tiene datos: ${verifySheet4?.includes('<row r="2">')}`);
 
     // NO se toca: styles.xml, pivotCaches, pivotTables
     // refreshOnLoad="1" en ambos caches reconstruye al abrir
@@ -344,7 +376,12 @@ export async function exportUnifiedExcel(selectedSprint) {
     /* ═══════════════════════════════════════════════════════════════
        6. DESCARGAR
        ═══════════════════════════════════════════════════════════════ */
-    const blob = await zip.generateAsync({ type: "blob" });
+    const blob = await zip.generateAsync({
+      type: "blob",
+      compression: "DEFLATE",
+      compressionOptions: { level: 6 },
+    });
+    console.log(`[exportExcel] ✅ Excel generado: ${blob.size} bytes`);
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -354,6 +391,7 @@ export async function exportUnifiedExcel(selectedSprint) {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    console.log("[exportExcel] ✅ Descarga iniciada");
   } catch (err) {
     console.error("Error al exportar Excel:", err);
     alert("Error al generar el Excel. Ver consola para detalles.");
