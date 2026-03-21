@@ -33,15 +33,31 @@ function escXml(s) {
 export async function exportUnifiedExcel(selectedSprint) {
   try {
     /* ═══════════════════════════════════════════════════════════════
-       1. OBTENER DATOS DE SUPABASE
+       1. OBTENER DATOS DE SUPABASE (con paginación para tickets)
        ═══════════════════════════════════════════════════════════════ */
-    const [ticketsRes, equipoRes, personsRes] = await Promise.all([
-      supabase.from("jira_tickets").select("*"),
+    // Supabase limita a 1000 filas por consulta, se pagina igual que en la página
+    const [equipoRes, personsRes] = await Promise.all([
       supabase.from("equipo_desarrollo").select("correo_pgim, correo_gcorp, nombre_clave, nombre"),
       supabase.from("jira_persons").select("email, display_name"),
     ]);
 
-    const allTickets = ticketsRes.data || [];
+    // Paginación de tickets (batches de 1000)
+    let allTickets = [];
+    const pageSize = 1000;
+    let from = 0;
+    let hasMore = true;
+    while (hasMore) {
+      const { data, error } = await supabase
+        .from("jira_tickets")
+        .select("jira_key, summary, status, issue_type, sprint, story_points, assignee_email, reporter_email, parent_key, created_at, updated_at, subtask_keys, comentario, priority")
+        .order("updated_at", { ascending: false })
+        .range(from, from + pageSize - 1);
+      if (error || !data) { hasMore = false; break; }
+      allTickets = [...allTickets, ...data];
+      from += pageSize;
+      hasMore = data.length === pageSize;
+    }
+
     const equipo = equipoRes.data || [];
     const persons = personsRes.data || [];
 
@@ -395,20 +411,237 @@ export async function exportUnifiedExcel(selectedSprint) {
     zip.file("xl/worksheets/sheet4.xml", qaSheetXml);     // Datos QA
     if (sharedStrXml) zip.file("xl/sharedStrings.xml", sharedStrXml);
 
-    // Cache 1 (Osi) — refreshOnLoad + recordCount
-    let cacheDef1 = await zip.file("xl/pivotCache/pivotCacheDefinition1.xml").async("string");
-    if (!cacheDef1.includes("refreshOnLoad")) {
-      cacheDef1 = cacheDef1.replace("<pivotCacheDefinition ", '<pivotCacheDefinition refreshOnLoad="1" ');
-    }
-    cacheDef1 = cacheDef1.replace(/recordCount="\d+"/, `recordCount="${allTickets.length}"`);
-    zip.file("xl/pivotCache/pivotCacheDefinition1.xml", cacheDef1);
+    // Cache 1 (Osi) — records completos para que pivots se muestren sin refresh manual
+    // Campos Osi: 0=Tipo, 1=Clave, 2=Resumen, 3=Subtareas, 4=Principal,
+    //             5=Épica, 6=Sprint, 7=Persona asignada, 8=Story Points,
+    //             9=Estado, 10=Informador, 11=Creada
 
-    // Cache 1 records vacíos (Excel reconstruye)
-    zip.file(
-      "xl/pivotCache/pivotCacheRecords1.xml",
+    // Extraer valores únicos para campos indexados
+    const c1Tipos = unique(rowsOsi.map((r) => r.Tipo).filter(Boolean));
+    const c1Sprints = sortSprints(unique(rowsOsi.map((r) => r.Sprint).filter(Boolean)));
+    const c1Asignados = unique(rowsOsi.map((r) => r["Persona asignada"]).filter((v) => v && v !== "—")).sort();
+    const c1Estados = unique(rowsOsi.map((r) => r.Estado).filter(Boolean));
+    const c1Informadores = unique(rowsOsi.map((r) => r.Informador).filter((v) => v && v !== "—")).sort();
+    const c1Epicas = unique(rowsOsi.map((r) => r["Épica"]).filter(Boolean));
+
+    const c1TipoBlank = rowsOsi.some((r) => !r.Tipo);
+    const c1SprintBlank = rowsOsi.some((r) => !r.Sprint);
+    const c1AsignadoBlank = rowsOsi.some((r) => !r["Persona asignada"] || r["Persona asignada"] === "—");
+    const c1EstadoBlank = rowsOsi.some((r) => !r.Estado);
+    const c1InformadorBlank = rowsOsi.some((r) => !r.Informador || r.Informador === "—");
+    const c1EpicaBlank = rowsOsi.some((r) => !r["Épica"]);
+
+    // Mapas de índice
+    const c1TipoIdx = idxMap(c1Tipos, c1TipoBlank);
+    const c1SprintIdx = idxMap(c1Sprints, c1SprintBlank);
+    const c1AsignadoIdx = idxMap(c1Asignados, c1AsignadoBlank);
+    const c1EstadoIdx = idxMap(c1Estados, c1EstadoBlank);
+    const c1InformadorIdx = idxMap(c1Informadores, c1InformadorBlank);
+    const c1EpicaIdx = idxMap(c1Epicas, c1EpicaBlank);
+
+    // Story Points: detectar si hay números y/o blanks
+    const spHasNum = rowsOsi.some((r) => r["Story Points"] !== "" && r["Story Points"] != null);
+    const spHasBlank = rowsOsi.some((r) => r["Story Points"] === "" || r["Story Points"] == null);
+    const spValues = unique(rowsOsi.map((r) => r["Story Points"]).filter((v) => v !== "" && v != null));
+    const spMin = spValues.length > 0 ? Math.min(...spValues) : 0;
+    const spMax = spValues.length > 0 ? Math.max(...spValues) : 0;
+
+    // Cache definition 1
+    const cacheDef1Xml =
       '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-        '<pivotCacheRecords xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="0"/>'
-    );
+      '<pivotCacheDefinition xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" ' +
+      'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" ' +
+      `r:id="rId1" refreshedBy="Sistema" refreshedDate="46098" ` +
+      `createdVersion="8" refreshedVersion="8" minRefreshableVersion="3" recordCount="${rowsOsi.length}">` +
+      '<cacheSource type="worksheet"><worksheetSource ref="A1:L1048576" sheet="Osi"/></cacheSource>' +
+      '<cacheFields count="12">' +
+      `<cacheField name="Tipo" numFmtId="0">${buildShared(c1Tipos, c1TipoBlank)}</cacheField>` +
+      '<cacheField name="Clave" numFmtId="0"><sharedItems containsBlank="1"/></cacheField>' +
+      '<cacheField name="Resumen" numFmtId="0"><sharedItems containsBlank="1" longText="1"/></cacheField>' +
+      '<cacheField name="Subtareas" numFmtId="0"><sharedItems containsBlank="1" longText="1"/></cacheField>' +
+      '<cacheField name="Principal" numFmtId="0"><sharedItems containsBlank="1"/></cacheField>' +
+      `<cacheField name="Épica" numFmtId="0">${buildShared(c1Epicas, c1EpicaBlank)}</cacheField>` +
+      `<cacheField name="Sprint" numFmtId="0">${buildShared(c1Sprints, c1SprintBlank)}</cacheField>` +
+      `<cacheField name="Persona asignada" numFmtId="0">${buildShared(c1Asignados, c1AsignadoBlank)}</cacheField>` +
+      `<cacheField name="Story Points" numFmtId="0"><sharedItems containsSemiMixedTypes="0" containsString="0"${spHasNum ? ' containsNumber="1"' : ""}${spHasBlank ? ' containsBlank="1"' : ""} minValue="${spMin}" maxValue="${spMax}"/></cacheField>` +
+      `<cacheField name="Estado" numFmtId="0">${buildShared(c1Estados, c1EstadoBlank)}</cacheField>` +
+      `<cacheField name="Informador" numFmtId="0">${buildShared(c1Informadores, c1InformadorBlank)}</cacheField>` +
+      '<cacheField name="Creada" numFmtId="0"><sharedItems containsBlank="1"/></cacheField>' +
+      "</cacheFields></pivotCacheDefinition>";
+
+    // Cache records 1
+    const c1Records = rowsOsi
+      .map((r) => {
+        const ti = c1TipoIdx[r.Tipo] ?? (c1TipoBlank ? c1Tipos.length : 0);
+        const si = c1SprintIdx[r.Sprint] ?? (c1SprintBlank ? c1Sprints.length : 0);
+        const ai = c1AsignadoIdx[r["Persona asignada"]] ?? (c1AsignadoBlank ? c1Asignados.length : 0);
+        const ei = c1EstadoIdx[r.Estado] ?? (c1EstadoBlank ? c1Estados.length : 0);
+        const ii = c1InformadorIdx[r.Informador] ?? (c1InformadorBlank ? c1Informadores.length : 0);
+        const epi = c1EpicaIdx[r["Épica"]] ?? (c1EpicaBlank ? c1Epicas.length : 0);
+        const sp = r["Story Points"];
+        const spXml = sp !== "" && sp != null ? `<n v="${sp}"/>` : "<m/>";
+        return (
+          "<r>" +
+          `<x v="${ti}"/>` +
+          `<s v="${escXml(r.Clave)}"/>` +
+          `<s v="${escXml(r.Resumen)}"/>` +
+          `<s v="${escXml(r.Subtareas)}"/>` +
+          `<s v="${escXml(r.Principal)}"/>` +
+          `<x v="${epi}"/>` +
+          `<x v="${si}"/>` +
+          `<x v="${ai}"/>` +
+          spXml +
+          `<x v="${ei}"/>` +
+          `<x v="${ii}"/>` +
+          `<s v="${escXml(r.Creada)}"/>` +
+          "</r>"
+        );
+      })
+      .join("");
+    const cacheRecords1Xml =
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      `<pivotCacheRecords xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="${rowsOsi.length}">` +
+      c1Records +
+      "</pivotCacheRecords>";
+
+    zip.file("xl/pivotCache/pivotCacheDefinition1.xml", cacheDef1Xml);
+    zip.file("xl/pivotCache/pivotCacheRecords1.xml", cacheRecords1Xml);
+
+    // -- Pivot Tables 1, 2, 3 (dinámicas, ajustadas al cache 1 actual) --
+    // Índices para filtros de página
+    const c1TipoTotal = c1Tipos.length + (c1TipoBlank ? 1 : 0);
+    const c1SprintTotal = c1Sprints.length + (c1SprintBlank ? 1 : 0);
+    const c1AsignadoTotal = c1Asignados.length + (c1AsignadoBlank ? 1 : 0);
+    const c1EstadoTotal = c1Estados.length + (c1EstadoBlank ? 1 : 0);
+    const c1EpicaTotal = c1Epicas.length + (c1EpicaBlank ? 1 : 0);
+    const c1InformadorTotal = c1Informadores.length + (c1InformadorBlank ? 1 : 0);
+
+    // Filtro Tipo: mostrar solo "Historia"
+    const c1TipoHidden = new Set();
+    for (let i = 0; i < c1TipoTotal; i++) {
+      const val = i < c1Tipos.length ? c1Tipos[i] : "";
+      if (val !== "Historia") c1TipoHidden.add(i);
+    }
+    const c1TipoMulti = c1TipoHidden.size > 0;
+
+    // Sprint más actual de Osi (para filtro de página)
+    const c1HighestSprint = [...c1Sprints].reverse().find((s) => /Iteracion|Tablero/i.test(s)) || c1Sprints[c1Sprints.length - 1] || "";
+    const c1SprintPageItem = c1Sprints.indexOf(c1HighestSprint);
+
+    // Ocultar blanks en estado y asignado
+    const c1EstadoHidden = new Set();
+    if (c1EstadoBlank) c1EstadoHidden.add(c1Estados.length);
+    const c1AsignadoHidden = new Set();
+    if (c1AsignadoBlank) c1AsignadoHidden.add(c1Asignados.length);
+
+    // --- pivotTable1: Cuenta de Historias por Persona y Estado ---
+    // Campos: 0=Tipo(page), 1=Clave(data/count), 2=Resumen(-), 3=Subtareas(-), 4=Principal(-),
+    //         5=Épica(-), 6=Sprint(page), 7=Persona asignada(row), 8=SP(-), 9=Estado(col), 10=Informador(-), 11=Creada(-)
+    const c1Pt1Xml =
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<pivotTableDefinition xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" ' +
+      'name="TablaDinamica2" cacheId="0" ' +
+      'applyNumberFormats="0" applyBorderFormats="0" applyFontFormats="0" applyPatternFormats="0" ' +
+      'applyAlignmentFormats="0" applyWidthHeightFormats="1" dataCaption="Valores" ' +
+      'updatedVersion="8" minRefreshableVersion="3" useAutoFormatting="1" itemPrintTitles="1" ' +
+      'createdVersion="8" indent="0" outline="1" outlineData="1" multipleFieldFilters="0">' +
+      '<location ref="A4:F14" firstHeaderRow="1" firstDataRow="2" firstDataCol="1" rowPageCount="2" colPageCount="1"/>' +
+      '<pivotFields count="12">' +
+      `<pivotField axis="axisPage"${c1TipoMulti ? ' multipleItemSelectionAllowed="1"' : ""} showAll="0">${buildItems(c1TipoTotal, c1TipoHidden)}</pivotField>` +
+      '<pivotField dataField="1" showAll="0"/>' +
+      '<pivotField showAll="0"/>' +
+      '<pivotField showAll="0"/>' +
+      '<pivotField showAll="0"/>' +
+      '<pivotField showAll="0"/>' +
+      `<pivotField axis="axisPage" showAll="0">${buildItems(c1SprintTotal, null)}</pivotField>` +
+      `<pivotField axis="axisRow" showAll="0">${buildItems(c1AsignadoTotal, c1AsignadoHidden)}</pivotField>` +
+      '<pivotField showAll="0"/>' +
+      `<pivotField axis="axisCol" showAll="0">${buildItems(c1EstadoTotal, c1EstadoHidden)}</pivotField>` +
+      '<pivotField showAll="0"/>' +
+      '<pivotField showAll="0"/>' +
+      "</pivotFields>" +
+      '<rowFields count="1"><field x="7"/></rowFields>' +
+      '<rowItems count="1"><i t="grand"><x/></i></rowItems>' +
+      '<colFields count="1"><field x="9"/></colFields>' +
+      '<colItems count="1"><i t="grand"><x/></i></colItems>' +
+      `<pageFields count="2"><pageField fld="0" hier="-1"/><pageField fld="6" item="${c1SprintPageItem >= 0 ? c1SprintPageItem : 0}" hier="-1"/></pageFields>` +
+      '<dataFields count="1"><dataField name="Cuenta de Clave" fld="1" subtotal="count" baseField="0" baseItem="0"/></dataFields>' +
+      '<pivotTableStyleInfo name="PivotStyleMedium4" showRowHeaders="1" showColHeaders="1" showRowStripes="0" showColStripes="0" showLastColumn="1"/>' +
+      "</pivotTableDefinition>";
+
+    // --- pivotTable2: Suma de Story Points por Persona y Estado ---
+    const c1Pt2Xml =
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<pivotTableDefinition xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" ' +
+      'name="TablaDinamica3" cacheId="0" ' +
+      'applyNumberFormats="0" applyBorderFormats="0" applyFontFormats="0" applyPatternFormats="0" ' +
+      'applyAlignmentFormats="0" applyWidthHeightFormats="1" dataCaption="Valores" ' +
+      'updatedVersion="8" minRefreshableVersion="3" useAutoFormatting="1" itemPrintTitles="1" ' +
+      'createdVersion="8" indent="0" outline="1" outlineData="1" multipleFieldFilters="0">' +
+      '<location ref="I4:N14" firstHeaderRow="1" firstDataRow="2" firstDataCol="1" rowPageCount="2" colPageCount="1"/>' +
+      '<pivotFields count="12">' +
+      `<pivotField axis="axisPage"${c1TipoMulti ? ' multipleItemSelectionAllowed="1"' : ""} showAll="0">${buildItems(c1TipoTotal, c1TipoHidden)}</pivotField>` +
+      '<pivotField showAll="0"/>' +
+      '<pivotField showAll="0"/>' +
+      '<pivotField showAll="0"/>' +
+      '<pivotField showAll="0"/>' +
+      '<pivotField showAll="0"/>' +
+      `<pivotField axis="axisPage" showAll="0">${buildItems(c1SprintTotal, null)}</pivotField>` +
+      `<pivotField axis="axisRow" showAll="0">${buildItems(c1AsignadoTotal, c1AsignadoHidden)}</pivotField>` +
+      '<pivotField dataField="1" showAll="0"/>' +
+      `<pivotField axis="axisCol" showAll="0">${buildItems(c1EstadoTotal, c1EstadoHidden)}</pivotField>` +
+      '<pivotField showAll="0"/>' +
+      '<pivotField showAll="0"/>' +
+      "</pivotFields>" +
+      '<rowFields count="1"><field x="7"/></rowFields>' +
+      '<rowItems count="1"><i t="grand"><x/></i></rowItems>' +
+      '<colFields count="1"><field x="9"/></colFields>' +
+      '<colItems count="1"><i t="grand"><x/></i></colItems>' +
+      `<pageFields count="2"><pageField fld="0" hier="-1"/><pageField fld="6" item="${c1SprintPageItem >= 0 ? c1SprintPageItem : 0}" hier="-1"/></pageFields>` +
+      '<dataFields count="1"><dataField name="Suma de Story Points" fld="8" subtotal="sum" baseField="0" baseItem="0"/></dataFields>' +
+      '<pivotTableStyleInfo name="PivotStyleMedium4" showRowHeaders="1" showColHeaders="1" showRowStripes="0" showColStripes="0" showLastColumn="1"/>' +
+      "</pivotTableDefinition>";
+
+    // --- pivotTable3: Reporte por Épica (HU count + SP sum) ---
+    // Campos: 0=Tipo(page), 5=Épica(row), 6=Sprint(page), 8=SP(data/sum), 9=Estado(data/count)
+    const c1Pt3Xml =
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<pivotTableDefinition xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" ' +
+      'name="TablaEpica" cacheId="0" ' +
+      'applyNumberFormats="0" applyBorderFormats="0" applyFontFormats="0" applyPatternFormats="0" ' +
+      'applyAlignmentFormats="0" applyWidthHeightFormats="1" dataCaption="Valores" ' +
+      'updatedVersion="8" minRefreshableVersion="3" useAutoFormatting="1" itemPrintTitles="1" ' +
+      'createdVersion="8" indent="0" outline="1" outlineData="1" multipleFieldFilters="0">' +
+      '<location ref="A4:C50" firstHeaderRow="0" firstDataRow="1" firstDataCol="1" rowPageCount="2" colPageCount="1"/>' +
+      '<pivotFields count="12">' +
+      `<pivotField axis="axisPage"${c1TipoMulti ? ' multipleItemSelectionAllowed="1"' : ""} showAll="0">${buildItems(c1TipoTotal, c1TipoHidden)}</pivotField>` +
+      '<pivotField showAll="0"/>' +
+      '<pivotField showAll="0"/>' +
+      '<pivotField showAll="0"/>' +
+      '<pivotField showAll="0"/>' +
+      `<pivotField axis="axisRow" showAll="0">${buildItems(c1EpicaTotal, null)}</pivotField>` +
+      `<pivotField axis="axisPage" showAll="0">${buildItems(c1SprintTotal, null)}</pivotField>` +
+      '<pivotField showAll="0"/>' +
+      '<pivotField dataField="1" showAll="0"/>' +
+      '<pivotField dataField="1" showAll="0"/>' +
+      '<pivotField showAll="0"/>' +
+      '<pivotField showAll="0"/>' +
+      "</pivotFields>" +
+      '<rowFields count="1"><field x="5"/></rowFields>' +
+      '<rowItems count="1"><i t="grand"><x/></i></rowItems>' +
+      '<colFields count="1"><field x="-2"/></colFields>' +
+      '<colItems count="2"><i><x/></i><i i="1"><x v="1"/></i></colItems>' +
+      `<pageFields count="2"><pageField fld="0" hier="-1"/><pageField fld="6" item="${c1SprintPageItem >= 0 ? c1SprintPageItem : 0}" hier="-1"/></pageFields>` +
+      '<dataFields count="2">' +
+      '<dataField name="HU" fld="9" subtotal="count" baseField="0" baseItem="0"/>' +
+      '<dataField name="Puntos" fld="8" subtotal="sum" baseField="0" baseItem="0"/>' +
+      '</dataFields>' +
+      '<pivotTableStyleInfo name="PivotStyleMedium4" showRowHeaders="1" showColHeaders="1" showRowStripes="0" showColStripes="0" showLastColumn="1"/>' +
+      "</pivotTableDefinition>";
+
+    zip.file("xl/pivotTables/pivotTable1.xml", c1Pt1Xml);
+    zip.file("xl/pivotTables/pivotTable2.xml", c1Pt2Xml);
+    zip.file("xl/pivotTables/pivotTable3.xml", c1Pt3Xml);
 
     // Cache 2 (Datos QA) — completo con records
     zip.file("xl/pivotCache/pivotCacheDefinition2.xml", cacheDef2Xml);
