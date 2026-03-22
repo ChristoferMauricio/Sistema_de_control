@@ -44,6 +44,7 @@ export default function TicketRow({
   onEditComment,
   subtasksMap = {},
   linksMap = {},
+  linkedSummaryMap = {},
 }) {
   const role        = useRole();
   const statusColor = getStatusColor(ticket.status);  // Colores CSS segun el estado
@@ -70,6 +71,15 @@ export default function TicketRow({
             >
               {ticket.jira_key}
             </a>
+          </td>
+        )}
+
+        {/* ── Resumen del ticket (solo errores) ── */}
+        {mode === "errores" && (
+          <td className="px-4 py-3 text-gray-800 max-w-xs">
+            <span className="text-xs" title={ticket.summary}>
+              {truncate(ticket.summary, 50)}
+            </span>
           </td>
         )}
 
@@ -188,6 +198,23 @@ export default function TicketRow({
             <span className="text-gray-300 text-xs">—</span>
           )}
         </td>
+
+        {/* ── Resumen de actividades vinculadas (solo errores) ── */}
+        {mode === "errores" && (
+          <td className="px-4 py-3 text-gray-700 max-w-xs">
+            {linksMap[ticket.jira_key]?.length > 0 ? (
+              <div className="flex flex-col gap-1">
+                {linksMap[ticket.jira_key].map((lk) => (
+                  <span key={lk} className="text-xs" title={linkedSummaryMap[lk]}>
+                    {truncate(linkedSummaryMap[lk] || "—", 50)}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <span className="text-gray-300 text-xs">—</span>
+            )}
+          </td>
+        )}
 
         {/* ── Sprint Historia (solo errores) ── */}
         {mode === "errores" && (

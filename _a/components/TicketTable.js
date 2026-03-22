@@ -155,7 +155,7 @@ export default function TicketTable({
     activeFilterCount, clearAllFilters,
     resolveName, resolveEpic,
     uniqueTypes, uniqueSprints, uniqueStatuses, uniqueAssignees, uniqueReporters,
-    subtasksMap, linksMap,
+    subtasksMap, linksMap, linkedSummaryMap,
   } = data;
 
   // ── Guardar comentario ─────────────────────────────────────────────────────
@@ -339,6 +339,11 @@ export default function TicketTable({
                   Código <SortIcon field="jira_key" sortField={sortField} sortDir={sortDir} />
                 </th>
               )}
+              {mode === "errores" && (
+                <th onClick={() => toggleSort("summary")} className="px-4 py-3 cursor-pointer hover:bg-gray-100 transition-colors min-w-[180px]">
+                  Resumen <SortIcon field="summary" sortField={sortField} sortDir={sortDir} />
+                </th>
+              )}
               {mode !== "errores" && (
                 <th onClick={() => toggleSort("issue_type")} className="px-4 py-3 cursor-pointer hover:bg-gray-100 transition-colors whitespace-nowrap" style={{ minWidth: "120px" }}>
                   Tipo <SortIcon field="issue_type" sortField={sortField} sortDir={sortDir} />
@@ -363,6 +368,9 @@ export default function TicketTable({
               <th className="px-4 py-3 font-medium min-w-[120px]">
                 {mode === "errores" ? "Actividades vinculadas" : "Principal"}
               </th>
+              {mode === "errores" && (
+                <th className="px-4 py-3 font-medium min-w-[180px]">Resumen Activ.</th>
+              )}
               {mode === "errores" && (
                 <th onClick={() => toggleSort("storySprint")} className="px-4 py-3 cursor-pointer hover:bg-gray-100 transition-colors whitespace-nowrap" style={{ minWidth: "120px" }}>
                   Sprint Historia <SortIcon field="storySprint" sortField={sortField} sortDir={sortDir} />
@@ -406,6 +414,12 @@ export default function TicketTable({
                     className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[80px]" />
                 </th>
               )}
+              {mode === "errores" && (
+                <th className="px-4 py-2">
+                  <input type="text" value={filterSummary} onChange={(e) => setFilterSummary(e.target.value)} placeholder="Buscar..."
+                    className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[120px]" />
+                </th>
+              )}
               {mode !== "errores" && (
                 <th className="px-4 py-2">
                   <FilterSelect value={filterType} onChange={setFilterType} options={uniqueTypes} placeholder="Todos" />
@@ -434,6 +448,7 @@ export default function TicketTable({
                 <input type="text" value={filterPrincipal} onChange={(e) => setFilterPrincipal(e.target.value)} placeholder="Buscar..."
                   className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[80px]" />
               </th>
+              {mode === "errores" && <th className="px-4 py-2" />}
               {mode === "errores" && (
                 <th className="px-4 py-2">
                   <input type="text" value={filterSprint} onChange={(e) => setFilterSprint(e.target.value)} placeholder="Filtrar sprint..."
@@ -502,6 +517,7 @@ export default function TicketTable({
                   onEditComment={setEditingComment}
                   subtasksMap={subtasksMap}
                   linksMap={linksMap}
+                  linkedSummaryMap={linkedSummaryMap}
                 />
               ))
             )}

@@ -94,6 +94,7 @@ export function useTicketData({ tickets = [], externalFilterType = "", defaultFi
   const [persons, setPersons]   = useState([]); // jira_persons: { email, display_name }
   const [equipo,  setEquipo]    = useState([]); // equipo_desarrollo
   const [linksMap, setLinksMap] = useState({}); // source_key → [target_keys]
+  const [linkedSummaryMap, setLinkedSummaryMap] = useState({}); // target_key → summary
 
   // ── Sincronizacion con filtros externos (props del padre) ──────────────────
   // Cuando el padre cambia externalFilterType, se refleja en el filtro local
@@ -186,6 +187,20 @@ export function useTicketData({ tickets = [], externalFilterType = "", defaultFi
         lMap[row.source_key].push(row.target_key);
       }
       setLinksMap(lMap);
+
+      // Obtener summaries de tickets vinculados
+      const allTargets = [...new Set(Object.values(lMap).flat())];
+      if (allTargets.length > 0) {
+        const { data: targetTickets } = await supabase
+          .from("jira_tickets")
+          .select("jira_key, summary")
+          .in("jira_key", allTargets);
+        const sMap = {};
+        (targetTickets || []).forEach((t) => {
+          sMap[t.jira_key] = t.summary || "";
+        });
+        setLinkedSummaryMap(sMap);
+      }
     }
     fetchLinks();
   }, []);
@@ -445,6 +460,6 @@ export function useTicketData({ tickets = [], externalFilterType = "", defaultFi
     // Opciones para dropdowns
     uniqueTypes, uniqueSprints, uniqueStatuses, uniqueAssignees, uniqueReporters,
     // Relacional
-    subtasksMap, linksMap,
+    subtasksMap, linksMap, linkedSummaryMap,
   };
 }
