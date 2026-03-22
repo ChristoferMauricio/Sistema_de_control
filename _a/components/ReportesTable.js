@@ -717,11 +717,10 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
     }, [filtered, filteredSubtasks, resolveName]);
 
     const totalsSP = useMemo(() => {
-        const t = { total: 0, subtareasCount: 0, puntajeTotal: 0 };
+        const t = { total: 0, puntajeTotal: 0 };
         STATUS_COLUMNS.forEach((col) => { t[col.key] = 0; });
         pivotDataSP.forEach((row) => {
             t.total += row.total;
-            t.subtareasCount += row.subtareasCount;
             t.puntajeTotal += row.puntajeTotal;
             STATUS_COLUMNS.forEach((col) => { t[col.key] += row[col.key]; });
         });
@@ -964,12 +963,6 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                                         {col.label}
                                     </th>
                                 ))}
-                                <th className="text-center px-3 py-2 font-semibold text-gray-700 border-l border-gray-200" style={{ minWidth: "100px" }}>
-                                    Total SP
-                                </th>
-                                <th className="text-center px-3 py-2 font-semibold text-gray-700 border-l border-gray-200" style={{ minWidth: "160px" }}>
-                                    Soporte e Incidencias
-                                </th>
                                 <th className="text-center px-4 py-2 font-bold text-gray-900 border-l border-gray-200 bg-gray-100" style={{ minWidth: "100px" }}>
                                     TOTAL
                                 </th>
@@ -1000,27 +993,6 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                                                     )}
                                                 </td>
                                             ))}
-                                            <td className="px-3 py-2 text-center border-l border-gray-100">
-                                                <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-xs font-bold bg-purple-50 text-purple-700 border border-purple-200">
-                                                    {row.total}
-                                                </span>
-                                            </td>
-                                            <td className="px-3 py-2 text-center border-l border-gray-100">
-                                                <div className="inline-flex items-center gap-1.5">
-                                                    <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                                                        {row.subtareasCount}
-                                                    </span>
-                                                    <button
-                                                        onClick={() => openSubtasks(row.assignee)}
-                                                        className="p-1 rounded-md hover:bg-gray-200 text-gray-400 hover:text-gray-600 transition-colors"
-                                                        title="Ver detalles de soporte e incidencias"
-                                                    >
-                                                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-                                                        </svg>
-                                                    </button>
-                                                </div>
-                                            </td>
                                             <td className="px-4 py-2 text-center border-l border-gray-100 bg-gray-50/50">
                                                 <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-sm font-bold text-gray-800">
                                                     {row.puntajeTotal}
@@ -1044,19 +1016,6 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                                                 </div>
                                             </td>
                                         ))}
-                                        <td className="px-4 py-3 text-center border-l border-gray-100">
-                                            <div className="flex flex-col items-center">
-                                                <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-sm font-bold bg-gray-200 text-gray-700">
-                                                    {totalsSP.total}
-                                                </span>
-                                                <span className="text-[10px] text-gray-400 mt-0.5">100%</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-3 text-center border-l border-gray-100">
-                                            <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-sm font-bold bg-blue-100 text-blue-800">
-                                                {totalsSP.subtareasCount}
-                                            </span>
-                                        </td>
                                         <td className="px-4 py-3 text-center border-l border-gray-200 bg-gray-100">
                                             <span className="inline-flex items-center justify-center min-w-[36px] px-3 py-1 rounded-lg text-base font-bold text-gray-900">
                                                 {totalsSP.puntajeTotal}
