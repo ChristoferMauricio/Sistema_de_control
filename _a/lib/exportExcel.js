@@ -225,7 +225,7 @@ function buildQACacheAndPivots(rowsQA, latestSprint) {
 
   // ─── 3. Pivot cache definition (SIN refreshOnLoad) ─────────────────
   let defXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
-  defXml += '<pivotCacheDefinition xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"';
+  defXml += '<pivotCacheDefinition refreshOnLoad="1" xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"';
   defXml += ' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
   defXml += ` r:id="rId1" refreshedBy="Sistema" refreshedDate="46098"`;
   defXml += ` createdVersion="8" refreshedVersion="8" minRefreshableVersion="3"`;
