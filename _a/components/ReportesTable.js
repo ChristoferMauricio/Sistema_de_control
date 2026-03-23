@@ -437,6 +437,91 @@ function SubtasksModal({ assigneeName, subtasks, onClose }) {
     );
 }
 
+// ─── Modal de detalle de tickets (click en números de tabla pivot) ───────────
+
+const JIRA_BASE = "https://supervisorservicio2020.atlassian.net/browse";
+
+function TicketListModal({ title, assigneeName, items, onClose }) {
+    return (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+            <div className="min-h-full flex items-start justify-center p-4 py-8">
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+                <div
+                    className="relative bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col animate-fade-in"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    {/* Header */}
+                    <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between shrink-0">
+                        <div>
+                            <h3 className="font-semibold text-gray-900 text-lg">{title}</h3>
+                            <p className="text-xs text-gray-400 mt-0.5">
+                                {assigneeName} · {items.length} ticket{items.length !== 1 ? "s" : ""}
+                            </p>
+                        </div>
+                        <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    {/* Body */}
+                    <div className="p-6 overflow-y-auto space-y-3">
+                        {items.length === 0 ? (
+                            <div className="text-center py-8 text-gray-400">No hay tickets registrados.</div>
+                        ) : (
+                            items.map((ticket) => {
+                                const statusLower = (ticket.status || "").toLowerCase();
+                                const isCompleted = statusLower.includes("finalizada") || statusLower.includes("terminada") || statusLower.includes("done") || statusLower.includes("listo");
+                                const isSubtask = ticket.issue_type === "Sub-tarea" || ticket.issue_type === "Subtarea";
+
+                                return (
+                                    <div key={ticket.jira_key} className="p-4 bg-gray-50 rounded-xl border-2 border-gray-300">
+                                        <div className="flex items-start gap-3">
+                                            <a
+                                                href={`${JIRA_BASE}/${ticket.jira_key}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className={`font-mono font-bold shrink-0 hover:underline ${isCompleted ? "text-green-600" : "text-orange-600"}`}
+                                            >
+                                                {ticket.jira_key}
+                                            </a>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="text-sm text-gray-800 leading-snug">{ticket.summary}</div>
+                                                <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${
+                                                        isSubtask
+                                                            ? "bg-indigo-50 text-indigo-600 border border-indigo-200"
+                                                            : "bg-sky-50 text-sky-600 border border-sky-200"
+                                                    }`}>
+                                                        {ticket.issue_type}
+                                                    </span>
+                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium ${
+                                                        isCompleted
+                                                            ? "bg-green-50 text-green-600 border border-green-200"
+                                                            : "bg-amber-50 text-amber-600 border border-amber-200"
+                                                    }`}>
+                                                        {ticket.status}
+                                                    </span>
+                                                    {ticket.story_points != null && (
+                                                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-50 text-purple-600 border border-purple-200">
+                                                            {ticket.story_points} SP
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })
+                        )}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 // ─── Componente principal ────────────────────────────────────────────────────
 
 /**
@@ -462,6 +547,7 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
     }, []);
     const [traceModal, setTraceModal] = useState(null); // { assigneeName, stories }
     const [subtasksModal, setSubtasksModal] = useState(null); // { assigneeName, subtasks }
+    const [detailModal, setDetailModal] = useState(null); // { title, assigneeName, items }
 
     // Sincronizar selectedSprint con parámetro URL ?sprint=
     useEffect(() => {
@@ -749,6 +835,53 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
         setSubtasksModal({ assigneeName, subtasks: assigneeSubtasks });
     }
 
+    // Open detail modal: show historias or subtareas filtered by assignee + status
+    function openDetail(assigneeName, statusKey) {
+        // Determinar si esta persona tiene subtareas (ej: Supervisor de Servicio)
+        const personSubtasks = filteredSubtasks.filter(
+            (t) => resolveName(t.assignee_email) === assigneeName
+        );
+        const hasSubtasks = personSubtasks.length > 0;
+
+        let items;
+        let title;
+
+        if (hasSubtasks) {
+            // Mostrar subtareas filtradas por estado
+            if (statusKey) {
+                items = personSubtasks.filter((t) => {
+                    const matched = STATUS_COLUMNS.find((col) =>
+                        col.jiraStatuses.some((s) => s.toLowerCase() === (t.status || "").toLowerCase())
+                    );
+                    return matched?.key === statusKey;
+                });
+                title = `Subtareas — ${STATUS_COLUMNS.find((c) => c.key === statusKey)?.label || statusKey}`;
+            } else {
+                items = personSubtasks;
+                title = "Todas las subtareas";
+            }
+        } else {
+            // Mostrar historias filtradas por estado
+            const personHistorias = filtered.filter(
+                (t) => resolveName(t.assignee_email) === assigneeName
+            );
+            if (statusKey) {
+                items = personHistorias.filter((t) => {
+                    const matched = STATUS_COLUMNS.find((col) =>
+                        col.jiraStatuses.some((s) => s.toLowerCase() === (t.status || "").toLowerCase())
+                    );
+                    return matched?.key === statusKey;
+                });
+                title = `Historias — ${STATUS_COLUMNS.find((c) => c.key === statusKey)?.label || statusKey}`;
+            } else {
+                items = personHistorias;
+                title = "Todas las historias";
+            }
+        }
+
+        setDetailModal({ title, assigneeName, items });
+    }
+
     /**
      * Exporta a Excel unificado con tablas dinámicas (Osi + Datos QA).
      * Delega al módulo compartido exportExcel.js
@@ -847,9 +980,13 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                                             {STATUS_COLUMNS.map((col) => (
                                                 <td key={col.key} className="px-2 py-2 text-center border-l border-gray-100">
                                                     {row[col.key] > 0 ? (
-                                                        <span className={`inline-flex items-center justify-center min-w-[28px] px-2 py-0.5 rounded-lg text-xs font-bold ${STATUS_COLORS[col.key]}`}>
+                                                        <button
+                                                            onClick={() => openDetail(row.assignee, col.key)}
+                                                            className={`inline-flex items-center justify-center min-w-[28px] px-2 py-0.5 rounded-lg text-xs font-bold cursor-pointer hover:ring-2 hover:ring-orange-300 transition-all ${STATUS_COLORS[col.key]}`}
+                                                            title={`Ver tickets — ${col.label}`}
+                                                        >
                                                             {row[col.key]}
-                                                        </span>
+                                                        </button>
                                                     ) : (
                                                         <span className="text-gray-200 text-xs">0</span>
                                                     )}
@@ -857,9 +994,13 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                                             ))}
                                             <td className="px-3 py-2 text-center border-l border-gray-100">
                                                 <div className="inline-flex items-center gap-1.5">
-                                                    <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-xs font-bold bg-gray-100 text-gray-700 border border-gray-200">
+                                                    <button
+                                                        onClick={() => openDetail(row.assignee, null)}
+                                                        className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-xs font-bold bg-gray-100 text-gray-700 border border-gray-200 cursor-pointer hover:ring-2 hover:ring-orange-300 transition-all"
+                                                        title="Ver todos los tickets"
+                                                    >
                                                         {row.total}
-                                                    </span>
+                                                    </button>
                                                     <button
                                                         onClick={() => openTrace(row.assignee)}
                                                         className="p-1 rounded-md hover:bg-gray-200 text-gray-400 hover:text-gray-600 transition-colors"
@@ -874,25 +1015,24 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                                             {!isPF3QA && (
                                                 <td className="px-3 py-2 text-center border-l border-gray-100">
                                                     <div className="inline-flex items-center gap-1.5">
-                                                        <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                                                            {row.subtareasCount}
-                                                        </span>
                                                         <button
                                                             onClick={() => openSubtasks(row.assignee)}
-                                                            className="p-1 rounded-md hover:bg-gray-200 text-gray-400 hover:text-gray-600 transition-colors"
-                                                            title="Ver detalles de soporte e incidencias"
+                                                            className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200 cursor-pointer hover:ring-2 hover:ring-orange-300 transition-all"
+                                                            title="Ver subtareas"
                                                         >
-                                                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-                                                            </svg>
+                                                            {row.subtareasCount}
                                                         </button>
                                                     </div>
                                                 </td>
                                             )}
                                             <td className="px-4 py-2 text-center border-l border-gray-100 bg-gray-50/50">
-                                                <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-sm font-bold text-gray-800">
+                                                <button
+                                                    onClick={() => openDetail(row.assignee, null)}
+                                                    className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-sm font-bold text-gray-800 cursor-pointer hover:ring-2 hover:ring-orange-300 transition-all"
+                                                    title="Ver todos los tickets"
+                                                >
                                                     {isPF3QA ? row.total : row.puntajeTotal}
-                                                </span>
+                                                </button>
                                             </td>
                                         </tr>
                                     ))}
@@ -988,18 +1128,26 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                                             {STATUS_COLUMNS.map((col) => (
                                                 <td key={col.key} className="px-2 py-2 text-center border-l border-gray-100">
                                                     {row[col.key] > 0 ? (
-                                                        <span className={`inline-flex items-center justify-center min-w-[28px] px-2 py-0.5 rounded-lg text-xs font-bold ${STATUS_COLORS[col.key]}`}>
-                                                            {row[col.key]}
-                                                        </span>
+                                                        <button
+                                                            onClick={() => openDetail(row.assignee, col.key)}
+                                                            className={`inline-flex items-center justify-center min-w-[28px] px-2 py-0.5 rounded-lg text-xs font-bold cursor-pointer hover:ring-2 hover:ring-orange-300 transition-all ${STATUS_COLORS[col.key]}`}
+                                                            title={`Ver tickets — ${col.label}`}
+                                                        >
+                                                            {Math.round(row[col.key] * 100) / 100}
+                                                        </button>
                                                     ) : (
                                                         <span className="text-gray-200 text-xs">0</span>
                                                     )}
                                                 </td>
                                             ))}
                                             <td className="px-4 py-2 text-center border-l border-gray-100 bg-gray-50/50">
-                                                <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-sm font-bold text-gray-800">
+                                                <button
+                                                    onClick={() => openDetail(row.assignee, null)}
+                                                    className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-sm font-bold text-gray-800 cursor-pointer hover:ring-2 hover:ring-orange-300 transition-all"
+                                                    title="Ver todos los tickets"
+                                                >
                                                     {row.puntajeTotal}
-                                                </span>
+                                                </button>
                                             </td>
                                         </tr>
                                     ))}
@@ -1047,6 +1195,16 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                     assigneeName={subtasksModal.assigneeName}
                     subtasks={subtasksModal.subtasks}
                     onClose={() => setSubtasksModal(null)}
+                />
+            )}
+
+            {/* Ticket List Detail Modal */}
+            {detailModal && (
+                <TicketListModal
+                    title={detailModal.title}
+                    assigneeName={detailModal.assigneeName}
+                    items={detailModal.items}
+                    onClose={() => setDetailModal(null)}
                 />
             )}
         </>
