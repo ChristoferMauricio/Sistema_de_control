@@ -678,7 +678,7 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
         return t;
     }, [pivotData]);
 
-    // ── Pivot de Story Points: igual que pivotData pero sumando SP en vez de contar ──
+    // ── Pivot de Story Points: suma SP por integrante, distribuyendo por estado de subtareas ──
     const pivotDataSP = useMemo(() => {
         const map = {};
 
@@ -686,17 +686,30 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
             const realName = resolveName(t.assignee_email);
             const sp = parseFloat(t.story_points) || 0;
             if (!map[realName]) {
-                map[realName] = { assignee: realName, total: 0, subtareasCount: 0 };
+                map[realName] = { assignee: realName, total: 0 };
                 STATUS_COLUMNS.forEach((col) => { map[realName][col.key] = 0; });
             }
 
             map[realName].total += sp;
 
-            const matched = STATUS_COLUMNS.find((col) =>
-                col.jiraStatuses.some((s) => s.toLowerCase() === (t.status || "").toLowerCase())
-            );
-            if (matched) {
-                map[realName][matched.key] += sp;
+            // Buscar subtareas de esta historia (solo aplica a historias de iteración/PF3-1799)
+            const subs = filteredSubtasks.filter(s => s.parent_key === t.jira_key);
+
+            if (subs.length > 0 && sp > 0) {
+                // Distribuir SP proporcionalmente por estado de cada subtarea
+                const spPerSub = sp / subs.length;
+                subs.forEach(sub => {
+                    const matched = STATUS_COLUMNS.find(col =>
+                        col.jiraStatuses.some(s => s.toLowerCase() === (sub.status || "").toLowerCase())
+                    );
+                    if (matched) map[realName][matched.key] += spPerSub;
+                });
+            } else {
+                // Sin subtareas: SP va al estado de la historia
+                const matched = STATUS_COLUMNS.find((col) =>
+                    col.jiraStatuses.some((s) => s.toLowerCase() === (t.status || "").toLowerCase())
+                );
+                if (matched) map[realName][matched.key] += sp;
             }
         });
 
