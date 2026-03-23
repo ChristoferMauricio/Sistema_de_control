@@ -700,19 +700,9 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
             }
         });
 
-        // Contar subtareas para la tabla de SP (cada subtarea = 1)
-        filteredSubtasks.forEach((t) => {
-            const realName = resolveName(t.assignee_email);
-            if (!map[realName]) {
-                map[realName] = { assignee: realName, total: 0, subtareasCount: 0 };
-                STATUS_COLUMNS.forEach((col) => { map[realName][col.key] = 0; });
-            }
-            map[realName].subtareasCount += 1;
-        });
-
         return Object.values(map).map(row => ({
             ...row,
-            puntajeTotal: row.total + row.subtareasCount
+            puntajeTotal: row.total
         })).sort((a, b) => b.puntajeTotal - a.puntajeTotal);
     }, [filtered, filteredSubtasks, resolveName]);
 
