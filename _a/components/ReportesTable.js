@@ -649,10 +649,15 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
             if (!validParentKeys.has(t.parent_key)) return false;
 
             // Second, it must pass the sprint filter if one is selected
-            if (!selectedSprint) return true;
-            return t.sprint === selectedSprint || storyKeysBySprint.has(t.parent_key);
+            if (selectedSprint && !(t.sprint === selectedSprint || storyKeysBySprint.has(t.parent_key))) return false;
+
+            // Third, apply label filter
+            if (labelFilter === "reportar" && Array.isArray(t.labels) && t.labels.includes("No_Reportar")) return false;
+            if (labelFilter === "no_reportar" && (!Array.isArray(t.labels) || !t.labels.includes("No_Reportar"))) return false;
+
+            return true;
         });
-    }, [tickets, selectedSprint, filtered]);
+    }, [tickets, selectedSprint, filtered, labelFilter]);
 
     // Crear mapa de Programador → Nombre (case-insensitive)
     // nameMap: jiraDisplayName.lower → alias personalizado (tabla Nombres)
