@@ -20,7 +20,7 @@ export async function fetchAndClassify() {
   // 1. Obtener todos los tickets PF3QA (Historias + Errores)
   const { data: ticketsPF3QA } = await supabase
     .from("jira_tickets")
-    .select("jira_key, summary, status, issue_type, sprint, story_points, assignee_email, reporter_email, parent_key, created_at, updated_at, comentario, priority")
+    .select("jira_key, summary, status, issue_type, sprint, story_points, assignee_email, reporter_email, parent_key, created_at, updated_at, comentario, priority, labels")
     .like("jira_key", "PF3QA-%")
     .in("issue_type", ["Historia", "Bug", "Error", "Error Desarrollo", "Error Certificación", "Error en Certificación"])
     .order("updated_at", { ascending: false });

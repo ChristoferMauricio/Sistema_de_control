@@ -123,7 +123,7 @@ async function searchJira(jql, epicLinkFieldId) {
   const allIssues = [];
 
   // Campos base a solicitar en cada peticion
-  const baseFields = "key,summary,status,assignee,priority,issuetype,created,updated,reporter,parent,subtasks,customfield_10036,customfield_10020,customfield_10014,description,issuelinks";
+  const baseFields = "key,summary,status,assignee,priority,issuetype,created,updated,reporter,parent,subtasks,customfield_10036,customfield_10020,customfield_10014,description,issuelinks,labels";
 
   // Agregar el campo Epic Link descubierto si es diferente al incluido por defecto
   const fields = epicLinkFieldId && epicLinkFieldId !== "customfield_10014"
@@ -218,6 +218,7 @@ function transformIssue(issue, epicLinkFieldId) {
     created_at:     f.created       || null,
     updated_at:     f.updated       || null,
     synced_at:      now,
+    labels:         Array.isArray(f.labels) && f.labels.length > 0 ? f.labels : null,
   };
 
   // Construir arreglo de personas (se deduplicara mas adelante por email/accountId)

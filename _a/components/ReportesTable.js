@@ -532,6 +532,7 @@ function TicketListModal({ title, assigneeName, items, onClose }) {
  */
 export default function ReportesTable({ tickets = [], nombres = [] }) {
     const [selectedSprint, setSelectedSprint] = useState(() => getCurrentSprint(new Date())?.iteracion || "");
+    const [labelFilter, setLabelFilter] = useState("todo"); // "todo" | "reportar" | "no_reportar"
     const [persons, setPersons] = useState([]);
     const [equipo,  setEquipo]  = useState([]);
 
@@ -617,11 +618,14 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
     // para ocultar la columna de soporte e incidencias
     const isPF3QA = /Tablero\s+Sprint/i.test(selectedSprint);
 
-    // Filtrar por sprint
+    // Filtrar por sprint + etiqueta
     const filtered = useMemo(() => {
-        if (!selectedSprint) return historias;
-        return historias.filter((t) => t.sprint === selectedSprint);
-    }, [historias, selectedSprint]);
+        let result = historias;
+        if (selectedSprint) result = result.filter((t) => t.sprint === selectedSprint);
+        if (labelFilter === "reportar") result = result.filter((t) => !Array.isArray(t.labels) || !t.labels.includes("No_Reportar"));
+        if (labelFilter === "no_reportar") result = result.filter((t) => Array.isArray(t.labels) && t.labels.includes("No_Reportar"));
+        return result;
+    }, [historias, selectedSprint, labelFilter]);
 
     // ── Subtareas de soporte e incidencias ────────────────────────────────────
     // Filtra subtareas que pertenecen a historias de la epica PF3-1799 (estabilizacion)
@@ -933,6 +937,23 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                                     Limpiar
                                 </button>
                             )}
+                        </div>
+
+                        <div className="flex items-center gap-2 border-l border-gray-200 pl-4">
+                            <label className="text-xs font-medium text-gray-500">Etiqueta:</label>
+                            <select
+                                value={labelFilter}
+                                onChange={(e) => setLabelFilter(e.target.value)}
+                                className={`px-2.5 py-2 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[120px] ${
+                                    labelFilter !== "todo"
+                                        ? "border-orange-300 bg-orange-50 text-orange-700 font-medium"
+                                        : "border-gray-200 bg-white text-gray-700"
+                                }`}
+                            >
+                                <option value="todo">Todo</option>
+                                <option value="reportar">Reportar</option>
+                                <option value="no_reportar">No Reportar</option>
+                            </select>
                         </div>
                     </div>
                 </div>

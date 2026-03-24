@@ -456,7 +456,7 @@ export async function exportUnifiedExcel(selectedSprint) {
     while (hasMore) {
       const { data, error } = await supabase
         .from("jira_tickets")
-        .select("jira_key, summary, status, issue_type, sprint, story_points, assignee_email, reporter_email, parent_key, created_at, updated_at, comentario, priority")
+        .select("jira_key, summary, status, issue_type, sprint, story_points, assignee_email, reporter_email, parent_key, created_at, updated_at, comentario, priority, labels")
         .order("updated_at", { ascending: false })
         .range(from, from + pageSize - 1);
       if (error) { console.error("[exportExcel] Supabase error:", error); hasMore = false; break; }
@@ -551,7 +551,7 @@ export async function exportUnifiedExcel(selectedSprint) {
     const headersOsi = [
       "Tipo", "Clave", "Resumen", "Subtareas", "Principal",
       "Épica", "Sprint", "Persona asignada", "Story Points",
-      "Estado", "Informador", "Creada",
+      "Estado", "Informador", "Creada", "Etiquetas",
     ];
     const rowsOsi = allTickets.map((t) => ({
       Tipo: t.issue_type || "",
@@ -566,13 +566,14 @@ export async function exportUnifiedExcel(selectedSprint) {
       Estado: t.status || "",
       Informador: resolveName(t.reporter_email),
       Creada: t.created_at ? formatDate(t.created_at) : "",
+      Etiquetas: Array.isArray(t.labels) ? t.labels.join(", ") : "",
     }));
     const osiXml = buildSheetXml(headersOsi, rowsOsi,
-      [16, 13, 52, 20, 13, 32, 22, 24, 13, 20, 24, 18], sst);
+      [16, 13, 52, 20, 13, 32, 22, 24, 13, 20, 24, 18, 20], sst);
     console.log(`[exportExcel] ✅ Hoja Osi: ${rowsOsi.length} filas`);
 
     // ─── Hoja "Datos QA" (sheet4) — TODOS los tickets PF3QA ────────
-    const headersQA = ["Tipo", "Clave", "Resumen", "Sprint", "Persona asignada", "Estado", "Informador"];
+    const headersQA = ["Tipo", "Clave", "Resumen", "Sprint", "Persona asignada", "Estado", "Informador", "Etiquetas"];
     const pf3qaTickets = allTickets.filter((t) => t.jira_key?.startsWith("PF3QA-"));
 
     // Determinar sprint QA más reciente
@@ -592,9 +593,10 @@ export async function exportUnifiedExcel(selectedSprint) {
       "Persona asignada": resolveName(t.assignee_email),
       Estado: t.status || "",
       Informador: resolveName(t.reporter_email),
+      Etiquetas: Array.isArray(t.labels) ? t.labels.join(", ") : "",
     }));
     const qaXml = buildSheetXml(headersQA, rowsQA,
-      [16, 13, 52, 22, 24, 20, 24], sst);
+      [16, 13, 52, 22, 24, 20, 24, 20], sst);
     console.log(`[exportExcel] ✅ Hoja QA: ${rowsQA.length} filas (todos los PF3QA)`);
 
     /* ═══════════════════════════════════════════════════════════════
