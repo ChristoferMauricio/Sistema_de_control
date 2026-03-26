@@ -107,7 +107,7 @@ function MeetingCalendar({ reuniones, onEventClick }) {
     const [year, setYear] = useState(today.getFullYear());
     const [month, setMonth] = useState(today.getMonth());
     const [showTentativas, setShowTentativas] = useState(false);
-    const [showRealizadas, setShowRealizadas] = useState(false);
+    const [showRealizadas, setShowRealizadas] = useState(true);
     const [showCanceladas, setShowCanceladas] = useState(false);
     const [showCliente, setShowCliente] = useState(true);
     const [showInterna, setShowInterna] = useState(true);
