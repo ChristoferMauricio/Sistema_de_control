@@ -152,9 +152,10 @@ function MeetingCalendar({ reuniones, onEventClick }) {
                 });
             });
         }
-        // Filtra por tipo
+        // Filtra por tipo (solo afecta a programadas; realizadas/canceladas/tentativas siempre pasan)
         Object.keys(map).forEach((k) => {
             map[k] = map[k].filter((ev) => {
+                if (ev._status !== "programada") return true;
                 if (ev.tipo === "Reunión con cliente" && !showCliente) return false;
                 if (ev.tipo === "Reunión Interna" && !showInterna) return false;
                 return true;
