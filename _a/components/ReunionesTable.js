@@ -100,7 +100,7 @@ const MONTHS_ES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio
  * @param {Object} props
  * @param {Array}  props.reuniones - Todas las reuniones para construir el mapa de eventos
  */
-function MeetingCalendar({ reuniones }) {
+function MeetingCalendar({ reuniones, onEventClick }) {
     const today = new Date();
     const [year, setYear] = useState(today.getFullYear());
     const [month, setMonth] = useState(today.getMonth());
@@ -268,7 +268,8 @@ function MeetingCalendar({ reuniones }) {
                                     return (
                                         <div key={`${ev.id}-${evIdx}`}
                                             title={`${isTent ? "[TENTATIVA] " : ""}${ev.tipo}\n${ev.modulo || ""}\n${ev.tema || ""}\n${hora ? "Hora: " + hora : ""}`}
-                                            className={`text-[10px] leading-tight px-1.5 py-0.5 rounded truncate cursor-default
+                                            onClick={() => onEventClick?.(ev)}
+                                            className={`text-[10px] leading-tight px-1.5 py-0.5 rounded truncate cursor-pointer hover:opacity-80 transition-opacity
                                                 ${isTent
                                                     ? "border border-dashed border-amber-300 bg-amber-50/60 text-amber-700 opacity-80"
                                                     : isCliente ? "bg-blue-50 text-blue-700" : "bg-emerald-50 text-emerald-700"
@@ -311,6 +312,164 @@ function ConfirmDeleteModal({ onConfirm, onCancel }) {
                         Eliminar
                     </button>
                 </div>
+            </div>
+        </div>,
+        document.body
+    );
+}
+
+// ─── Modal de detalle de reunion ─────────────────────────────────────────────
+
+/**
+ * Panel lateral de solo lectura que muestra el detalle de una reunion.
+ * Incluye botones para editar y eliminar (solo para roles no-viewer).
+ */
+function DetailModal({ row, onEdit, onDelete, onClose, canEdit }) {
+    const isCliente = row.tipo === "Reunión con cliente";
+    const accentBg = isCliente ? "bg-blue-500" : "bg-emerald-500";
+    const accentLight = isCliente ? "bg-blue-50 text-blue-700" : "bg-emerald-50 text-emerald-700";
+    const ec = getEstadoColor(row.estado);
+    const pc = getPrioridadColor(row.prioridad);
+
+    const hora = row.fecha_programada?.split(" ")[1] || "";
+    const fecha = row.fecha_programada?.split(" ")[0] || "";
+
+    // Format date nicely
+    function formatFecha(f) {
+        if (!f) return "";
+        try {
+            const [y, m, d] = f.split("-");
+            const date = new Date(y, m - 1, d);
+            return date.toLocaleDateString("es-PE", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+        } catch { return f; }
+    }
+
+    return createPortal(
+        <div className="fixed inset-0 z-[9999] flex justify-end">
+            <div className="fixed inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
+            <div
+                className="relative bg-white shadow-2xl w-full max-w-md h-screen flex flex-col animate-slide-in-right"
+                style={{ borderRadius: "1rem 0 0 1rem" }}
+                onClick={(e) => e.stopPropagation()}
+            >
+                {/* Header con color */}
+                <div className={`${accentBg} px-5 pt-5 pb-4 shrink-0`} style={{ borderRadius: "1rem 0 0 0" }}>
+                    <div className="flex items-center justify-between mb-3">
+                        <span className="text-xs font-medium text-white/70 uppercase tracking-wider">
+                            {row.tipo}
+                        </span>
+                        <button onClick={onClose}
+                            className="p-1.5 rounded-lg hover:bg-white/20 transition-colors text-white/70 hover:text-white">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                    <h2 className="text-lg font-semibold text-white leading-snug">
+                        {row.tema || row.modulo || "Sin tema"}
+                    </h2>
+                    {row.modulo && row.tema && (
+                        <p className="text-sm text-white/80 mt-1">{row.modulo}</p>
+                    )}
+                </div>
+
+                {/* Body */}
+                <div className="px-5 py-5 overflow-y-auto flex-1 space-y-4">
+
+                    {/* Fecha y hora */}
+                    {(fecha || (row.fechas_propuestas || []).length > 0) && (
+                        <div className="flex items-start gap-3">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+                            </svg>
+                            <div>
+                                {fecha ? (
+                                    <>
+                                        <p className="text-sm font-medium text-gray-800 capitalize">{formatFecha(fecha)}</p>
+                                        {hora && <p className="text-sm text-gray-500 mt-0.5">{hora} hrs</p>}
+                                    </>
+                                ) : (
+                                    <div className="space-y-1">
+                                        <p className="text-xs font-medium text-gray-500">Fechas propuestas:</p>
+                                        {(row.fechas_propuestas || []).map((fp, i) => (
+                                            <p key={i} className="text-sm text-gray-700">
+                                                {formatFecha(fp.fecha)} {fp.hora && `a las ${fp.hora}`}
+                                            </p>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Estado */}
+                    <div className="flex items-center gap-3">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ${ec.bg} ${ec.text}`}>
+                            {row.estado}
+                        </span>
+                    </div>
+
+                    {/* Prioridad */}
+                    <div className="flex items-center gap-3">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 3v1.5M3 21v-6m0 0l2.77-.693a9 9 0 016.208.682l.108.054a9 9 0 006.086.71l3.114-.732a48.524 48.524 0 01-.005-10.499l-3.11.732a9 9 0 01-6.085-.711l-.108-.054a9 9 0 00-6.208-.682L3 4.5M3 15V4.5" />
+                        </svg>
+                        <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ${pc.bg} ${pc.text}`}>
+                            {row.prioridad || "—"}
+                        </span>
+                    </div>
+
+                    {/* Sprint */}
+                    {row.sprint && (
+                        <div className="flex items-center gap-3">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
+                            </svg>
+                            <span className="text-sm text-gray-700 bg-gray-100 px-2.5 py-1 rounded-md">{row.sprint}</span>
+                        </div>
+                    )}
+
+                    <div className="border-t border-gray-100" />
+
+                    {/* Presentes */}
+                    {(row.presentes || []).length > 0 && (
+                        <div>
+                            <div className="flex items-center gap-3 mb-3">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+                                </svg>
+                                <span className="text-sm font-medium text-gray-600">Participantes ({(row.presentes || []).length})</span>
+                            </div>
+                            <div className="flex flex-wrap gap-1.5 ml-8">
+                                {(row.presentes || []).map((name) => (
+                                    <span key={name} className="inline-flex items-center gap-1.5 pl-1 pr-2.5 py-1 rounded-full bg-gray-100 text-sm text-gray-700">
+                                        <span className={`w-6 h-6 rounded-full ${accentBg} text-white flex items-center justify-center text-xs font-semibold`}>
+                                            {name.charAt(0)}
+                                        </span>
+                                        <span className="text-xs">{name}</span>
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Footer con acciones */}
+                {canEdit && (
+                    <div className="px-5 py-4 flex items-center justify-end gap-3 shrink-0 shadow-[0_-1px_3px_rgba(0,0,0,0.05)]">
+                        <button type="button" onClick={() => { onClose(); onDelete(row.id); }}
+                            className="px-4 py-2 rounded-xl text-sm font-medium text-red-500 hover:bg-red-50 transition-colors">
+                            Eliminar
+                        </button>
+                        <button type="button" onClick={() => { onClose(); onEdit(row); }}
+                            className={`px-6 py-2 rounded-xl text-sm font-medium text-white ${accentBg} hover:opacity-90 shadow-md transition-all`}>
+                            Editar
+                        </button>
+                    </div>
+                )}
             </div>
         </div>,
         document.body
@@ -778,6 +937,7 @@ export default function ReunionesTable({ reuniones = [], sprints = [], nombres =
     const role = useRole();
     const [search, setSearch] = useState("");
     const [editRow, setEditRow] = useState(null);
+    const [detailRow, setDetailRow] = useState(null);
     const [deleteId, setDeleteId] = useState(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [filterSprint, setFilterSprint] = useState("");
@@ -842,7 +1002,7 @@ export default function ReunionesTable({ reuniones = [], sprints = [], nombres =
     return (
         <div>
             {/* Calendar view */}
-            <MeetingCalendar reuniones={reuniones} />
+            <MeetingCalendar reuniones={reuniones} onEventClick={(ev) => setDetailRow(ev)} />
 
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
                 {/* Toolbar */}
@@ -923,7 +1083,7 @@ export default function ReunionesTable({ reuniones = [], sprints = [], nombres =
                                     const pc = getPrioridadColor(r.prioridad);
                                     const presentes = r.presentes || [];
                                     return (
-                                        <tr key={r.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+                                        <tr key={r.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors cursor-pointer" onClick={() => setDetailRow(r)}>
                                             <td className="px-4 py-3 text-gray-400 text-xs font-mono">{r.id}</td>
                                             <td className="px-4 py-3">
                                                 {r.sprint ? (
@@ -958,7 +1118,7 @@ export default function ReunionesTable({ reuniones = [], sprints = [], nombres =
                                                 </span>
                                             </td>
                                             {role !== "viewer" && (
-                                                <td className="px-4 py-3 text-center">
+                                                <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                                                     <div className="flex items-center justify-center gap-1">
                                                         <button onClick={() => setEditRow(r)} title="Editar"
                                                             className="p-1.5 rounded-lg text-gray-400 hover:bg-orange-50 hover:text-orange-600 transition-colors">
@@ -1003,6 +1163,15 @@ export default function ReunionesTable({ reuniones = [], sprints = [], nombres =
                 )}
 
                 {/* Modals */}
+                {detailRow && (
+                    <DetailModal
+                        row={detailRow}
+                        onEdit={(r) => setEditRow(r)}
+                        onDelete={(id) => setDeleteId(id)}
+                        onClose={() => setDetailRow(null)}
+                        canEdit={role !== "viewer"}
+                    />
+                )}
                 {editRow && (
                     <EditModal
                         row={editRow}
