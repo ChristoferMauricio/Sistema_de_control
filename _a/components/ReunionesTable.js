@@ -484,10 +484,21 @@ function DetailModal({ row, onEdit, onDelete, onClose, canEdit }) {
  * chips de sugerencia para temas y selector de presentes con busqueda.
  */
 function EditModal({ row, sprints, nombres, onSave, onClose, isNew }) {
+    // Pre-parse fecha_programada into _customDate/_customTime for the date picker
+    const _initCustomDate = (() => {
+        if (!row.fecha_programada) return {};
+        const parts = row.fecha_programada.split(" ");
+        const isInProposed = (row.fechas_propuestas || []).some(
+            (fp) => `${fp.fecha} ${fp.hora || ""}`.trim() === row.fecha_programada
+        );
+        if (isInProposed) return {};
+        return { _customDate: parts[0] || "", _customTime: parts[1] || "" };
+    })();
     const [form, setForm] = useState({
         ...row,
         fechas_propuestas: row.fechas_propuestas || [],
         presentes: row.presentes || [],
+        ..._initCustomDate,
     });
     const [customModulo, setCustomModulo] = useState(
         row.modulo && !MODULO_OPTIONS.includes(row.modulo) ? row.modulo : ""
