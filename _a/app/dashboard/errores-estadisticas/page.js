@@ -264,8 +264,8 @@ function StatsTable({ title, subtitle, data, onBarClick, onStatusClick, showExcl
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b-2 border-gray-200 dark:border-gray-600 bg-gray-50/80 dark:bg-gray-800/80">
-              <th className="text-left px-4 py-2 font-semibold text-gray-700 dark:text-gray-300" style={{ minWidth: "150px" }}>Integrante</th>
-              <th colSpan={statusDefs.length} className="text-center px-2 py-1 border-l border-gray-200 dark:border-gray-600">
+              <th className="text-left px-4 py-2 font-semibold text-gray-700 dark:text-gray-300 border-r-2 border-gray-300 dark:border-gray-500" style={{ minWidth: "150px" }}>Integrante</th>
+              <th colSpan={statusDefs.length} className="text-center px-2 py-1 border-t-2 border-sky-300 dark:border-sky-600">
                 <div className="flex items-center justify-center gap-1.5 text-sky-600">
                   <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
@@ -273,10 +273,10 @@ function StatsTable({ title, subtitle, data, onBarClick, onStatusClick, showExcl
                   <span className="text-xs font-semibold">Historias</span>
                 </div>
               </th>
-              <th className="text-center px-2 py-2 border-l border-gray-200 dark:border-gray-600 font-semibold text-sky-700 dark:text-sky-400 bg-sky-50/50 dark:bg-sky-900/20" style={{ minWidth: "50px" }}>
+              <th className="text-center px-2 py-2 border-l-2 border-sky-300 dark:border-sky-600 border-t-2 border-r-2 font-semibold text-sky-700 dark:text-sky-400 bg-sky-50/50 dark:bg-sky-900/20" style={{ minWidth: "50px" }}>
                 <span className="text-xs">Sub</span>
               </th>
-              <th colSpan={statusDefs.length} className="text-center px-2 py-1 border-l border-gray-200 dark:border-gray-600">
+              <th colSpan={statusDefs.length} className="text-center px-2 py-1 border-t-2 border-red-300 dark:border-red-600">
                 <div className="flex items-center justify-center gap-1.5 text-red-500">
                   <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -284,36 +284,36 @@ function StatsTable({ title, subtitle, data, onBarClick, onStatusClick, showExcl
                   <span className="text-xs font-semibold">Errores</span>
                 </div>
               </th>
-              <th className="text-center px-2 py-2 border-l border-gray-200 dark:border-gray-600 font-semibold text-red-600 dark:text-red-400 bg-red-50/50 dark:bg-red-900/20" style={{ minWidth: "50px" }}>
+              <th className="text-center px-2 py-2 border-l-2 border-red-300 dark:border-red-600 border-t-2 border-r-2 font-semibold text-red-600 dark:text-red-400 bg-red-50/50 dark:bg-red-900/20" style={{ minWidth: "50px" }}>
                 <span className="text-xs">Sub</span>
               </th>
               {showExcluidos && (
-                <th className="text-center px-2 py-2 border-l border-gray-200 dark:border-gray-600 font-semibold text-amber-600 dark:text-amber-400" style={{ minWidth: "50px" }}>
+                <th className="text-center px-2 py-2 border-l-2 border-amber-300 dark:border-amber-600 border-t-2 border-r-2 font-semibold text-amber-600 dark:text-amber-400" style={{ minWidth: "50px" }}>
                   <span className="text-xs">Excl.</span>
                 </th>
               )}
-              <th className="text-center px-3 py-2 border-l border-gray-200 dark:border-gray-600 font-bold text-gray-900 dark:text-gray-100 bg-orange-50/50 dark:bg-orange-900/20" style={{ minWidth: "55px" }}>TOTAL</th>
+              <th className="text-center px-3 py-2 border-l-2 border-orange-300 dark:border-orange-600 border-t-2 border-r-2 font-bold text-gray-900 dark:text-gray-100 bg-orange-50/50 dark:bg-orange-900/20" style={{ minWidth: "55px" }}>TOTAL</th>
             </tr>
             <tr className="border-b border-gray-200 dark:border-gray-600 bg-gray-50/40 dark:bg-gray-800/40">
-              <th />
-              {statusDefs.map((sd) => (
-                <th key={`h-${sd.key}`} className="text-center px-1 py-1 border-l border-gray-100 dark:border-gray-700">
+              <th className="border-r-2 border-gray-300 dark:border-gray-500" />
+              {statusDefs.map((sd, i) => (
+                <th key={`h-${sd.key}`} className={`text-center px-1 py-1 ${i === 0 ? "border-l-2 border-l-sky-300 dark:border-l-sky-600" : "border-l border-gray-100 dark:border-gray-700"}`}>
                   <span className={`inline-flex items-center px-1 py-0.5 rounded text-[8px] font-bold ${sd.color}`}>
                     {sd.label.replace("Listo para dev", "Dev").replace("Por hacer", "P.Hacer")}
                   </span>
                 </th>
               ))}
-              <th className="border-l border-gray-200 dark:border-gray-600" />
-              {statusDefs.map((sd) => (
-                <th key={`e-${sd.key}`} className="text-center px-1 py-1 border-l border-gray-100 dark:border-gray-700">
+              <th className="border-l-2 border-r-2 border-sky-300 dark:border-sky-600" />
+              {statusDefs.map((sd, i) => (
+                <th key={`e-${sd.key}`} className={`text-center px-1 py-1 ${i === 0 ? "border-l-2 border-l-red-300 dark:border-l-red-600" : "border-l border-gray-100 dark:border-gray-700"}`}>
                   <span className={`inline-flex items-center px-1 py-0.5 rounded text-[8px] font-bold ${sd.color}`}>
                     {sd.label.replace("Listo para dev", "Dev").replace("Por hacer", "P.Hacer")}
                   </span>
                 </th>
               ))}
-              <th className="border-l border-gray-200 dark:border-gray-600" />
-              {showExcluidos && <th className="border-l border-gray-200 dark:border-gray-600" />}
-              <th className="border-l border-gray-200 dark:border-gray-600" />
+              <th className="border-l-2 border-r-2 border-red-300 dark:border-red-600" />
+              {showExcluidos && <th className="border-l-2 border-r-2 border-amber-300 dark:border-amber-600" />}
+              <th className="border-l-2 border-r-2 border-orange-300 dark:border-orange-600" />
             </tr>
           </thead>
           <tbody>
@@ -321,13 +321,13 @@ function StatsTable({ title, subtitle, data, onBarClick, onStatusClick, showExcl
               const rowTotal = row.historias + row.errores + row.excluidos;
               return (
                 <tr key={row.name} className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50/50 dark:hover:bg-gray-800/50 transition-colors">
-                  <td className="px-4 py-2 font-medium text-gray-800 dark:text-gray-200 whitespace-nowrap">{row.name}</td>
-                  {statusDefs.map((sd) => (
-                    <td key={`h-${sd.key}`} className="px-1 py-2 text-center border-l border-gray-100 dark:border-gray-700">
+                  <td className="px-4 py-2 font-medium text-gray-800 dark:text-gray-200 whitespace-nowrap border-r-2 border-gray-300 dark:border-gray-500">{row.name}</td>
+                  {statusDefs.map((sd, i) => (
+                    <td key={`h-${sd.key}`} className={`px-1 py-2 text-center ${i === 0 ? "border-l-2 border-l-sky-300 dark:border-l-sky-600" : "border-l border-gray-100 dark:border-gray-700"}`}>
                       <StatusCell count={row.historiasStatus[sd.key] || 0} statusKey={sd.key} personName={row.name} type="Historia" />
                     </td>
                   ))}
-                  <td className="px-2 py-2 text-center border-l border-gray-200 dark:border-gray-600 bg-sky-50/30 dark:bg-sky-900/20">
+                  <td className="px-2 py-2 text-center border-l-2 border-r-2 border-sky-300 dark:border-sky-600 bg-sky-50/30 dark:bg-sky-900/20">
                     {row.historias > 0 ? (
                       <button onClick={() => onBarClick(row.name, "Historia")} className="inline-flex items-center justify-center min-w-[26px] px-1.5 py-0.5 rounded-lg text-xs font-bold bg-sky-100 text-sky-700 border border-sky-200 hover:bg-sky-200 dark:bg-sky-900/60 dark:text-sky-300 dark:border-sky-700 dark:hover:bg-sky-800/80 transition-colors cursor-pointer">
                         {row.historias}
@@ -336,12 +336,12 @@ function StatsTable({ title, subtitle, data, onBarClick, onStatusClick, showExcl
                       <span className="text-gray-200 dark:text-gray-600 text-xs">0</span>
                     )}
                   </td>
-                  {statusDefs.map((sd) => (
-                    <td key={`e-${sd.key}`} className="px-1 py-2 text-center border-l border-gray-100 dark:border-gray-700">
+                  {statusDefs.map((sd, i) => (
+                    <td key={`e-${sd.key}`} className={`px-1 py-2 text-center ${i === 0 ? "border-l-2 border-l-red-300 dark:border-l-red-600" : "border-l border-gray-100 dark:border-gray-700"}`}>
                       <StatusCell count={row.erroresStatus[sd.key] || 0} statusKey={sd.key} personName={row.name} type="Error" />
                     </td>
                   ))}
-                  <td className="px-2 py-2 text-center border-l border-gray-200 dark:border-gray-600 bg-red-50/30 dark:bg-red-900/20">
+                  <td className="px-2 py-2 text-center border-l-2 border-r-2 border-red-300 dark:border-red-600 bg-red-50/30 dark:bg-red-900/20">
                     {row.errores > 0 ? (
                       <button onClick={() => onBarClick(row.name, "Error")} className="inline-flex items-center justify-center min-w-[26px] px-1.5 py-0.5 rounded-lg text-xs font-bold bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 dark:bg-red-900/60 dark:text-red-300 dark:border-red-700 dark:hover:bg-red-800/80 transition-colors cursor-pointer">
                         {row.errores}
@@ -351,7 +351,7 @@ function StatsTable({ title, subtitle, data, onBarClick, onStatusClick, showExcl
                     )}
                   </td>
                   {showExcluidos && (
-                    <td className="px-2 py-2 text-center border-l border-gray-200 dark:border-gray-600">
+                    <td className="px-2 py-2 text-center border-l-2 border-r-2 border-amber-300 dark:border-amber-600">
                       {row.excluidos > 0 ? (
                         <button onClick={() => onBarClick(row.name, "Excluido")} className="inline-flex items-center justify-center min-w-[26px] px-1.5 py-0.5 rounded-lg text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 dark:bg-amber-900/60 dark:text-amber-300 dark:border-amber-700 dark:hover:bg-amber-800/80 transition-colors cursor-pointer">
                           {row.excluidos}
@@ -361,7 +361,7 @@ function StatsTable({ title, subtitle, data, onBarClick, onStatusClick, showExcl
                       )}
                     </td>
                   )}
-                  <td className="px-3 py-2 text-center border-l border-gray-200 dark:border-gray-600 bg-gray-50/50 dark:bg-gray-800/50">
+                  <td className="px-3 py-2 text-center border-l-2 border-r-2 border-orange-300 dark:border-orange-600 bg-gray-50/50 dark:bg-gray-800/50">
                     <span className="inline-flex items-center justify-center min-w-[28px] px-1.5 py-0.5 rounded-lg text-xs font-bold text-gray-800 dark:text-gray-200">{rowTotal}</span>
                   </td>
                 </tr>
@@ -369,9 +369,9 @@ function StatsTable({ title, subtitle, data, onBarClick, onStatusClick, showExcl
             })}
             {/* Fila TOTAL */}
             <tr className="border-t-2 border-gray-300 dark:border-gray-500 bg-gray-50/80 dark:bg-gray-800/80 font-semibold">
-              <td className="px-4 py-2 text-gray-700 dark:text-gray-300">TOTAL</td>
-              {statusDefs.map((sd) => (
-                <td key={`th-${sd.key}`} className="px-1 py-2 text-center border-l border-gray-100 dark:border-gray-700">
+              <td className="px-4 py-2 text-gray-700 dark:text-gray-300 border-r-2 border-gray-300 dark:border-gray-500">TOTAL</td>
+              {statusDefs.map((sd, i) => (
+                <td key={`th-${sd.key}`} className={`px-1 py-2 text-center ${i === 0 ? "border-l-2 border-l-sky-300 dark:border-l-sky-600 border-b-2 border-b-sky-300 dark:border-b-sky-600" : "border-l border-gray-100 dark:border-gray-700 border-b-2 border-b-sky-300 dark:border-b-sky-600"}`}>
                   <div className="flex flex-col items-center">
                     <span className={`inline-flex items-center justify-center min-w-[22px] px-1 py-0.5 rounded text-[10px] font-bold ${sd.color}`}>
                       {totals.historiasStatus[sd.key]}
@@ -380,11 +380,11 @@ function StatsTable({ title, subtitle, data, onBarClick, onStatusClick, showExcl
                   </div>
                 </td>
               ))}
-              <td className="px-2 py-2 text-center border-l border-gray-200 dark:border-gray-600 bg-sky-50/30 dark:bg-sky-900/20">
+              <td className="px-2 py-2 text-center border-l-2 border-r-2 border-b-2 border-sky-300 dark:border-sky-600 bg-sky-50/30 dark:bg-sky-900/20">
                 <span className="inline-flex items-center justify-center min-w-[26px] px-1.5 py-0.5 rounded-lg text-xs font-bold bg-sky-200 text-sky-800 dark:bg-sky-900/60 dark:text-sky-300">{totals.historias}</span>
               </td>
-              {statusDefs.map((sd) => (
-                <td key={`te-${sd.key}`} className="px-1 py-2 text-center border-l border-gray-100 dark:border-gray-700">
+              {statusDefs.map((sd, i) => (
+                <td key={`te-${sd.key}`} className={`px-1 py-2 text-center ${i === 0 ? "border-l-2 border-l-red-300 dark:border-l-red-600 border-b-2 border-b-red-300 dark:border-b-red-600" : "border-l border-gray-100 dark:border-gray-700 border-b-2 border-b-red-300 dark:border-b-red-600"}`}>
                   <div className="flex flex-col items-center">
                     <span className={`inline-flex items-center justify-center min-w-[22px] px-1 py-0.5 rounded text-[10px] font-bold ${sd.color}`}>
                       {totals.erroresStatus[sd.key]}
@@ -393,15 +393,15 @@ function StatsTable({ title, subtitle, data, onBarClick, onStatusClick, showExcl
                   </div>
                 </td>
               ))}
-              <td className="px-2 py-2 text-center border-l border-gray-200 dark:border-gray-600 bg-red-50/30 dark:bg-red-900/20">
+              <td className="px-2 py-2 text-center border-l-2 border-r-2 border-b-2 border-red-300 dark:border-red-600 bg-red-50/30 dark:bg-red-900/20">
                 <span className="inline-flex items-center justify-center min-w-[26px] px-1.5 py-0.5 rounded-lg text-xs font-bold bg-red-100 text-red-700 dark:bg-red-900/60 dark:text-red-300">{totals.errores}</span>
               </td>
               {showExcluidos && (
-                <td className="px-2 py-2 text-center border-l border-gray-200 dark:border-gray-600">
+                <td className="px-2 py-2 text-center border-l-2 border-r-2 border-b-2 border-amber-300 dark:border-amber-600">
                   <span className="inline-flex items-center justify-center min-w-[26px] px-1.5 py-0.5 rounded-lg text-xs font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/60 dark:text-amber-300">{totals.excluidos}</span>
                 </td>
               )}
-              <td className="px-3 py-2 text-center border-l border-gray-200 dark:border-gray-600 bg-gray-100 dark:bg-gray-700/50">
+              <td className="px-3 py-2 text-center border-l-2 border-r-2 border-b-2 border-orange-300 dark:border-orange-600 bg-gray-100 dark:bg-gray-700/50">
                 <span className="inline-flex items-center justify-center min-w-[30px] px-2 py-0.5 rounded-lg text-sm font-bold text-gray-900 dark:text-gray-100">{grandTotal}</span>
               </td>
             </tr>
