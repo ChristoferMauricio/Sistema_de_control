@@ -54,6 +54,16 @@ const ESTADO_INTERNA = [
     "Realizada",
 ];
 
+/** Sugerencias predefinidas de temas para llenado rapido */
+const TEMA_SUGGESTIONS = [
+    "Seguimiento de avance",
+    "Revisión de entregables",
+    "Planificación de sprint",
+    "Coordinación técnica",
+    "Demo / Presentación",
+    "Retrospectiva",
+];
+
 const PAGE_SIZE = 10;
 
 /** Devuelve clases CSS de fondo y texto segun el estado de la reunion */
@@ -307,23 +317,12 @@ function ConfirmDeleteModal({ onConfirm, onCancel }) {
     );
 }
 
-// ─── Modal de edicion / creacion ─────────────────────────────────────────────
+// ─── Modal de edicion / creacion (estilo Google Calendar) ────────────────────
 
 /**
- * Formulario modal para crear o editar una reunion. Gestiona:
- * - Seleccion de sprint, tipo (interna/cliente), modulo (predefinido o personalizado)
- * - Tema/objetivo de la reunion
- * - Flujo de estados diferenciado para reuniones con cliente vs internas
- * - Fechas propuestas (multi-fecha con hora) en estados tentativos
- * - Confirmacion de fecha programada (radio buttons) en estados de programacion
- * - Seleccion de presentes (multi-select con nombres del equipo)
- * @param {Object}   props
- * @param {Object}   props.row      - Datos de la reunion (existente o template vacio)
- * @param {Array}    props.sprints   - Sprints disponibles para el dropdown
- * @param {Array}    props.nombres   - Nombres del equipo para el selector de presentes
- * @param {Function} props.onSave    - Callback para guardar (insert o update)
- * @param {Function} props.onClose   - Callback para cerrar el modal
- * @param {boolean}  props.isNew     - true si es una nueva reunion, false si es edicion
+ * Panel lateral estilo Google Calendar para crear o editar una reunion.
+ * Se desliza desde la derecha con diseño compacto, iconos inline,
+ * chips de sugerencia para temas y selector de presentes con busqueda.
  */
 function EditModal({ row, sprints, nombres, onSave, onClose, isNew }) {
     const [form, setForm] = useState({
@@ -338,11 +337,11 @@ function EditModal({ row, sprints, nombres, onSave, onClose, isNew }) {
         row.modulo && !MODULO_OPTIONS.includes(row.modulo)
     );
     const [saving, setSaving] = useState(false);
+    const [guestSearch, setGuestSearch] = useState("");
 
     function updateField(field, value) {
         setForm((f) => {
             const updated = { ...f, [field]: value };
-            // When tipo changes, reset estado
             if (field === "tipo") {
                 updated.estado = "1.Tentativa";
                 updated.fecha_programada = "";
@@ -351,12 +350,8 @@ function EditModal({ row, sprints, nombres, onSave, onClose, isNew }) {
         });
     }
 
-    // Selecciona la lista de estados segun el tipo de reunion
     const estadoOptions = form.tipo === "Reunión con cliente" ? ESTADO_CLIENTE : ESTADO_INTERNA;
 
-    // ── Logica de visibilidad de campos de fecha ────────────────────────────
-    // canAddDates: permite agregar/editar fechas propuestas (estados tentativos)
-    // showDatePicker: muestra radio buttons para confirmar una fecha (estados de programacion)
     const isClienteProposal =
         form.tipo === "Reunión con cliente" &&
         ["1.Tentativa", "2.Enviar correo", "3.Correo enviado", "4.Respuesta pendiente"].includes(form.estado);
@@ -371,8 +366,15 @@ function EditModal({ row, sprints, nombres, onSave, onClose, isNew }) {
         form.tipo !== "Reunión con cliente" && form.estado === "2.Reunión programada";
     const showDatePicker = isClienteConfirm || isInternaConfirm;
 
-    const HOURS = Array.from({ length: 15 }, (_, i) => i + 7); // 7..21
+    const HOURS = Array.from({ length: 15 }, (_, i) => i + 7);
     const MINUTES = [0, 15, 30, 45];
+
+    const isCliente = form.tipo === "Reunión con cliente";
+    const accentColor = isCliente ? "blue" : "emerald";
+    const accentClasses = {
+        blue: { bg: "bg-blue-500", hover: "hover:bg-blue-600", light: "bg-blue-50 text-blue-700 border-blue-200", ring: "focus:ring-blue-500/40", shadow: "shadow-blue-500/15" },
+        emerald: { bg: "bg-emerald-500", hover: "hover:bg-emerald-600", light: "bg-emerald-50 text-emerald-700 border-emerald-200", ring: "focus:ring-emerald-500/40", shadow: "shadow-emerald-500/15" },
+    }[accentColor];
 
     function TimeSelect({ value, onChange, className }) {
         const [h, m] = (value || "").split(":").map(Number);
@@ -388,13 +390,13 @@ function EditModal({ row, sprints, nombres, onSave, onClose, isNew }) {
         return (
             <div className={`flex items-center gap-1 ${className || ""}`}>
                 <select value={hour} onChange={(e) => emit(e.target.value === "" ? "" : Number(e.target.value), minute === "" ? 0 : minute)}
-                    className="px-2 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40 bg-white">
+                    className="px-1.5 py-1.5 rounded-md border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40 bg-white">
                     <option value="">HH</option>
                     {HOURS.map((hh) => <option key={hh} value={hh}>{hh}</option>)}
                 </select>
                 <span className="text-gray-400 font-medium">:</span>
                 <select value={minute} onChange={(e) => emit(hour === "" ? 7 : hour, e.target.value === "" ? "" : Number(e.target.value))}
-                    className="px-2 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40 bg-white">
+                    className="px-1.5 py-1.5 rounded-md border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40 bg-white">
                     <option value="">MM</option>
                     {MINUTES.map((mm) => <option key={mm} value={mm}>{String(mm).padStart(2, "0")}</option>)}
                 </select>
@@ -403,23 +405,15 @@ function EditModal({ row, sprints, nombres, onSave, onClose, isNew }) {
     }
 
     function addProposedDate() {
-        updateField("fechas_propuestas", [
-            ...form.fechas_propuestas,
-            { fecha: "", hora: "" },
-        ]);
+        updateField("fechas_propuestas", [...form.fechas_propuestas, { fecha: "", hora: "" }]);
     }
 
     function removeProposedDate(idx) {
-        updateField(
-            "fechas_propuestas",
-            form.fechas_propuestas.filter((_, i) => i !== idx)
-        );
+        updateField("fechas_propuestas", form.fechas_propuestas.filter((_, i) => i !== idx));
     }
 
     function updateProposedDate(idx, field, value) {
-        const updated = form.fechas_propuestas.map((d, i) =>
-            i === idx ? { ...d, [field]: value } : d
-        );
+        const updated = form.fechas_propuestas.map((d, i) => (i === idx ? { ...d, [field]: value } : d));
         updateField("fechas_propuestas", updated);
     }
 
@@ -439,214 +433,329 @@ function EditModal({ row, sprints, nombres, onSave, onClose, isNew }) {
         setSaving(false);
     }
 
+    const filteredNombres = nombres.filter(
+        (n) => !(form.presentes || []).includes(n.Nombre) && n.Nombre.toLowerCase().includes(guestSearch.toLowerCase())
+    );
+
+    // ── Iconos SVG inline ────────────────────────────────────────────────────
+    const CalendarIcon = () => (
+        <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+        </svg>
+    );
+    const ClockIcon = () => (
+        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+    );
+    const SprintIcon = () => (
+        <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
+        </svg>
+    );
+    const ModuleIcon = () => (
+        <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
+        </svg>
+    );
+    const StatusIcon = () => (
+        <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+    );
+    const PeopleIcon = () => (
+        <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+        </svg>
+    );
+
     return createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-6">
-            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={() => {
+        <div className="fixed inset-0 z-[9999] flex justify-end">
+            <div className="fixed inset-0 bg-black/30 backdrop-blur-sm" onClick={() => {
                 if (window.confirm("¿Salir sin guardar?")) onClose();
             }} />
             <div
-                className="relative bg-white rounded-2xl shadow-2xl max-w-4xl w-full h-[calc(100vh-3rem)] flex flex-col animate-fade-in"
+                className="relative bg-white shadow-2xl w-full max-w-md h-screen flex flex-col animate-slide-in-right"
+                style={{ borderRadius: "1rem 0 0 1rem" }}
                 onClick={(e) => e.stopPropagation()}
             >
-                {/* Header */}
-                <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between shrink-0">
-                    <h3 className="font-semibold text-gray-900 text-lg">
-                        {isNew ? "Nueva Reunión" : `Editar Reunión #${row.id}`}
-                    </h3>
-                    <button onClick={() => { if (window.confirm("¿Salir sin guardar?")) onClose(); }}
-                        className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
+                {/* Header - minimal + tipo tabs */}
+                <div className="px-5 pt-4 pb-3 shrink-0 space-y-3 border-b border-gray-100">
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">
+                            {isNew ? "Nueva reunión" : `Reunión #${row.id}`}
+                        </span>
+                        <button onClick={() => { if (window.confirm("¿Salir sin guardar?")) onClose(); }}
+                            className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                    {/* ── Tipo: tabs de colores (fijos en header) ──────────── */}
+                    <div className="flex gap-2">
+                        <button type="button" onClick={() => updateField("tipo", "Reunión Interna")}
+                            className={`flex-1 py-2 rounded-xl text-sm font-medium transition-all ${
+                                !isCliente
+                                    ? "bg-emerald-500 text-white shadow-sm shadow-emerald-500/20"
+                                    : "bg-gray-100 text-gray-500 hover:bg-emerald-50 hover:text-emerald-600"
+                            }`}>
+                            Interna
+                        </button>
+                        <button type="button" onClick={() => updateField("tipo", "Reunión con cliente")}
+                            className={`flex-1 py-2 rounded-xl text-sm font-medium transition-all ${
+                                isCliente
+                                    ? "bg-blue-500 text-white shadow-sm shadow-blue-500/20"
+                                    : "bg-gray-100 text-gray-500 hover:bg-blue-50 hover:text-blue-600"
+                            }`}>
+                            Cliente
+                        </button>
+                    </div>
                 </div>
 
                 {/* Form body */}
-                <div className="px-6 py-5 overflow-y-auto space-y-5 flex-1">
+                <div className="px-5 py-4 overflow-y-auto flex-1 space-y-4">
 
-                    {/* Row 1: Sprint, Tipo, Módulo */}
-                    <div className="grid grid-cols-3 gap-4">
-                        <div>
-                            <label className="block text-xs font-medium text-gray-500 mb-1">Sprint</label>
-                            <select value={form.sprint || ""} onChange={(e) => updateField("sprint", e.target.value)}
-                                className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40 bg-white">
-                                <option value="">Seleccionar...</option>
-                                {sprints.map((s) => (
-                                    <option key={s} value={s}>{s}</option>
-                                ))}
-                            </select>
+                    {/* ── Tema: input prominente + chips ───────────────────── */}
+                    <div>
+                        <input
+                            type="text"
+                            value={form.tema || ""}
+                            onChange={(e) => updateField("tema", e.target.value)}
+                            className="w-full text-lg font-medium text-gray-900 placeholder-gray-300 border-0 border-b-2 border-gray-200 focus:border-orange-400 pb-2 bg-transparent outline-none transition-colors"
+                            placeholder="Agregar tema u objetivo"
+                        />
+                        <div className="flex flex-wrap gap-1.5 mt-2.5">
+                            {TEMA_SUGGESTIONS.map((t) => (
+                                <button key={t} type="button" onClick={() => updateField("tema", t)}
+                                    className={`px-2.5 py-1 rounded-full text-xs transition-all ${
+                                        form.tema === t
+                                            ? `${accentClasses.light} border font-medium`
+                                            : "bg-gray-100 text-gray-500 hover:bg-orange-50 hover:text-orange-600"
+                                    }`}>
+                                    {t}
+                                </button>
+                            ))}
                         </div>
-                        <div>
-                            <label className="block text-xs font-medium text-gray-500 mb-1">Tipo</label>
-                            <select value={form.tipo || "Reunión Interna"} onChange={(e) => updateField("tipo", e.target.value)}
-                                className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40 bg-white">
-                                <option value="Reunión Interna">Reunión Interna</option>
-                                <option value="Reunión con cliente">Reunión con cliente</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-xs font-medium text-gray-500 mb-1">Módulo</label>
-                            {useCustomModulo ? (
-                                <div className="flex gap-2">
-                                    <input type="text" value={customModulo} onChange={(e) => setCustomModulo(e.target.value)}
-                                        className="flex-1 px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40" placeholder="Escribir módulo..." />
-                                    <button onClick={() => { setUseCustomModulo(false); setCustomModulo(""); }}
-                                        className="px-2 py-1 text-xs text-gray-400 hover:text-gray-600">✕</button>
+                    </div>
+
+                    <div className="border-t border-gray-100" />
+
+                    {/* ── Fechas propuestas (con iconos) ───────────────────── */}
+                    {canAddDates && (
+                        <div className="space-y-2">
+                            {form.fechas_propuestas.map((fp, idx) => (
+                                <div key={idx} className="flex items-center gap-2 group">
+                                    <CalendarIcon />
+                                    <input type="date" value={fp.fecha || ""} onChange={(e) => updateProposedDate(idx, "fecha", e.target.value)}
+                                        className="px-2 py-1.5 rounded-md border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40 bg-white" />
+                                    <ClockIcon />
+                                    <TimeSelect value={fp.hora || ""} onChange={(val) => updateProposedDate(idx, "hora", val)} />
+                                    <button type="button" onClick={() => removeProposedDate(idx)}
+                                        className="p-1 rounded-md text-gray-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
                                 </div>
-                            ) : (
-                                <select value={form.modulo || ""} onChange={(e) => {
-                                    if (e.target.value === "__custom__") { setUseCustomModulo(true); }
-                                    else updateField("modulo", e.target.value);
-                                }}
-                                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40 bg-white">
-                                    <option value="">Seleccionar...</option>
-                                    {MODULO_OPTIONS.map((m) => <option key={m} value={m}>{m}</option>)}
-                                    <option value="__custom__">— Otro (escribir) —</option>
-                                </select>
+                            ))}
+                            <button type="button" onClick={addProposedDate}
+                                className="inline-flex items-center gap-1.5 ml-7 text-xs font-medium text-orange-500 hover:text-orange-600 transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                                </svg>
+                                Agregar opción de horario
+                            </button>
+                        </div>
+                    )}
+
+                    {/* ── Fecha programada (confirmar) ─────────────────────── */}
+                    {showDatePicker && (
+                        <div className="space-y-2">
+                            <div className="flex items-center gap-2 text-xs font-medium text-gray-500">
+                                <CalendarIcon />
+                                <span>Confirmar fecha</span>
+                            </div>
+                            {form.fechas_propuestas.filter((fp) => fp.fecha).map((fp, idx) => {
+                                const val = `${fp.fecha} ${fp.hora || ""}`.trim();
+                                return (
+                                    <label key={idx} className={`flex items-center gap-3 ml-7 px-3 py-2.5 rounded-lg border cursor-pointer transition-all ${form.fecha_programada === val ? `${accentClasses.light}` : "border-gray-200 hover:bg-gray-50"}`}>
+                                        <input type="radio" name="fecha_confirmada" value={val} checked={form.fecha_programada === val}
+                                            onChange={() => updateField("fecha_programada", val)}
+                                            className="accent-orange-500" />
+                                        <span className="text-sm text-gray-700">{fp.fecha} {fp.hora && `a las ${fp.hora}`}</span>
+                                    </label>
+                                );
+                            })}
+                            <label className={`flex items-center gap-3 ml-7 px-3 py-2.5 rounded-lg border cursor-pointer transition-all ${form.fecha_programada && !form.fechas_propuestas.some((fp) => `${fp.fecha} ${fp.hora || ""}`.trim() === form.fecha_programada) ? `${accentClasses.light}` : "border-gray-200 hover:bg-gray-50"}`}>
+                                <input type="radio" name="fecha_confirmada" value="__custom__" checked={form.fecha_programada && !form.fechas_propuestas.some((fp) => `${fp.fecha} ${fp.hora || ""}`.trim() === form.fecha_programada)}
+                                    onChange={() => updateField("fecha_programada", "__custom__")}
+                                    className="accent-orange-500" />
+                                <span className="text-sm text-gray-500">Otra fecha</span>
+                            </label>
+                            {form.fecha_programada && !form.fechas_propuestas.some((fp) => `${fp.fecha} ${fp.hora || ""}`.trim() === form.fecha_programada) && (
+                                <div className="flex items-center gap-2 ml-7">
+                                    <input type="date" value={form._customDate || ""} onChange={(e) => {
+                                        setForm((f) => ({ ...f, _customDate: e.target.value, fecha_programada: `${e.target.value} ${f._customTime || ""}`.trim() }));
+                                    }}
+                                        className="px-2 py-1.5 rounded-md border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40" />
+                                    <TimeSelect value={form._customTime || ""} onChange={(val) => {
+                                        setForm((f) => ({ ...f, _customTime: val, fecha_programada: `${f._customDate || ""} ${val}`.trim() }));
+                                    }} />
+                                </div>
                             )}
                         </div>
-                    </div>
-
-                    {/* Row 2: Tema */}
-                    <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">Tema u Objetivo</label>
-                        <textarea value={form.tema || ""} onChange={(e) => updateField("tema", e.target.value)}
-                            rows={3}
-                            className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40 resize-y"
-                            placeholder="Describe el objetivo de la reunión..." />
-                    </div>
-
-                    {/* Row 3: Estado + Prioridad */}
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-xs font-medium text-gray-500 mb-1">Estado</label>
-                            <select value={form.estado || "1.Tentativa"} onChange={(e) => updateField("estado", e.target.value)}
-                                className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40 bg-white">
-                                {estadoOptions.map((e) => <option key={e} value={e}>{e}</option>)}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-xs font-medium text-gray-500 mb-1">Prioridad</label>
-                            <select value={form.prioridad || "2.Media"} onChange={(e) => updateField("prioridad", e.target.value)}
-                                className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40 bg-white">
-                                {PRIORIDAD_OPTIONS.map((p) => <option key={p} value={p}>{p}</option>)}
-                            </select>
-                        </div>
-                    </div>
-
-                    {/* Row 4: Fechas propuestas */}
-                    {canAddDates && (
-                        <div>
-                            <label className="block text-xs font-medium text-gray-500 mb-2">Fechas propuestas</label>
-                            <div className="space-y-2">
-                                {form.fechas_propuestas.map((fp, idx) => (
-                                    <div key={idx} className="flex items-center gap-2">
-                                        <input type="date" value={fp.fecha || ""} onChange={(e) => updateProposedDate(idx, "fecha", e.target.value)}
-                                            className="px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40" />
-                                        <TimeSelect value={fp.hora || ""} onChange={(val) => updateProposedDate(idx, "hora", val)} />
-                                        <button onClick={() => removeProposedDate(idx)}
-                                            className="p-1 rounded-lg text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors">
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                            </svg>
-                                        </button>
-                                    </div>
-                                ))}
-                                <button onClick={addProposedDate}
-                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-orange-50 text-orange-600 border border-orange-200 hover:bg-orange-100 transition-colors">
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                                    </svg>
-                                    Agregar fecha
-                                </button>
-                            </div>
-                        </div>
                     )}
 
-                    {/* Row 5: Select confirmed date (when status = "Reunión programada") */}
-                    {showDatePicker && (
-                        <div>
-                            <label className="block text-xs font-medium text-gray-500 mb-2">Fecha programada (confirmar)</label>
-                            <div className="space-y-2">
-                                {form.fechas_propuestas.filter((fp) => fp.fecha).map((fp, idx) => {
-                                    const val = `${fp.fecha} ${fp.hora || ""}`.trim();
-                                    return (
-                                        <label key={idx} className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${form.fecha_programada === val ? "bg-blue-50 border-blue-300" : "border-gray-200 hover:bg-gray-50"}`}>
-                                            <input type="radio" name="fecha_confirmada" value={val} checked={form.fecha_programada === val}
-                                                onChange={() => updateField("fecha_programada", val)}
-                                                className="accent-orange-500" />
-                                            <span className="text-sm text-gray-700">{fp.fecha} {fp.hora && `a las ${fp.hora}`}</span>
-                                        </label>
-                                    );
-                                })}
-                                {/* Custom date option */}
-                                <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${form.fecha_programada && !form.fechas_propuestas.some((fp) => `${fp.fecha} ${fp.hora || ""}`.trim() === form.fecha_programada) ? "bg-blue-50 border-blue-300" : "border-gray-200 hover:bg-gray-50"}`}>
-                                    <input type="radio" name="fecha_confirmada" value="__custom__" checked={form.fecha_programada && !form.fechas_propuestas.some((fp) => `${fp.fecha} ${fp.hora || ""}`.trim() === form.fecha_programada)}
-                                        onChange={() => updateField("fecha_programada", "__custom__")}
-                                        className="accent-orange-500" />
-                                    <span className="text-sm text-gray-500">Otra fecha</span>
-                                </label>
-                                {form.fecha_programada && !form.fechas_propuestas.some((fp) => `${fp.fecha} ${fp.hora || ""}`.trim() === form.fecha_programada) && (
-                                    <div className="flex items-center gap-2 ml-7">
-                                        <input type="date" value={form._customDate || ""} onChange={(e) => {
-                                            setForm((f) => ({ ...f, _customDate: e.target.value, fecha_programada: `${e.target.value} ${f._customTime || ""}`.trim() }));
-                                        }}
-                                            className="px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40" />
-                                        <TimeSelect value={form._customTime || ""} onChange={(val) => {
-                                            setForm((f) => ({ ...f, _customTime: val, fecha_programada: `${f._customDate || ""} ${val}`.trim() }));
-                                        }} />
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Show confirmed date for other statuses */}
+                    {/* ── Fecha programada (solo lectura) ──────────────────── */}
                     {!canAddDates && !showDatePicker && form.fecha_programada && (
-                        <div>
-                            <label className="block text-xs font-medium text-gray-500 mb-1">Fecha programada</label>
-                            <div className="px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-700">
+                        <div className="flex items-center gap-3">
+                            <CalendarIcon />
+                            <div className="px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-700 flex-1">
                                 {form.fecha_programada}
                             </div>
                         </div>
                     )}
 
-                    {/* Row 6: Presentes (multi-select) */}
-                    <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-2">Presentes</label>
-                        <div className="flex flex-wrap gap-2 p-3 rounded-lg border border-gray-200 bg-gray-50/50 min-h-[44px]">
-                            {nombres.map((n) => {
-                                const name = n.Nombre;
-                                const selected = (form.presentes || []).includes(name);
+                    <div className="border-t border-gray-100" />
+
+                    {/* ── Sprint ────────────────────────────────────────────── */}
+                    <div className="flex items-center gap-3">
+                        <SprintIcon />
+                        <select value={form.sprint || ""} onChange={(e) => updateField("sprint", e.target.value)}
+                            className="flex-1 px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40 bg-white text-gray-700">
+                            <option value="">Sprint...</option>
+                            {sprints.map((s) => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                    </div>
+
+                    {/* ── Módulo ────────────────────────────────────────────── */}
+                    <div className="flex items-center gap-3">
+                        <ModuleIcon />
+                        {useCustomModulo ? (
+                            <div className="flex-1 flex gap-2">
+                                <input type="text" value={customModulo} onChange={(e) => setCustomModulo(e.target.value)}
+                                    className="flex-1 px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40" placeholder="Escribir módulo..." />
+                                <button type="button" onClick={() => { setUseCustomModulo(false); setCustomModulo(""); }}
+                                    className="px-2 py-1 text-xs text-gray-400 hover:text-gray-600 rounded hover:bg-gray-100">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </div>
+                        ) : (
+                            <select value={form.modulo || ""} onChange={(e) => {
+                                if (e.target.value === "__custom__") setUseCustomModulo(true);
+                                else updateField("modulo", e.target.value);
+                            }}
+                                className="flex-1 px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40 bg-white text-gray-700">
+                                <option value="">Módulo...</option>
+                                {MODULO_OPTIONS.map((m) => <option key={m} value={m}>{m}</option>)}
+                                <option value="__custom__">-- Otro (escribir) --</option>
+                            </select>
+                        )}
+                    </div>
+
+                    {/* ── Estado ────────────────────────────────────────────── */}
+                    <div className="flex items-center gap-3">
+                        <StatusIcon />
+                        <select value={form.estado || "1.Tentativa"} onChange={(e) => updateField("estado", e.target.value)}
+                            className="flex-1 px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40 bg-white text-gray-700">
+                            {estadoOptions.map((e) => <option key={e} value={e}>{e}</option>)}
+                        </select>
+                    </div>
+
+                    {/* ── Prioridad (pill buttons) ─────────────────────────── */}
+                    <div className="flex items-center gap-3">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 3v1.5M3 21v-6m0 0l2.77-.693a9 9 0 016.208.682l.108.054a9 9 0 006.086.71l3.114-.732a48.524 48.524 0 01-.005-10.499l-3.11.732a9 9 0 01-6.085-.711l-.108-.054a9 9 0 00-6.208-.682L3 4.5M3 15V4.5" />
+                        </svg>
+                        <div className="flex gap-1.5 flex-1">
+                            {PRIORIDAD_OPTIONS.map((p) => {
+                                const selected = (form.prioridad || "2.Media") === p;
+                                let colors;
+                                if (p.includes("Alta")) colors = selected ? "bg-red-500 text-white shadow-sm" : "bg-red-50 text-red-600 border border-red-200 hover:bg-red-100";
+                                else if (p.includes("Media")) colors = selected ? "bg-amber-500 text-white shadow-sm" : "bg-amber-50 text-amber-600 border border-amber-200 hover:bg-amber-100";
+                                else colors = selected ? "bg-green-500 text-white shadow-sm" : "bg-green-50 text-green-600 border border-green-200 hover:bg-green-100";
                                 return (
-                                    <button key={name} type="button" onClick={() => togglePresente(name)}
-                                        className={`inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${selected
-                                            ? "bg-orange-500 text-white shadow-sm"
-                                            : "bg-white text-gray-600 border border-gray-200 hover:border-orange-300 hover:text-orange-600"
-                                            }`}>
-                                        {name}
-                                        {selected && (
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 ml-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                            </svg>
-                                        )}
+                                    <button key={p} type="button" onClick={() => updateField("prioridad", p)}
+                                        className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all ${colors}`}>
+                                        {p.replace(/^\d\./, "")}
                                     </button>
                                 );
                             })}
-                            {nombres.length === 0 && <span className="text-xs text-gray-400">No hay nombres disponibles</span>}
+                        </div>
+                    </div>
+
+                    <div className="border-t border-gray-100" />
+
+                    {/* ── Presentes (chips + búsqueda) ─────────────────────── */}
+                    <div>
+                        <div className="flex items-center gap-3 mb-3">
+                            <PeopleIcon />
+                            <span className="text-sm font-medium text-gray-600">Participantes</span>
+                            {(form.presentes || []).length > 0 && (
+                                <span className="text-xs text-gray-400 ml-auto">{(form.presentes || []).length} seleccionados</span>
+                            )}
+                        </div>
+
+                        {/* Chips de seleccionados */}
+                        {(form.presentes || []).length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 ml-8 mb-3">
+                                {(form.presentes || []).map((name) => (
+                                    <span key={name} className="inline-flex items-center gap-1 pl-1 pr-2 py-1 rounded-full bg-gray-100 text-sm text-gray-700 hover:bg-gray-200 transition-colors">
+                                        <span className={`w-6 h-6 rounded-full ${accentClasses.bg} text-white flex items-center justify-center text-xs font-semibold`}>
+                                            {name.charAt(0)}
+                                        </span>
+                                        <span className="text-xs">{name}</span>
+                                        <button type="button" onClick={() => togglePresente(name)}
+                                            className="ml-0.5 text-gray-400 hover:text-red-500 transition-colors">
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        </button>
+                                    </span>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Buscador */}
+                        <div className="ml-8">
+                            <input
+                                type="text"
+                                value={guestSearch}
+                                onChange={(e) => setGuestSearch(e.target.value)}
+                                className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40 bg-white"
+                                placeholder="Buscar participante..."
+                            />
+                            {/* Sugerencias */}
+                            <div className="flex flex-wrap gap-1.5 mt-2">
+                                {filteredNombres.map((n) => (
+                                    <button key={n.Nombre} type="button" onClick={() => { togglePresente(n.Nombre); setGuestSearch(""); }}
+                                        className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-white text-gray-600 border border-gray-200 hover:border-orange-300 hover:text-orange-600 hover:bg-orange-50 transition-all">
+                                        {n.Nombre}
+                                    </button>
+                                ))}
+                                {filteredNombres.length === 0 && !guestSearch && nombres.length > 0 && (form.presentes || []).length === nombres.length && (
+                                    <span className="text-xs text-gray-400">Todos seleccionados</span>
+                                )}
+                                {filteredNombres.length === 0 && guestSearch && (
+                                    <span className="text-xs text-gray-400">No se encontraron coincidencias</span>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>
 
                 {/* Footer */}
-                <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-3 shrink-0">
-                    <button onClick={() => { if (window.confirm("¿Salir sin guardar?")) onClose(); }}
-                        className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors">
+                <div className="px-5 py-4 flex items-center justify-end gap-3 shrink-0 shadow-[0_-1px_3px_rgba(0,0,0,0.05)]">
+                    <button type="button" onClick={() => { if (window.confirm("¿Salir sin guardar?")) onClose(); }}
+                        className="px-4 py-2 rounded-xl text-sm font-medium text-gray-500 hover:bg-gray-100 transition-colors">
                         Cancelar
                     </button>
-                    <button onClick={handleSave} disabled={saving}
-                        className="px-5 py-2 rounded-xl text-sm font-medium bg-orange-500 text-white hover:bg-orange-600 shadow-md shadow-orange-500/15 transition-all disabled:opacity-50 disabled:cursor-wait">
-                        {saving ? "Guardando..." : (isNew ? "Crear" : "Guardar cambios")}
+                    <button type="button" onClick={handleSave} disabled={saving}
+                        className={`px-6 py-2 rounded-xl text-sm font-medium text-white ${accentClasses.bg} ${accentClasses.hover} shadow-md ${accentClasses.shadow} transition-all disabled:opacity-50 disabled:cursor-wait`}>
+                        {saving ? "Guardando..." : (isNew ? "Crear" : "Guardar")}
                     </button>
                 </div>
             </div>
