@@ -785,22 +785,21 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                 STATUS_COLUMNS.forEach((col) => { map[realName][col.key] = 0; });
             }
 
-            map[realName].total += sp;
-
-            // Buscar subtareas de esta historia (solo aplica a historias de iteración/PF3-1799)
+            // Buscar subtareas de esta historia
             const subs = filteredSubtasks.filter(s => s.parent_key === t.jira_key);
 
-            if (subs.length > 0 && sp > 0) {
-                // Distribuir SP proporcionalmente por estado de cada subtarea
-                const spPerSub = sp / subs.length;
+            if (subs.length > 0) {
+                // Cada subtarea vale 1 punto, distribuido por su estado
+                map[realName].total += subs.length;
                 subs.forEach(sub => {
                     const matched = STATUS_COLUMNS.find(col =>
                         col.jiraStatuses.some(s => s.toLowerCase() === (sub.status || "").toLowerCase())
                     );
-                    if (matched) map[realName][matched.key] += spPerSub;
+                    if (matched) map[realName][matched.key] += 1;
                 });
             } else {
                 // Sin subtareas: SP va al estado de la historia
+                map[realName].total += sp;
                 const matched = STATUS_COLUMNS.find((col) =>
                     col.jiraStatuses.some((s) => s.toLowerCase() === (t.status || "").toLowerCase())
                 );
@@ -845,47 +844,63 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
     }
 
     // Open detail modal: show historias or subtareas filtered by assignee + status
-    function openDetail(assigneeName, statusKey) {
-        // Determinar si esta persona tiene subtareas (ej: Supervisor de Servicio)
-        const personSubtasks = filteredSubtasks.filter(
-            (t) => resolveName(t.assignee_email) === assigneeName
-        );
-        const hasSubtasks = personSubtasks.length > 0;
-
+    function openDetail(assigneeName, statusKey, source = "historias") {
         let items;
         let title;
 
-        if (hasSubtasks) {
-            // Mostrar subtareas filtradas por estado
-            if (statusKey) {
-                items = personSubtasks.filter((t) => {
-                    const matched = STATUS_COLUMNS.find((col) =>
-                        col.jiraStatuses.some((s) => s.toLowerCase() === (t.status || "").toLowerCase())
-                    );
-                    return matched?.key === statusKey;
-                });
-                title = `Subtareas — ${STATUS_COLUMNS.find((c) => c.key === statusKey)?.label || statusKey}`;
-            } else {
-                items = personSubtasks;
-                title = "Todas las subtareas";
-            }
-        } else {
-            // Mostrar historias filtradas por estado
+        const filterByStatus = (list) => {
+            if (!statusKey) return list;
+            return list.filter((t) => {
+                const matched = STATUS_COLUMNS.find((col) =>
+                    col.jiraStatuses.some((s) => s.toLowerCase() === (t.status || "").toLowerCase())
+                );
+                return matched?.key === statusKey;
+            });
+        };
+        const statusLabel = statusKey ? STATUS_COLUMNS.find((c) => c.key === statusKey)?.label || statusKey : null;
+
+        if (source === "subtareas") {
+            const personSubtasks = filteredSubtasks.filter(
+                (t) => resolveName(t.assignee_email) === assigneeName
+            );
+            items = filterByStatus(personSubtasks);
+            title = statusLabel ? `Subtareas — ${statusLabel}` : "Todas las subtareas";
+        } else if (source === "sp") {
+            // SP table: historias sin subtareas muestran la historia,
+            // historias con subtareas muestran las subtareas directamente (1 punto c/u)
             const personHistorias = filtered.filter(
                 (t) => resolveName(t.assignee_email) === assigneeName
             );
-            if (statusKey) {
-                items = personHistorias.filter((t) => {
+            const result = [];
+            personHistorias.forEach((t) => {
+                const subs = filteredSubtasks.filter(s => s.parent_key === t.jira_key);
+                if (subs.length > 0) {
+                    // Mostrar subtareas individuales
+                    subs.forEach((sub) => {
+                        if (!statusKey) { result.push(sub); return; }
+                        const matched = STATUS_COLUMNS.find((col) =>
+                            col.jiraStatuses.some((s) => s.toLowerCase() === (sub.status || "").toLowerCase())
+                        );
+                        if (matched?.key === statusKey) result.push(sub);
+                    });
+                } else {
+                    // Sin subtareas: mostrar historia
+                    if (!statusKey) { result.push(t); return; }
                     const matched = STATUS_COLUMNS.find((col) =>
                         col.jiraStatuses.some((s) => s.toLowerCase() === (t.status || "").toLowerCase())
                     );
-                    return matched?.key === statusKey;
-                });
-                title = `Historias — ${STATUS_COLUMNS.find((c) => c.key === statusKey)?.label || statusKey}`;
-            } else {
-                items = personHistorias;
-                title = "Todas las historias";
-            }
+                    if (matched?.key === statusKey) result.push(t);
+                }
+            });
+            items = result;
+            title = statusLabel ? `SP — ${statusLabel}` : "Todas las historias (SP)";
+        } else {
+            // Tabla de Historias → filtrar por estado de la historia
+            const personHistorias = filtered.filter(
+                (t) => resolveName(t.assignee_email) === assigneeName
+            );
+            items = filterByStatus(personHistorias);
+            title = statusLabel ? `Historias — ${statusLabel}` : "Todas las historias";
         }
 
         setDetailModal({ title, assigneeName, items });
@@ -1155,7 +1170,7 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                                                 <td key={col.key} className="px-2 py-2 text-center border-l border-gray-100">
                                                     {row[col.key] > 0 ? (
                                                         <button
-                                                            onClick={() => openDetail(row.assignee, col.key)}
+                                                            onClick={() => openDetail(row.assignee, col.key, "sp")}
                                                             className={`inline-flex items-center justify-center min-w-[28px] px-2 py-0.5 rounded-lg text-xs font-bold cursor-pointer hover:ring-2 hover:ring-orange-300 transition-all ${STATUS_COLORS[col.key]}`}
                                                             title={`Ver tickets — ${col.label}`}
                                                         >
@@ -1168,7 +1183,7 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                                             ))}
                                             <td className="px-4 py-2 text-center border-l border-gray-100 bg-gray-50/50">
                                                 <button
-                                                    onClick={() => openDetail(row.assignee, null)}
+                                                    onClick={() => openDetail(row.assignee, null, "sp")}
                                                     className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-sm font-bold text-gray-800 cursor-pointer hover:ring-2 hover:ring-orange-300 transition-all"
                                                     title="Ver todos los tickets"
                                                 >
