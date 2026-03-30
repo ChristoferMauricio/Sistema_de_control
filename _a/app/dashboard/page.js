@@ -115,7 +115,7 @@ export default function DashboardPage() {
     while (hasMore) {
       const { data, error } = await supabase
         .from("jira_tickets")
-        .select("jira_key, summary, status, issue_type, sprint, story_points, assignee_email, reporter_email, parent_key, subtask_keys, created_at, updated_at, synced_at, comentario, priority, labels")
+        .select("jira_key, summary, status, issue_type, sprint, story_points, assignee_email, reporter_email, parent_key, created_at, updated_at, synced_at, comentario, priority, labels")
         .order("updated_at", { ascending: false })
         .range(from, from + pageSize - 1);
 
