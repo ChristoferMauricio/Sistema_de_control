@@ -20,10 +20,11 @@
  */
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import TicketTable from "@/components/TicketTable";
+import JqlSearchBar from "@/components/JqlSearchBar";
 import Card from "@/components/ui/Card";
 import { getCurrentSprint, formatCronogramaDate } from "@/lib/cronogramaData";
 import { useRole } from "@/app/dashboard/RoleContext";
@@ -48,6 +49,12 @@ export default function DashboardPage() {
   const role = useRole();
   const [userEmail, setUserEmail] = useState("");        // Email del usuario autenticado
   const [externalFilter, setExternalFilter] = useState(""); // Filtro externo por tipo de ticket (Historia, Subtarea, Epic)
+  const [jqlActive, setJqlActive]         = useState(false); // JQL está activo → bloquear filtros de columna
+  const [jqlResults, setJqlResults]       = useState(null);  // Tickets filtrados por JQL (null = sin JQL)
+  /* ─── Datos auxiliares para JQL (nombres y personas) ─── */
+  const [jqlNombres, setJqlNombres] = useState([]);
+  const [jqlPersons, setJqlPersons] = useState([]);
+  const [jqlEquipo,  setJqlEquipo]  = useState([]);
 
   /** Estadísticas KPI calculadas a partir de los tickets */
   const [stats, setStats] = useState({
@@ -194,6 +201,76 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  /* ─── Fetch de datos auxiliares para resolución de nombres en JQL ─── */
+  useEffect(() => {
+    async function fetchJqlHelperData() {
+      const [nombresRes, personsRes, equipoRes] = await Promise.all([
+        supabase.from("Nombres").select("Nombre, Programador"),
+        supabase.from("jira_persons").select("email, display_name"),
+        supabase.from("equipo_desarrollo").select("nombre, nombre_clave, correo_pgim, correo_gcorp"),
+      ]);
+      if (nombresRes.data)  setJqlNombres(nombresRes.data);
+      if (personsRes.data)  setJqlPersons(personsRes.data);
+      if (equipoRes.data)   setJqlEquipo(equipoRes.data);
+    }
+    fetchJqlHelperData();
+  }, [syncVersion]);
+
+  /* ─── Helpers de JQL: resolución de nombres y épicas ─── */
+  const jqlHelpers = useMemo(() => {
+    // Mapas de resolución
+    const nameMap = {};
+    jqlNombres.forEach(n => { if (n.Programador) nameMap[n.Programador.toLowerCase()] = n.Nombre; });
+    const personsMap = {};
+    jqlPersons.forEach(p => { if (p.email) personsMap[p.email] = p.display_name; });
+    const equipoEmailMap = {};
+    const equipoKeyMap = {};
+    jqlEquipo.forEach(m => {
+      if (m.correo_pgim) equipoEmailMap[m.correo_pgim.toLowerCase()] = m.nombre;
+      if (m.correo_gcorp && m.correo_gcorp !== "-") equipoEmailMap[m.correo_gcorp.toLowerCase()] = m.nombre;
+      if (m.nombre_clave && m.nombre_clave !== "-") equipoKeyMap[m.nombre_clave.toLowerCase()] = m.nombre;
+    });
+    const NAME_OVERRIDES = { "miguel castillo": "Supervisor de Servicio" };
+
+    const resolveName = (email) => {
+      if (!email || email.trim() === "") return "—";
+      const byEmail = equipoEmailMap[email.toLowerCase()];
+      if (byEmail) return NAME_OVERRIDES[byEmail.toLowerCase()] || byEmail;
+      const displayName = personsMap[email] || email;
+      const resolved = equipoKeyMap[displayName.toLowerCase()]
+        || nameMap[displayName.toLowerCase()]
+        || displayName;
+      return NAME_OVERRIDES[resolved.toLowerCase()] || resolved;
+    };
+
+    // Mapa de tickets y resolución de épica
+    const ticketMap = {};
+    tickets.forEach(t => { ticketMap[t.jira_key] = t; });
+
+    const isStory = (type) => (type || "").toLowerCase().includes("histori") || (type || "").toLowerCase() === "story";
+    const isSubtask = (type) => (type || "").toLowerCase().includes("subtare") || (type || "").toLowerCase().includes("sub-task") || (type || "").toLowerCase() === "subtask";
+    const isEpic = (type) => (type || "").toLowerCase().includes("epic") || (type || "").toLowerCase().includes("épica");
+
+    const resolveEpic = (ticket) => {
+      if (isEpic(ticket.issue_type)) return { key: ticket.jira_key, summary: ticket.summary };
+      if (isStory(ticket.issue_type) && ticket.parent_key) {
+        const parent = ticketMap[ticket.parent_key];
+        if (parent && isEpic(parent.issue_type)) return { key: parent.jira_key, summary: parent.summary };
+      }
+      if (isSubtask(ticket.issue_type) && ticket.parent_key) {
+        const parentStory = ticketMap[ticket.parent_key];
+        if (parentStory && isStory(parentStory.issue_type) && parentStory.parent_key) {
+          const grandParentEpic = ticketMap[parentStory.parent_key];
+          if (grandParentEpic && isEpic(grandParentEpic.issue_type))
+            return { key: grandParentEpic.jira_key, summary: grandParentEpic.summary };
+        }
+      }
+      return null;
+    };
+
+    return { resolveName, resolveEpic, localComments: {} };
+  }, [tickets, jqlNombres, jqlPersons, jqlEquipo]);
 
   /**
    * Maneja la sincronización manual con la API de Jira.
@@ -536,8 +613,24 @@ export default function DashboardPage() {
         ))}
       </div>
 
+      {/* Búsqueda avanzada JQL */}
+      <JqlSearchBar
+        tickets={tickets}
+        onResults={setJqlResults}
+        onActiveChange={setJqlActive}
+        helpers={jqlHelpers}
+      />
+
       {/* Tickets Table */}
-      <TicketTable tickets={tickets} title="Todos los Tickets" statusHistory={statusHistory} externalFilterType={externalFilter} defaultFilterSprint="" syncVersion={syncVersion} />
+      <TicketTable
+        tickets={jqlActive && jqlResults ? jqlResults : tickets}
+        title={jqlActive && jqlResults ? `Resultados JQL (${jqlResults.length})` : "Todos los Tickets"}
+        statusHistory={statusHistory}
+        externalFilterType={externalFilter}
+        defaultFilterSprint=""
+        syncVersion={syncVersion}
+        jqlActive={jqlActive}
+      />
     </div>
   );
 }

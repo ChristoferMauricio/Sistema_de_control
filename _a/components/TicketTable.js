@@ -95,6 +95,7 @@ export default function TicketTable({
   externalFilterType = "",
   defaultFilterSprint = "",
   syncVersion = 0,
+  jqlActive = false,
 }) {
   // ── Estado de UI local ─────────────────────────────────────────────────────
   const [expandedRow,    setExpandedRow]    = useState(null);
@@ -142,7 +143,7 @@ export default function TicketTable({
   }, []);
 
   // ── Hook de datos / filtros ────────────────────────────────────────────────
-  const data = useTicketData({ tickets, externalFilterType, defaultFilterSprint, localComments, syncVersion });
+  const data = useTicketData({ tickets, externalFilterType, defaultFilterSprint, localComments, syncVersion, jqlActive });
   const {
     search, setSearch,
     filterType, setFilterType, filterSprint, setFilterSprint,
@@ -310,8 +311,9 @@ export default function TicketTable({
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar tickets..."
-              className="pl-9 pr-4 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500/40 focus:border-orange-500/40 transition-all w-full sm:w-64"
+              placeholder={jqlActive ? "Deshabilitado (JQL activo)" : "Buscar tickets..."}
+              disabled={jqlActive}
+              className={`pl-9 pr-4 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500/40 focus:border-orange-500/40 transition-all w-full sm:w-64 ${jqlActive ? "opacity-50 cursor-not-allowed" : ""}`}
             />
           </div>
         </div>
@@ -407,7 +409,7 @@ export default function TicketTable({
             </tr>
 
             {/* Fila de filtros */}
-            <tr className="border-b border-gray-100 bg-gray-50/30">
+            <tr className={`border-b border-gray-100 bg-gray-50/30 ${jqlActive ? "opacity-40 pointer-events-none" : ""}`}>
               {mode === "errores" && (
                 <th className="px-4 py-2">
                   <input type="text" value={filterKey} onChange={(e) => setFilterKey(e.target.value)} placeholder="Buscar..."

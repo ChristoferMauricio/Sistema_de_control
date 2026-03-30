@@ -72,7 +72,7 @@ export const hasStatusHistory = (type) => !isSubtask(type) && !isEpic(type);
  * @param {number}  [params.syncVersion]          - Incrementar para forzar re-fetch de datos auxiliares
  * @returns {Object} Estado de filtros, datos procesados, helpers y funciones de control
  */
-export function useTicketData({ tickets = [], externalFilterType = "", defaultFilterSprint = null, localComments = {}, syncVersion = 0 }) {
+export function useTicketData({ tickets = [], externalFilterType = "", defaultFilterSprint = null, localComments = {}, syncVersion = 0, jqlActive = false }) {
   const [search, setSearch]               = useState("");
   const [sortField, setSortField]         = useState("updated_at");
   const [sortDir, setSortDir]             = useState("desc");
@@ -113,6 +113,17 @@ export function useTicketData({ tickets = [], externalFilterType = "", defaultFi
       hasAppliedDefaultSprint.current = true;
     }
   }, [defaultFilterSprint]);
+
+  // ── Limpiar filtros cuando JQL se activa ────────────────────────────────────
+  useEffect(() => {
+    if (jqlActive) {
+      setSearch("");
+      setFilterType(""); setFilterKey(""); setFilterSummary(""); setFilterPrincipal("");
+      setFilterEpic(""); setFilterSprint(""); setFilterStatus(""); setFilterAssignee("");
+      setFilterReporter(""); setFilterComentario("");
+      setCurrentPage(1);
+    }
+  }, [jqlActive]);
 
   // ── Sincronizacion bidireccional con URL params ───────────────────────────
   // Lee parametros de URL al montar (sprint, tipo, estado) para permitir deep-linking
