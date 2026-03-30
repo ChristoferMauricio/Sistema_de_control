@@ -916,9 +916,9 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
         <>
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden animate-fade-in">
                 {/* Header */}
-                <div className="px-6 py-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="px-4 py-3 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div>
-                        <h3 className="text-lg font-semibold font-[family-name:var(--font-heading)] text-gray-900">
+                        <h3 className="text-[15px] font-semibold font-[family-name:var(--font-heading)] text-gray-900">
                             Historias por integrante
                         </h3>
                         <p className="text-xs text-gray-400 mt-0.5">
@@ -980,26 +980,26 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
 
                 {/* Table */}
                 <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
+                    <table className="w-full text-[13px]">
                         <thead>
                             <tr className="border-b-2 border-gray-200 bg-gray-50/80">
-                                <th className="text-left px-4 py-2 font-semibold text-gray-700" style={{ minWidth: "160px" }}>
+                                <th className="text-left px-3 py-1.5 font-semibold text-gray-700" style={{ minWidth: "160px" }}>
                                     Integrante
                                 </th>
                                 {STATUS_COLUMNS.map((col) => (
-                                    <th key={col.key} className="text-center px-2 py-2 font-medium text-gray-500 border-l border-gray-200" style={{ minWidth: "100px" }}>
+                                    <th key={col.key} className="text-center px-1.5 py-1.5 font-medium text-gray-500 border-l border-gray-200" style={{ minWidth: "100px" }}>
                                         {col.label}
                                     </th>
                                 ))}
-                                <th className="text-center px-3 py-2 font-semibold text-gray-700 border-l border-gray-200" style={{ minWidth: "100px" }}>
+                                <th className="text-center px-2 py-1.5 font-semibold text-gray-700 border-l border-gray-200" style={{ minWidth: "100px" }}>
                                     Historias
                                 </th>
                                 {!isPF3QA && (
-                                    <th className="text-center px-3 py-2 font-semibold text-gray-700 border-l border-gray-200" style={{ minWidth: "160px" }}>
+                                    <th className="text-center px-2 py-1.5 font-semibold text-gray-700 border-l border-gray-200" style={{ minWidth: "160px" }}>
                                         Soporte e Incidencias
                                     </th>
                                 )}
-                                <th className="text-center px-4 py-2 font-bold text-gray-900 border-l border-gray-200 bg-orange-50/50" style={{ minWidth: "100px" }}>
+                                <th className="text-center px-3 py-1.5 font-bold text-gray-900 border-l border-gray-200 bg-orange-50/50" style={{ minWidth: "100px" }}>
                                     TOTAL
                                 </th>
                             </tr>
@@ -1007,7 +1007,7 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                         <tbody>
                             {pivotData.length === 0 ? (
                                 <tr>
-                                    <td colSpan={STATUS_COLUMNS.length + 2} className="px-6 py-12 text-center text-gray-400">
+                                    <td colSpan={STATUS_COLUMNS.length + 2} className="px-4 py-8 text-center text-gray-400">
                                         No hay historias {selectedSprint ? `en ${selectedSprint}` : ""}
                                     </td>
                                 </tr>
@@ -1015,15 +1015,15 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                                 <>
                                     {pivotData.map((row) => (
                                         <tr key={row.assignee} className="border-b border-gray-200 hover:bg-gray-50/50 transition-colors">
-                                            <td className="px-4 py-2 font-medium text-gray-800 whitespace-nowrap">
+                                            <td className="px-3 py-1 font-medium text-gray-800 whitespace-nowrap">
                                                 {row.assignee}
                                             </td>
                                             {STATUS_COLUMNS.map((col) => (
-                                                <td key={col.key} className="px-2 py-2 text-center border-l border-gray-100">
+                                                <td key={col.key} className="px-1.5 py-1 text-center border-l border-gray-100">
                                                     {row[col.key] > 0 ? (
                                                         <button
                                                             onClick={() => openDetail(row.assignee, col.key)}
-                                                            className={`inline-flex items-center justify-center min-w-[28px] px-2 py-0.5 rounded-lg text-xs font-bold cursor-pointer hover:ring-2 hover:ring-orange-300 transition-all ${STATUS_COLORS[col.key]}`}
+                                                            className={`inline-flex items-center justify-center min-w-[28px] px-1 py-0.5 rounded-lg text-xs font-bold cursor-pointer hover:ring-2 hover:ring-orange-300 transition-all ${STATUS_COLORS[col.key]}`}
                                                             title={`Ver tickets — ${col.label}`}
                                                         >
                                                             {row[col.key]}
@@ -1033,11 +1033,11 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                                                     )}
                                                 </td>
                                             ))}
-                                            <td className="px-3 py-2 text-center border-l border-gray-100">
-                                                <div className="inline-flex items-center gap-1.5">
+                                            <td className="px-2 py-1 text-center border-l border-gray-100">
+                                                <div className="inline-flex items-center gap-1">
                                                     <button
                                                         onClick={() => openDetail(row.assignee, null)}
-                                                        className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-xs font-bold bg-gray-100 text-gray-700 border border-gray-200 cursor-pointer hover:ring-2 hover:ring-orange-300 transition-all"
+                                                        className="inline-flex items-center justify-center min-w-[32px] px-1 py-0.5 rounded-lg text-xs font-bold bg-gray-100 text-gray-700 border border-gray-200 cursor-pointer hover:ring-2 hover:ring-orange-300 transition-all"
                                                         title="Ver todos los tickets"
                                                     >
                                                         {row.total}
@@ -1047,18 +1047,18 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                                                         className="p-1 rounded-md hover:bg-gray-200 text-gray-400 hover:text-gray-600 transition-colors"
                                                         title="Ver trazabilidad de historias"
                                                     >
-                                                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                                             <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                                                         </svg>
                                                     </button>
                                                 </div>
                                             </td>
                                             {!isPF3QA && (
-                                                <td className="px-3 py-2 text-center border-l border-gray-100">
+                                                <td className="px-2 py-1 text-center border-l border-gray-100">
                                                     <div className="inline-flex items-center gap-1.5">
                                                         <button
                                                             onClick={() => openSubtasks(row.assignee)}
-                                                            className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200 cursor-pointer hover:ring-2 hover:ring-orange-300 transition-all"
+                                                            className="inline-flex items-center justify-center min-w-[32px] px-1 py-0.5 rounded-lg text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200 cursor-pointer hover:ring-2 hover:ring-orange-300 transition-all"
                                                             title="Ver subtareas"
                                                         >
                                                             {row.subtareasCount}
@@ -1066,10 +1066,10 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                                                     </div>
                                                 </td>
                                             )}
-                                            <td className="px-4 py-2 text-center border-l border-gray-100 bg-gray-50/50">
+                                            <td className="px-3 py-1 text-center border-l border-gray-100 bg-gray-50/50">
                                                 <button
                                                     onClick={() => openDetail(row.assignee, null)}
-                                                    className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-sm font-bold text-gray-800 cursor-pointer hover:ring-2 hover:ring-orange-300 transition-all"
+                                                    className="inline-flex items-center justify-center min-w-[32px] px-1 py-0.5 rounded-lg text-sm font-bold text-gray-800 cursor-pointer hover:ring-2 hover:ring-orange-300 transition-all"
                                                     title="Ver todos los tickets"
                                                 >
                                                     {isPF3QA ? row.total : row.puntajeTotal}
@@ -1080,9 +1080,9 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
 
                                     {/* Totals row */}
                                     <tr className="border-t-2 border-gray-300 bg-gray-50/80 font-semibold">
-                                        <td className="px-4 py-2 text-gray-700">TOTAL</td>
+                                        <td className="px-3 py-1.5 text-gray-700">TOTAL</td>
                                         {STATUS_COLUMNS.map((col) => (
-                                            <td key={col.key} className="px-2 py-2 text-center border-l border-gray-100">
+                                            <td key={col.key} className="px-1.5 py-1.5 text-center border-l border-gray-100">
                                                 <div className="flex flex-col items-center">
                                                     <span className={`inline-flex items-center justify-center min-w-[28px] px-2 py-0.5 rounded-lg text-xs font-bold ${STATUS_COLORS[col.key]}`}>
                                                         {totals[col.key]}
@@ -1093,23 +1093,23 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                                                 </div>
                                             </td>
                                         ))}
-                                        <td className="px-4 py-3 text-center border-l border-gray-100">
+                                        <td className="px-3 py-1.5 text-center border-l border-gray-100">
                                             <div className="flex flex-col items-center">
-                                                <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-sm font-bold bg-gray-200 text-gray-700">
+                                                <span className="inline-flex items-center justify-center min-w-[32px] px-1 py-0.5 rounded-lg text-sm font-bold bg-gray-200 text-gray-700">
                                                     {totals.total}
                                                 </span>
                                                 <span className="text-[10px] text-gray-400 mt-0.5">100%</span>
                                             </div>
                                         </td>
                                         {!isPF3QA && (
-                                            <td className="px-4 py-3 text-center border-l border-gray-100">
-                                                <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-sm font-bold bg-blue-100 text-blue-800">
+                                            <td className="px-3 py-1.5 text-center border-l border-gray-100">
+                                                <span className="inline-flex items-center justify-center min-w-[32px] px-1 py-0.5 rounded-lg text-sm font-bold bg-blue-100 text-blue-800">
                                                     {totals.subtareasCount}
                                                 </span>
                                             </td>
                                         )}
-                                        <td className="px-4 py-3 text-center border-l border-gray-200 bg-gray-100">
-                                            <span className="inline-flex items-center justify-center min-w-[36px] px-3 py-1 rounded-lg text-base font-bold text-gray-900">
+                                        <td className="px-3 py-1.5 text-center border-l border-gray-200 bg-gray-100">
+                                            <span className="inline-flex items-center justify-center min-w-[36px] px-2 py-1 rounded-lg text-base font-bold text-gray-900">
                                                 {isPF3QA ? totals.total : totals.puntajeTotal}
                                             </span>
                                         </td>
@@ -1124,8 +1124,8 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
             {/* ─── Tabla 02: Story Points por integrante (solo PF3) ─── */}
             {!isPF3QA && <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden animate-fade-in">
                 {/* Header */}
-                <div className="px-6 py-4 border-b border-gray-100">
-                    <h3 className="text-lg font-semibold font-[family-name:var(--font-heading)] text-gray-900">
+                <div className="px-4 py-3 border-b border-gray-100">
+                    <h3 className="text-[15px] font-semibold font-[family-name:var(--font-heading)] text-gray-900">
                         Story Points por integrante
                     </h3>
                     <p className="text-xs text-gray-400 mt-0.5">
@@ -1136,18 +1136,18 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
 
                 {/* Table */}
                 <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
+                    <table className="w-full text-[13px]">
                         <thead>
                             <tr className="border-b-2 border-gray-200 bg-gray-50/80">
-                                <th className="text-left px-4 py-2 font-semibold text-gray-700" style={{ minWidth: "160px" }}>
+                                <th className="text-left px-3 py-1.5 font-semibold text-gray-700" style={{ minWidth: "160px" }}>
                                     Integrante
                                 </th>
                                 {STATUS_COLUMNS.map((col) => (
-                                    <th key={col.key} className="text-center px-2 py-2 font-medium text-gray-500 border-l border-gray-200" style={{ minWidth: "100px" }}>
+                                    <th key={col.key} className="text-center px-1.5 py-1.5 font-medium text-gray-500 border-l border-gray-200" style={{ minWidth: "100px" }}>
                                         {col.label}
                                     </th>
                                 ))}
-                                <th className="text-center px-4 py-2 font-bold text-gray-900 border-l border-gray-200 bg-gray-100" style={{ minWidth: "100px" }}>
+                                <th className="text-center px-3 py-1.5 font-bold text-gray-900 border-l border-gray-200 bg-gray-100" style={{ minWidth: "100px" }}>
                                     TOTAL
                                 </th>
                             </tr>
@@ -1155,7 +1155,7 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                         <tbody>
                             {pivotDataSP.length === 0 ? (
                                 <tr>
-                                    <td colSpan={STATUS_COLUMNS.length + 2} className="px-6 py-12 text-center text-gray-400">
+                                    <td colSpan={STATUS_COLUMNS.length + 2} className="px-4 py-8 text-center text-gray-400">
                                         No hay historias {selectedSprint ? `en ${selectedSprint}` : ""}
                                     </td>
                                 </tr>
@@ -1163,15 +1163,15 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                                 <>
                                     {pivotDataSP.map((row) => (
                                         <tr key={row.assignee} className="border-b border-gray-200 hover:bg-gray-50/50 transition-colors">
-                                            <td className="px-4 py-2 font-medium text-gray-800 whitespace-nowrap">
+                                            <td className="px-3 py-1 font-medium text-gray-800 whitespace-nowrap">
                                                 {row.assignee}
                                             </td>
                                             {STATUS_COLUMNS.map((col) => (
-                                                <td key={col.key} className="px-2 py-2 text-center border-l border-gray-100">
+                                                <td key={col.key} className="px-1.5 py-1 text-center border-l border-gray-100">
                                                     {row[col.key] > 0 ? (
                                                         <button
                                                             onClick={() => openDetail(row.assignee, col.key, "sp")}
-                                                            className={`inline-flex items-center justify-center min-w-[28px] px-2 py-0.5 rounded-lg text-xs font-bold cursor-pointer hover:ring-2 hover:ring-orange-300 transition-all ${STATUS_COLORS[col.key]}`}
+                                                            className={`inline-flex items-center justify-center min-w-[28px] px-1 py-0.5 rounded-lg text-xs font-bold cursor-pointer hover:ring-2 hover:ring-orange-300 transition-all ${STATUS_COLORS[col.key]}`}
                                                             title={`Ver tickets — ${col.label}`}
                                                         >
                                                             {Math.round(row[col.key] * 100) / 100}
@@ -1181,10 +1181,10 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                                                     )}
                                                 </td>
                                             ))}
-                                            <td className="px-4 py-2 text-center border-l border-gray-100 bg-gray-50/50">
+                                            <td className="px-3 py-1 text-center border-l border-gray-100 bg-gray-50/50">
                                                 <button
                                                     onClick={() => openDetail(row.assignee, null, "sp")}
-                                                    className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-lg text-sm font-bold text-gray-800 cursor-pointer hover:ring-2 hover:ring-orange-300 transition-all"
+                                                    className="inline-flex items-center justify-center min-w-[32px] px-1 py-0.5 rounded-lg text-sm font-bold text-gray-800 cursor-pointer hover:ring-2 hover:ring-orange-300 transition-all"
                                                     title="Ver todos los tickets"
                                                 >
                                                     {row.puntajeTotal}
@@ -1195,11 +1195,11 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
 
                                     {/* Totals row */}
                                     <tr className="border-t-2 border-gray-300 bg-gray-50/80 font-semibold">
-                                        <td className="px-4 py-2 text-gray-700">TOTAL</td>
+                                        <td className="px-3 py-1.5 text-gray-700">TOTAL</td>
                                         {STATUS_COLUMNS.map((col) => (
-                                            <td key={col.key} className="px-2 py-2 text-center border-l border-gray-100">
+                                            <td key={col.key} className="px-1.5 py-1.5 text-center border-l border-gray-100">
                                                 <div className="flex flex-col items-center">
-                                                    <span className={`inline-flex items-center justify-center min-w-[28px] px-2 py-0.5 rounded-lg text-xs font-bold ${STATUS_COLORS[col.key]}`}>
+                                                    <span className={`inline-flex items-center justify-center min-w-[28px] px-1 py-0.5 rounded-lg text-xs font-bold ${STATUS_COLORS[col.key]}`}>
                                                         {totalsSP[col.key]}
                                                     </span>
                                                     <span className="text-[10px] text-gray-400 mt-0.5">
@@ -1208,8 +1208,8 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                                                 </div>
                                             </td>
                                         ))}
-                                        <td className="px-4 py-3 text-center border-l border-gray-200 bg-gray-100">
-                                            <span className="inline-flex items-center justify-center min-w-[36px] px-3 py-1 rounded-lg text-base font-bold text-gray-900">
+                                        <td className="px-3 py-1.5 text-center border-l border-gray-200 bg-gray-100">
+                                            <span className="inline-flex items-center justify-center min-w-[36px] px-2 py-1 rounded-lg text-base font-bold text-gray-900">
                                                 {totalsSP.puntajeTotal}
                                             </span>
                                         </td>
