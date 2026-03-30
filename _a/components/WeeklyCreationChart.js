@@ -155,20 +155,30 @@ export default function WeeklyCreationChart({ tickets = [], currentSprint = "" }
     }
   }, [weekTicketsMap]);
 
-  // ── Custom dot con cursor pointer ───────────────────────────────────────
+  // ── Custom dot con cursor pointer y etiqueta numérica ────────────────────
   const CustomDot = (props) => {
     const { cx, cy, payload } = props;
     return (
-      <circle
-        cx={cx}
-        cy={cy}
-        r={6}
-        fill="#3b82f6"
-        stroke="#fff"
-        strokeWidth={2}
-        style={{ cursor: "pointer" }}
-        onClick={() => handleDotClick({ payload })}
-      />
+      <g style={{ cursor: "pointer" }} onClick={() => handleDotClick({ payload })}>
+        <circle
+          cx={cx}
+          cy={cy}
+          r={6}
+          fill="#3b82f6"
+          stroke="#fff"
+          strokeWidth={2}
+        />
+        <text
+          x={cx}
+          y={cy - 14}
+          textAnchor="middle"
+          fill="#3b82f6"
+          fontSize={11}
+          fontWeight={700}
+        >
+          {payload.cantidad}
+        </text>
+      </g>
     );
   };
 

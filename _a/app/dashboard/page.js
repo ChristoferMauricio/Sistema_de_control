@@ -25,7 +25,6 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import TicketTable from "@/components/TicketTable";
 import JqlSearchBar from "@/components/JqlSearchBar";
-import WeeklyCreationChart from "@/components/WeeklyCreationChart";
 import Card from "@/components/ui/Card";
 import { getCurrentSprint, formatCronogramaDate } from "@/lib/cronogramaData";
 import { useRole } from "@/app/dashboard/RoleContext";
@@ -613,12 +612,6 @@ export default function DashboardPage() {
           </Card>
         ))}
       </div>
-
-      {/* Gráfica de creación semanal */}
-      <WeeklyCreationChart
-        tickets={tickets}
-        currentSprint={currentSprint?.iteracion || ""}
-      />
 
       {/* Búsqueda avanzada JQL */}
       <JqlSearchBar
