@@ -323,10 +323,11 @@ export default function WeeklyCreationChart({ tickets = [], currentSprint = "" }
       {/* ── Popup de detalle de semana ── */}
       {popup && (
         <>
-          <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40" onClick={() => setPopup(null)} />
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setPopup(null)}>
+          <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-[9998]" onClick={() => setPopup(null)} />
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-6" onClick={() => setPopup(null)}>
             <div
-              className="bg-white rounded-2xl border border-gray-200 shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col animate-fade-in"
+              className="bg-white rounded-2xl border border-gray-200 shadow-2xl w-full max-w-2xl flex flex-col animate-fade-in"
+              style={{ maxHeight: "calc(100vh - 3rem)" }}
               onClick={(e) => e.stopPropagation()}
             >
               {/* Popup header */}
@@ -350,7 +351,7 @@ export default function WeeklyCreationChart({ tickets = [], currentSprint = "" }
               </div>
 
               {/* Popup body */}
-              <div className="overflow-y-auto flex-1 px-6 py-3">
+              <div className="overflow-y-auto flex-1 min-h-0 px-6 py-3">
                 <table className="w-full text-sm">
                   <thead className="text-[11px] uppercase text-gray-400 font-semibold border-b border-gray-100 sticky top-0 bg-white">
                     <tr>
