@@ -10,7 +10,8 @@
  */
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   ResponsiveContainer,
   LineChart,
@@ -67,6 +68,9 @@ const TYPE_OPTIONS = [
   { value: "Bug", label: "Errores (Bugs)" },
 ];
 
+/** URL base de Jira para hipervínculos */
+const JIRA_BASE_URL = "https://supervisorservicio2020.atlassian.net/browse";
+
 // ─── Componente principal ────────────────────────────────────────────────────
 
 /**
@@ -79,6 +83,10 @@ export default function WeeklyCreationChart({ tickets = [], currentSprint = "" }
   const [filterSprint, setFilterSprint] = useState(currentSprint);
   const [filterType, setFilterType]     = useState("Historia");
   const [popup, setPopup]               = useState(null); // { weekLabel, tickets }
+  const [portalRoot, setPortalRoot]      = useState(null);
+
+  // Obtener document.body para el portal (solo client-side)
+  useEffect(() => { setPortalRoot(document.body); }, []);
 
   // ── Sprints únicos para el dropdown ─────────────────────────────────────
   const uniqueSprints = useMemo(() => {
@@ -320,11 +328,11 @@ export default function WeeklyCreationChart({ tickets = [], currentSprint = "" }
         )}
       </div>
 
-      {/* ── Popup de detalle de semana ── */}
-      {popup && (
+      {/* ── Popup de detalle de semana (portaleado a body) ── */}
+      {popup && portalRoot && createPortal(
         <>
-          <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-[9998]" onClick={() => setPopup(null)} />
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-6" onClick={() => setPopup(null)}>
+          <div className="fixed inset-0 bg-black/30 backdrop-blur-sm" style={{ zIndex: 99998 }} onClick={() => setPopup(null)} />
+          <div className="fixed inset-0 flex items-center justify-center" style={{ zIndex: 99999, padding: "1.5rem" }} onClick={() => setPopup(null)}>
             <div
               className="bg-white rounded-2xl border border-gray-200 shadow-2xl w-full max-w-2xl flex flex-col animate-fade-in"
               style={{ maxHeight: "calc(100vh - 3rem)" }}
@@ -375,7 +383,14 @@ export default function WeeklyCreationChart({ tickets = [], currentSprint = "" }
                             </span>
                           </td>
                           <td className="py-2.5 pr-3">
-                            <span className="font-mono text-xs font-bold text-blue-600">{t.jira_key}</span>
+                            <a
+                              href={`${JIRA_BASE_URL}/${t.jira_key}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="font-mono text-xs font-bold text-blue-600 hover:text-blue-800 hover:underline transition-colors"
+                            >
+                              {t.jira_key}
+                            </a>
                           </td>
                           <td className="py-2.5 pr-3 text-gray-700 max-w-[300px] truncate">{t.summary}</td>
                           <td className="py-2.5 pr-3">
@@ -394,7 +409,8 @@ export default function WeeklyCreationChart({ tickets = [], currentSprint = "" }
               </div>
             </div>
           </div>
-        </>
+        </>,
+        portalRoot
       )}
     </div>
   );
