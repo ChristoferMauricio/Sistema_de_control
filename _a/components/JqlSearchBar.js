@@ -215,7 +215,7 @@ export default function JqlSearchBar({ tickets = [], onResults, onActiveChange, 
   };
 
   return (
-    <div className="relative animate-fade-in">
+    <div className="relative z-20 animate-fade-in">
       {/* ── Barra principal ── */}
       <div className={`
         relative flex items-center gap-2 px-4 py-3 rounded-2xl border-2 transition-all duration-300
