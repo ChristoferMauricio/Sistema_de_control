@@ -77,7 +77,7 @@ const TYPE_OPTIONS = [
  */
 export default function WeeklyCreationChart({ tickets = [], currentSprint = "" }) {
   const [filterSprint, setFilterSprint] = useState(currentSprint);
-  const [filterType, setFilterType]     = useState("");
+  const [filterType, setFilterType]     = useState("Historia");
   const [popup, setPopup]               = useState(null); // { weekLabel, tickets }
 
   // ── Sprints únicos para el dropdown ─────────────────────────────────────
@@ -289,7 +289,7 @@ export default function WeeklyCreationChart({ tickets = [], currentSprint = "" }
           </div>
         ) : (
           <ResponsiveContainer width="100%" height={380}>
-            <LineChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+            <LineChart data={chartData} margin={{ top: 25, right: 30, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
               <XAxis
                 dataKey="weekShort"
@@ -307,7 +307,7 @@ export default function WeeklyCreationChart({ tickets = [], currentSprint = "" }
               />
               <Tooltip content={<CustomTooltip />} />
               <Line
-                type="monotone"
+                type="linear"
                 dataKey="cantidad"
                 stroke="#3b82f6"
                 strokeWidth={3}
