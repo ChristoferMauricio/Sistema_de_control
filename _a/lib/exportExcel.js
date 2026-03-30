@@ -466,13 +466,12 @@ export async function exportUnifiedExcel(selectedSprint) {
       hasMore = data.length === pageSize;
     }
 
-    const { data: subtaskRows } = await supabase
-      .from("jira_ticket_subtasks")
-      .select("parent_key, child_key");
     const subtaskMap = {};
-    (subtaskRows || []).forEach((r) => {
-      if (!subtaskMap[r.parent_key]) subtaskMap[r.parent_key] = [];
-      subtaskMap[r.parent_key].push(r.child_key);
+    allTickets.forEach((t) => {
+      if (t.parent_key) {
+        if (!subtaskMap[t.parent_key]) subtaskMap[t.parent_key] = [];
+        subtaskMap[t.parent_key].push(t.jira_key);
+      }
     });
 
     const equipo = equipoRes.data || [];
