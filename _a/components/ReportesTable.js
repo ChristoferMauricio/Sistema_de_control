@@ -757,7 +757,7 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
         return Object.values(map).map(row => ({
             ...row,
             puntajeTotal: row.total + row.subtareasCount
-        })).sort((a, b) => b.puntajeTotal - a.puntajeTotal);
+        })).sort((a, b) => a.assignee.localeCompare(b.assignee, "es"));
     }, [filtered, filteredSubtasks, resolveName]);
 
     // Totales por columna
@@ -810,7 +810,7 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
         return Object.values(map).map(row => ({
             ...row,
             puntajeTotal: row.total
-        })).sort((a, b) => b.puntajeTotal - a.puntajeTotal);
+        })).sort((a, b) => a.assignee.localeCompare(b.assignee, "es"));
     }, [filtered, filteredSubtasks, resolveName]);
 
     const totalsSP = useMemo(() => {
