@@ -171,17 +171,36 @@ export function useTicketData({ tickets = [], externalFilterType = "", defaultFi
     fetchPersonData();
   }, [syncVersion]);
 
-  // ── subtasksMap: derivado de los tickets cargados (parent_key) ────────────
-  // Construye un mapa { parent_key -> [child_keys] } para mostrar las subtareas de cada ticket
+  // ── subtasksMap: derivado de los tickets cargados (parent_key + subtask_keys) ─
+  // Construye un mapa { parent_key -> [child_keys] } combinando:
+  //   1) Cada ticket que tiene parent_key (hijo → padre)
+  //   2) Cada ticket que tiene subtask_keys[] (padre → hijos, campo de Jira)
+  // Esto garantiza cobertura completa incluso si uno de los dos campos falta.
   const subtasksMap = useMemo(() => {
     const map = {};
+
+    // Dirección 1: hijo → padre (parent_key)
     tickets.forEach((t) => {
       if (t.parent_key) {
-        if (!map[t.parent_key]) map[t.parent_key] = [];
-        map[t.parent_key].push(t.jira_key);
+        if (!map[t.parent_key]) map[t.parent_key] = new Set();
+        map[t.parent_key].add(t.jira_key);
       }
     });
-    return map;
+
+    // Dirección 2: padre → hijos (subtask_keys)
+    tickets.forEach((t) => {
+      if (Array.isArray(t.subtask_keys) && t.subtask_keys.length > 0) {
+        if (!map[t.jira_key]) map[t.jira_key] = new Set();
+        t.subtask_keys.forEach((sk) => map[t.jira_key].add(sk));
+      }
+    });
+
+    // Convertir Sets a Arrays para consumo downstream
+    const result = {};
+    for (const key of Object.keys(map)) {
+      result[key] = [...map[key]];
+    }
+    return result;
   }, [tickets]);
 
   // ── Fetch links (relaciones entre tickets desde BD) ────────────────────────
