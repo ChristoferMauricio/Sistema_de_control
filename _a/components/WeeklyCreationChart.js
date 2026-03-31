@@ -130,9 +130,10 @@ export default function WeeklyCreationChart({ tickets = [], currentSprint = "" }
       const key = monday.getTime();
 
       if (!weekMap[key]) {
-        weekMap[key] = { monday, count: 0, tickets: [] };
+        weekMap[key] = { monday, count: 0, points: 0, tickets: [] };
       }
       weekMap[key].count++;
+      weekMap[key].points += (parseFloat(ticket.story_points) || 0);
       weekMap[key].tickets.push(ticket);
     });
 
@@ -144,6 +145,7 @@ export default function WeeklyCreationChart({ tickets = [], currentSprint = "" }
       weekLabel: formatWeekLabel(weekMap[key].monday),
       weekShort: formatShort(weekMap[key].monday),
       cantidad: weekMap[key].count,
+      puntajes: Math.round(weekMap[key].points * 100) / 100,
     }));
 
     const tMap = {};
@@ -165,14 +167,21 @@ export default function WeeklyCreationChart({ tickets = [], currentSprint = "" }
 
   // ── Custom dot con cursor pointer y etiqueta numérica ────────────────────
   const CustomDot = (props) => {
-    const { cx, cy, payload } = props;
+    const { cx, cy, payload, dataKey } = props;
+    const isSP = dataKey === "puntajes";
+    const val = isSP ? payload.puntajes : payload.cantidad;
+    const color = isSP ? "#f97316" : "#3b82f6";
+    
+    // No mostrar el punto de Puntaje si es 0 y no es la gráfica de Bugs/Subtareas
+    if (isSP && val === 0) return null;
+
     return (
       <g style={{ cursor: "pointer" }} onClick={() => handleDotClick({ payload })}>
         <circle
           cx={cx}
           cy={cy}
           r={6}
-          fill="#3b82f6"
+          fill={color}
           stroke="#fff"
           strokeWidth={2}
         />
@@ -180,11 +189,11 @@ export default function WeeklyCreationChart({ tickets = [], currentSprint = "" }
           x={cx}
           y={cy - 14}
           textAnchor="middle"
-          fill="#3b82f6"
+          fill={color}
           fontSize={11}
           fontWeight={700}
         >
-          {payload.cantidad}
+          {val}
         </text>
       </g>
     );
@@ -192,16 +201,19 @@ export default function WeeklyCreationChart({ tickets = [], currentSprint = "" }
 
   // ── Custom active dot (hover) ───────────────────────────────────────────
   const CustomActiveDot = (props) => {
-    const { cx, cy, payload } = props;
+    const { cx, cy, payload, dataKey } = props;
+    const isSP = dataKey === "puntajes";
+    const color = isSP ? "#ea580c" : "#2563eb";
+    
     return (
       <circle
         cx={cx}
         cy={cy}
         r={8}
-        fill="#2563eb"
+        fill={color}
         stroke="#fff"
         strokeWidth={3}
-        style={{ cursor: "pointer", filter: "drop-shadow(0 0 4px rgba(37,99,235,0.4))" }}
+        style={{ cursor: "pointer", filter: `drop-shadow(0 0 4px ${color}60)` }}
         onClick={() => handleDotClick({ payload })}
       />
     );
@@ -215,6 +227,7 @@ export default function WeeklyCreationChart({ tickets = [], currentSprint = "" }
       <div className="bg-white rounded-xl border border-gray-200 shadow-lg px-4 py-3 text-sm">
         <p className="font-semibold text-gray-800">{d.weekLabel}</p>
         <p className="text-blue-600 font-bold text-lg mt-0.5">{d.cantidad} ticket{d.cantidad !== 1 ? "s" : ""}</p>
+        {d.puntajes > 0 && <p className="text-orange-500 font-bold text-sm mt-0.5">{d.puntajes} SP asignados</p>}
         <p className="text-[11px] text-gray-400 mt-1">Clic en el punto para ver detalle</p>
       </div>
     );
@@ -241,7 +254,7 @@ export default function WeeklyCreationChart({ tickets = [], currentSprint = "" }
             Tickets creados por semana
           </h3>
           <p className="text-xs text-gray-400 mt-0.5">
-            {filteredTickets.length} ticket{filteredTickets.length !== 1 ? "s" : ""} en {chartData.length} semana{chartData.length !== 1 ? "s" : ""}
+            {filteredTickets.length} ticket{filteredTickets.length !== 1 ? "s" : ""} · {Math.round(chartData.reduce((acc, curr) => acc + curr.puntajes, 0) * 100) / 100} SP en {chartData.length} semana{chartData.length !== 1 ? "s" : ""}
           </p>
         </div>
 
@@ -297,8 +310,8 @@ export default function WeeklyCreationChart({ tickets = [], currentSprint = "" }
           </div>
         ) : (
           <ResponsiveContainer width="100%" height={380}>
-            <LineChart data={chartData} margin={{ top: 25, right: 30, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+            <LineChart data={chartData} margin={{ top: 35, right: 30, left: -20, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
               <XAxis
                 dataKey="weekShort"
                 tick={{ fontSize: 11, fill: "#9ca3af" }}
@@ -307,22 +320,46 @@ export default function WeeklyCreationChart({ tickets = [], currentSprint = "" }
                 dy={8}
               />
               <YAxis
-                tick={{ fontSize: 11, fill: "#9ca3af" }}
+                yAxisId="left"
+                tick={{ fontSize: 11, fill: "#3b82f6" }}
                 axisLine={{ stroke: "#e5e7eb" }}
-                tickLine={{ stroke: "#e5e7eb" }}
+                tickLine={false}
                 allowDecimals={false}
-                dx={-4}
               />
+              {chartData.some(d => d.puntajes > 0) && (
+                <YAxis
+                  yAxisId="right"
+                  orientation="right"
+                  tick={{ fontSize: 11, fill: "#f97316" }}
+                  axisLine={{ stroke: "#e5e7eb" }}
+                  tickLine={false}
+                  allowDecimals={false}
+                />
+              )}
               <Tooltip content={<CustomTooltip />} />
               <Line
-                type="linear"
+                yAxisId="left"
+                type="monotone"
                 dataKey="cantidad"
                 stroke="#3b82f6"
                 strokeWidth={3}
                 dot={<CustomDot />}
                 activeDot={<CustomActiveDot />}
-                name="Tickets creados"
+                name="Tickets"
               />
+              {chartData.some(d => d.puntajes > 0) && (
+                <Line
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="puntajes"
+                  stroke="#f97316"
+                  strokeWidth={3}
+                  strokeDasharray="5 5"
+                  dot={<CustomDot />}
+                  activeDot={<CustomActiveDot />}
+                  name="Puntajes"
+                />
+              )}
             </LineChart>
           </ResponsiveContainer>
         )}
@@ -366,6 +403,7 @@ export default function WeeklyCreationChart({ tickets = [], currentSprint = "" }
                       <th className="text-left py-2 pr-3">Tipo</th>
                       <th className="text-left py-2 pr-3">Clave</th>
                       <th className="text-left py-2 pr-3">Resumen</th>
+                      <th className="text-center py-2 pr-3">Puntaje</th>
                       <th className="text-left py-2 pr-3">Estado</th>
                       <th className="text-left py-2">Creada</th>
                     </tr>
@@ -393,6 +431,15 @@ export default function WeeklyCreationChart({ tickets = [], currentSprint = "" }
                             </a>
                           </td>
                           <td className="py-2.5 pr-3 text-gray-700 max-w-[300px] truncate">{t.summary}</td>
+                          <td className="py-2.5 pr-3 text-center">
+                            {parseFloat(t.story_points) > 0 ? (
+                              <span className="inline-flex items-center justify-center min-w-[24px] px-1.5 py-0.5 rounded-lg text-[10px] font-bold bg-orange-50 text-orange-600 border border-orange-200">
+                                {t.story_points}
+                              </span>
+                            ) : (
+                              <span className="text-[11px] text-gray-300">—</span>
+                            )}
+                          </td>
                           <td className="py-2.5 pr-3">
                             <span className="text-xs text-gray-500">{t.status}</span>
                           </td>
