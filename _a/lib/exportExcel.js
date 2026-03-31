@@ -162,6 +162,7 @@ function buildSheetXml(headers, rows, colWidths, sst, headerStyle = "6") {
 const STATUS_ORDER = [
   "por hacer", "tareas por hacer", "to do",
   "en curso", "in progress",
+  "qa", "dev", "cert", "validación", "validacion",
   "finalizada", "done", "hecho",
 ];
 
