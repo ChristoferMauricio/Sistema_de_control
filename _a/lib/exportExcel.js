@@ -585,14 +585,20 @@ export async function exportUnifiedExcel(selectedSprint) {
     const headersQA = ["Tipo", "Clave", "Resumen", "Sprint", "Persona asignada", "Estado", "Informador", "Etiquetas"];
     const pf3qaTickets = allTickets.filter((t) => t.jira_key?.startsWith("PF3QA-"));
 
-    // Determinar sprint QA más reciente
-    const qaSprints = [...new Set(pf3qaTickets.map((t) => t.sprint).filter(Boolean))];
-    const latestQaSprint = qaSprints.sort((a, b) => {
-      const numA = parseInt(a.match(/(\d+)\s*$/)?.[1] || "0");
-      const numB = parseInt(b.match(/(\d+)\s*$/)?.[1] || "0");
-      return numB - numA;
-    })[0] || "";
-    console.log(`[exportExcel] Sprint QA más reciente: "${latestQaSprint}"`);
+    // ─── Determinar sprints por tablero (PF3 vs PF3QA) ────────────
+    const extractSprintNum = (s) => parseInt(s.match(/(\d+)\s*$/)?.[1] || "0");
+    const sortByNumDesc = (a, b) => extractSprintNum(b) - extractSprintNum(a);
+
+    // Sprint QA: siempre el más alto de los tickets PF3QA ("Tablero Sprint X")
+    const qaSprints = [...new Set(pf3qaTickets.map((t) => t.sprint).filter(Boolean))].sort(sortByNumDesc);
+    const sprintParaQA = qaSprints[0] || "";
+
+    // Sprint PF3: usa selectedSprint si fue proporcionado, sino el más alto de PF3
+    const pf3Tickets = allTickets.filter((t) => t.jira_key?.startsWith("PF3-"));
+    const pf3Sprints = [...new Set(pf3Tickets.map((t) => t.sprint).filter(Boolean))].sort(sortByNumDesc);
+    const sprintParaPF3 = selectedSprint || pf3Sprints[0] || "";
+
+    console.log(`[exportExcel] Sprint PF3: "${sprintParaPF3}", Sprint QA: "${sprintParaQA}"`);
 
     const rowsQA = pf3qaTickets.map((t) => ({
       Tipo: t.issue_type || "",
@@ -611,7 +617,7 @@ export async function exportUnifiedExcel(selectedSprint) {
     /* ═══════════════════════════════════════════════════════════════
        5. CONSTRUIR PIVOT CACHE + PIVOT TABLES QA
        ═══════════════════════════════════════════════════════════════ */
-    const qaPivot = buildQACacheAndPivots(rowsQA, latestQaSprint);
+    const qaPivot = buildQACacheAndPivots(rowsQA, sprintParaQA);
 
     /* ═══════════════════════════════════════════════════════════════
        6. INYECTAR TODO EN TEMPLATE
