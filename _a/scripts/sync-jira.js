@@ -159,12 +159,10 @@ function transformIssue(issue) {
     summary: fields.summary || "",
     status: fields.status?.name || "",
     assignee_email: fields.assignee?.emailAddress || "",
-    assignee_name: fields.assignee?.displayName || "",
     priority: fields.priority?.name || "",
     issue_type: fields.issuetype?.name || "",
     sprint: extractSprintName(fields.customfield_10020),
     story_points: fields.customfield_10036 || null,
-    reporter_name: fields.reporter?.displayName || "",
     reporter_email: fields.reporter?.emailAddress || "",
     parent_key: fields.parent?.key || null,
     subtask_keys: fields.subtasks && fields.subtasks.length > 0

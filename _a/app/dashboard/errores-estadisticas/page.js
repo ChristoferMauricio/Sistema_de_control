@@ -50,7 +50,7 @@ const STATUS_DEFS = [
   { key: "en_curso", label: "En curso", match: ["en curso", "in progress", "en progreso"], color: "bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300" },
   { key: "listo_dev", label: "Listo para dev", match: ["listo para dev"], color: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/60 dark:text-cyan-300" },
   { key: "qa", label: "QA en DEV", match: ["qa en dev", "qa en dev o cert"], color: "bg-amber-100 text-amber-700 dark:bg-amber-900/60 dark:text-amber-300" },
-  { key: "control_calidad", label: "Control calidad", match: ["control de calidad"], color: "bg-purple-100 text-purple-700 dark:bg-purple-900/60 dark:text-purple-300" },
+  { key: "control_calidad", label: "Control calidad", match: ["control de calidad", "control calidad"], color: "bg-purple-100 text-purple-700 dark:bg-purple-900/60 dark:text-purple-300" },
   { key: "finalizada", label: "Finalizada", match: ["finalizada", "listo (pase a cert)", "listo (pase a cert o prod)", "terminada", "done", "cerrado", "resuelto", "cerrada"], color: "bg-green-100 text-green-700 dark:bg-green-900/60 dark:text-green-300" },
 ];
 
