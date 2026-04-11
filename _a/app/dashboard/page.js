@@ -63,8 +63,8 @@ export default function DashboardPage() {
     subtareas: 0,
     epicas: 0,
     pendientes: 0,
-    certificacion: { porHacer: 0, enCurso: 0, finalizada: 0 },
-    desarrollo: { porHacer: 0, enCurso: 0, finalizada: 0 },
+    certificacion: { porHacer: 0, enCurso: 0, qaDev: 0, qaCert: 0, finalizada: 0 },
+    desarrollo: { porHacer: 0, enCurso: 0, qaDev: 0, qaCert: 0, finalizada: 0 },
   });
 
   /* ─── Estado del widget de Sprint actual ─── */
@@ -148,8 +148,16 @@ export default function DashboardPage() {
       const countStatuses = (arr) => {
         const porHacer = arr.filter(t => ["por hacer", "tareas por hacer", "to do", "abierto", "open"].includes((t.status || "").toLowerCase())).length;
         const enCurso = arr.filter(t => ["en curso", "in progress", "en progreso"].includes((t.status || "").toLowerCase())).length;
+        const qaDev = arr.filter(t => {
+            const s = (t.status || "").toLowerCase();
+            return s.includes("qa en dev") || s === "qa dev" || s === "qa";
+        }).length;
+        const qaCert = arr.filter(t => {
+            const s = (t.status || "").toLowerCase();
+            return s.includes("control calidad") || s.includes("control de calidad") || s.includes("validación") || s.includes("certificación") || s.includes("certific") || s === "qa en cert";
+        }).length;
         const finalizada = arr.filter(t => ["terminada", "done", "cerrado", "resuelto", "finalizado", "finalizada", "cerrada"].includes((t.status || "").toLowerCase())).length;
-        return { porHacer, enCurso, finalizada };
+        return { porHacer, enCurso, qaDev, qaCert, finalizada };
       };
 
       /* ─── Cálculo de pendientes según el rol del usuario ─── */
@@ -316,20 +324,30 @@ export default function DashboardPage() {
    * @param {{ porHacer: number, enCurso: number, finalizada: number }} props.data
    */
   const StatusCounters = ({ data }) => (
-    <div className="flex items-center gap-2 lg:gap-3 mt-1.5 w-full">
+    <div className="flex items-center gap-1.5 lg:gap-2 mt-2 w-full">
       <div className="flex flex-col items-center flex-1">
-        <span className="text-[1.35rem] font-bold font-[family-name:var(--font-heading)] text-gray-700 leading-none">{data.porHacer}</span>
-        <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mt-1 text-center whitespace-nowrap">Por hacer</span>
+        <span className="text-xl font-bold font-[family-name:var(--font-heading)] text-gray-700 leading-none">{data.porHacer}</span>
+        <span className="text-[8px] font-bold text-gray-400 uppercase tracking-wider mt-1 text-center whitespace-nowrap">Por hacer</span>
       </div>
-      <div className="w-px h-7 bg-gray-200 rounded-full shrink-0"></div>
+      <div className="w-px h-6 bg-gray-200 rounded-full shrink-0"></div>
       <div className="flex flex-col items-center flex-1">
-        <span className="text-[1.35rem] font-bold font-[family-name:var(--font-heading)] text-blue-600 leading-none">{data.enCurso}</span>
-        <span className="text-[9px] font-bold text-blue-400 uppercase tracking-wider mt-1 text-center whitespace-nowrap">En curso</span>
+        <span className="text-xl font-bold font-[family-name:var(--font-heading)] text-blue-600 leading-none">{data.enCurso}</span>
+        <span className="text-[8px] font-bold text-blue-400 uppercase tracking-wider mt-1 text-center whitespace-nowrap">En curso</span>
       </div>
-      <div className="w-px h-7 bg-gray-200 rounded-full shrink-0"></div>
+      <div className="w-px h-6 bg-gray-200 rounded-full shrink-0"></div>
       <div className="flex flex-col items-center flex-1">
-        <span className="text-[1.35rem] font-bold font-[family-name:var(--font-heading)] text-emerald-600 leading-none">{data.finalizada}</span>
-        <span className="text-[9px] font-bold text-emerald-500 uppercase tracking-wider mt-1 text-center whitespace-nowrap">Finalizada</span>
+        <span className="text-xl font-bold font-[family-name:var(--font-heading)] text-amber-500 leading-none">{data.qaDev}</span>
+        <span className="text-[8px] font-bold text-amber-500 uppercase tracking-wider mt-1 text-center whitespace-nowrap">QA Dev</span>
+      </div>
+      <div className="w-px h-6 bg-gray-200 rounded-full shrink-0"></div>
+      <div className="flex flex-col items-center flex-1">
+        <span className="text-xl font-bold font-[family-name:var(--font-heading)] text-purple-600 leading-none">{data.qaCert}</span>
+        <span className="text-[8px] font-bold text-purple-500 uppercase tracking-wider mt-1 text-center whitespace-nowrap">Calidad</span>
+      </div>
+      <div className="w-px h-6 bg-gray-200 rounded-full shrink-0"></div>
+      <div className="flex flex-col items-center flex-1">
+        <span className="text-xl font-bold font-[family-name:var(--font-heading)] text-emerald-600 leading-none">{data.finalizada}</span>
+        <span className="text-[8px] font-bold text-emerald-500 uppercase tracking-wider mt-1 text-center whitespace-nowrap">Finalizada</span>
       </div>
     </div>
   );
