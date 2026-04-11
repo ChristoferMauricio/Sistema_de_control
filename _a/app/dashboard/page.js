@@ -324,30 +324,38 @@ export default function DashboardPage() {
    * @param {{ porHacer: number, enCurso: number, finalizada: number }} props.data
    */
   const StatusCounters = ({ data }) => (
-    <div className="flex items-center gap-1.5 lg:gap-2 mt-2 w-full">
-      <div className="flex flex-col items-center flex-1">
-        <span className="text-xl font-bold font-[family-name:var(--font-heading)] text-gray-700 leading-none">{data.porHacer}</span>
-        <span className="text-[8px] font-bold text-gray-400 uppercase tracking-wider mt-1 text-center whitespace-nowrap">Por hacer</span>
+    <div className="flex flex-col w-full mt-2 gap-2">
+      {/* Fila superior: 3 items */}
+      <div className="flex items-center justify-between gap-1 w-full">
+        <div className="flex flex-col items-center flex-1">
+          <span className="text-[1.1rem] md:text-xl font-bold font-[family-name:var(--font-heading)] text-gray-700 leading-none">{data.porHacer}</span>
+          <span className="text-[8px] font-bold text-gray-400 uppercase tracking-wider mt-1 text-center whitespace-nowrap">Por hacer</span>
+        </div>
+        <div className="w-px h-5 bg-gray-200 rounded-full shrink-0"></div>
+        <div className="flex flex-col items-center flex-1">
+          <span className="text-[1.1rem] md:text-xl font-bold font-[family-name:var(--font-heading)] text-blue-600 leading-none">{data.enCurso}</span>
+          <span className="text-[8px] font-bold text-blue-400 uppercase tracking-wider mt-1 text-center whitespace-nowrap">En curso</span>
+        </div>
+        <div className="w-px h-5 bg-gray-200 rounded-full shrink-0"></div>
+        <div className="flex flex-col items-center flex-1">
+          <span className="text-[1.1rem] md:text-xl font-bold font-[family-name:var(--font-heading)] text-amber-500 leading-none">{data.qaDev}</span>
+          <span className="text-[8px] font-bold text-amber-500 uppercase tracking-wider mt-1 text-center whitespace-nowrap">QA Dev</span>
+        </div>
       </div>
-      <div className="w-px h-6 bg-gray-200 rounded-full shrink-0"></div>
-      <div className="flex flex-col items-center flex-1">
-        <span className="text-xl font-bold font-[family-name:var(--font-heading)] text-blue-600 leading-none">{data.enCurso}</span>
-        <span className="text-[8px] font-bold text-blue-400 uppercase tracking-wider mt-1 text-center whitespace-nowrap">En curso</span>
-      </div>
-      <div className="w-px h-6 bg-gray-200 rounded-full shrink-0"></div>
-      <div className="flex flex-col items-center flex-1">
-        <span className="text-xl font-bold font-[family-name:var(--font-heading)] text-amber-500 leading-none">{data.qaDev}</span>
-        <span className="text-[8px] font-bold text-amber-500 uppercase tracking-wider mt-1 text-center whitespace-nowrap">QA Dev</span>
-      </div>
-      <div className="w-px h-6 bg-gray-200 rounded-full shrink-0"></div>
-      <div className="flex flex-col items-center flex-1">
-        <span className="text-xl font-bold font-[family-name:var(--font-heading)] text-purple-600 leading-none">{data.qaCert}</span>
-        <span className="text-[8px] font-bold text-purple-500 uppercase tracking-wider mt-1 text-center whitespace-nowrap">Calidad</span>
-      </div>
-      <div className="w-px h-6 bg-gray-200 rounded-full shrink-0"></div>
-      <div className="flex flex-col items-center flex-1">
-        <span className="text-xl font-bold font-[family-name:var(--font-heading)] text-emerald-600 leading-none">{data.finalizada}</span>
-        <span className="text-[8px] font-bold text-emerald-500 uppercase tracking-wider mt-1 text-center whitespace-nowrap">Finalizada</span>
+      
+      <div className="w-full h-px bg-gray-100 rounded-full my-0.5"></div>
+
+      {/* Fila inferior: 2 items */}
+      <div className="flex items-center justify-center gap-1 w-full px-6">
+        <div className="flex flex-col items-center flex-1">
+          <span className="text-[1.1rem] md:text-xl font-bold font-[family-name:var(--font-heading)] text-purple-600 leading-none">{data.qaCert}</span>
+          <span className="text-[8px] font-bold text-purple-500 uppercase tracking-wider mt-1 text-center whitespace-nowrap">Calidad</span>
+        </div>
+        <div className="w-px h-5 bg-gray-200 rounded-full shrink-0 mx-2"></div>
+        <div className="flex flex-col items-center flex-1">
+          <span className="text-[1.1rem] md:text-xl font-bold font-[family-name:var(--font-heading)] text-emerald-600 leading-none">{data.finalizada}</span>
+          <span className="text-[8px] font-bold text-emerald-500 uppercase tracking-wider mt-1 text-center whitespace-nowrap">Finalizada</span>
+        </div>
       </div>
     </div>
   );
