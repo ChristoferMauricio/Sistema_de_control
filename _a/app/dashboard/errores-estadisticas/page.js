@@ -39,8 +39,12 @@ const ERROR_TYPES = ["Bug", "Error", "Error Desarrollo", "Error Certificación",
 const EPIC_DESARROLLO = "PF3QA-50";
 const EPIC_CERTIFICACION = "PF3QA-49";
 
-/** Patrón regex para excluir tickets de prueba/revisión de los conteos principales */
-const EXCLUDE_PATTERN = /prueba|revisión|revision/i;
+/**
+ * Patrón regex para excluir tickets de prueba/revisión de los conteos principales.
+ * Coincide si el resumen EMPIEZA con "prueba", "revisión" o "revision",
+ * o contiene "pruebas unitarias". NO coincide con "caso de prueba" u otros usos internos.
+ */
+const EXCLUDE_PATTERN = /^(?:prueba|revisión|revision)|pruebas\s+unitarias/i;
 
 /** URL base de Jira para construir links directos a tickets */
 const JIRA_BASE = "https://supervisorservicio2020.atlassian.net/browse";
@@ -275,7 +279,7 @@ function StatsTable({ title, subtitle, data, onBarClick, onStatusClick, showExcl
                   <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                   </svg>
-                  <span className="text-xs font-semibold">Historias</span>
+                  <span className="text-xs font-semibold">Mejoras</span>
                 </div>
               </th>
               <th className="text-center px-2 py-2 border-l-2 border-sky-300 dark:border-sky-600 border-t-2 border-r-2 font-semibold text-sky-700 dark:text-sky-400 bg-sky-50/50 dark:bg-sky-900/20" style={{ minWidth: "50px" }}>
@@ -727,7 +731,7 @@ export default function ErroresEstadisticasPage() {
       if (type === "Excluido") return EXCLUDE_PATTERN.test(t.summary || "");
       return t.issue_type === "Historia" && !EXCLUDE_PATTERN.test(t.summary || "");
     });
-    const titles = { Error: "Errores", Historia: "Historias", Excluido: "Excluidos (Prueba/Revisión)" };
+    const titles = { Error: "Errores", Historia: "Mejoras", Excluido: "Excluidos (Prueba/Revisión)" };
     setModal({
       title: titles[type] || type,
       personName,
@@ -749,7 +753,7 @@ export default function ErroresEstadisticasPage() {
       return t.issue_type === "Historia" && !EXCLUDE_PATTERN.test(t.summary || "");
     });
     setModal({
-      title: `${type === "Error" ? "Errores" : "Historias"} — ${statusDef?.label || statusKey}`,
+      title: `${type === "Error" ? "Errores" : "Mejoras"} — ${statusDef?.label || statusKey}`,
       personName,
       items,
     });
@@ -845,7 +849,7 @@ export default function ErroresEstadisticasPage() {
           >
             <span className="w-2 h-2 rounded-full bg-sky-400" />
             <span className="text-xs text-gray-600 dark:text-gray-300">
-              <span className="font-semibold text-gray-900 dark:text-gray-100">{totalHistorias}</span> Historias
+              <span className="font-semibold text-gray-900 dark:text-gray-100">{totalHistorias}</span> Mejoras
             </span>
           </button>
           <button
