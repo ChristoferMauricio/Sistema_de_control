@@ -10,6 +10,9 @@
 import { supabase } from "@/lib/supabase";
 import { sortSprints } from "@/lib/utils";
 
+/** Patrón para identificar tickets de prueba/revisión (excluidos) */
+const EXCLUDE_PATTERN = /^(?:prueba|revisión|revision)|pruebas\s+unitarias/i;
+
 /**
  * Obtiene todos los tickets PF3QA (Historias + Errores), los clasifica
  * en certificación, desarrollo o sin clasificar, y retorna agrupados.
@@ -72,11 +75,18 @@ export async function fetchAndClassify() {
   const certificacion = [];
   const desarrollo = [];
   const revision = [];
+  const excluidos = [];
 
   ticketsPF3QA.forEach((ticket) => {
     const targets = linksMap[ticket.jira_key] || [];
     const linkedSprints = [...new Set(targets.map((tk) => linkedSprintMap[tk]).filter(Boolean))];
     const enriched = { ...ticket, storySprint: linkedSprints.join(", ") || "—" };
+
+    // Tickets excluidos (prueba/revisión) van a su propia categoría
+    if (EXCLUDE_PATTERN.test(ticket.summary || "")) {
+      excluidos.push(enriched);
+      return;
+    }
 
     // Clasificación por épica (prioridad)
     if (ticket.parent_key === "PF3QA-50") { desarrollo.push(enriched); return; }
@@ -102,5 +112,5 @@ export async function fetchAndClassify() {
     revision.push(enriched);
   });
 
-  return { certificacion, desarrollo, revision, sprints, defaultSprint };
+  return { certificacion, desarrollo, revision, excluidos, sprints, defaultSprint };
 }
