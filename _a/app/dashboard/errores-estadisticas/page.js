@@ -35,11 +35,9 @@ import { exportUnifiedExcel } from "@/lib/exportExcel";
 /** Tipos de issue que se consideran "errores" en Jira */
 const ERROR_TYPES = ["Bug", "Error", "Error Desarrollo", "Error Certificación", "Error en Certificación"];
 
-/** Tipos de errores de Desarrollo */
-const ERROR_DESARROLLO = ["Bug", "Error", "Error Desarrollo"];
-
-/** Tipos de errores de Certificación */
-const ERROR_CERTIFICACION = ["Error Certificación", "Error en Certificación"];
+/** Épicas que clasifican los tickets PF3QA en Desarrollo o Certificación */
+const EPIC_DESARROLLO = "PF3QA-50";
+const EPIC_CERTIFICACION = "PF3QA-49";
 
 /** Patrón regex para excluir tickets de prueba/revisión de los conteos principales */
 const EXCLUDE_PATTERN = /prueba|revisión|revision/i;
@@ -438,6 +436,7 @@ export default function ErroresEstadisticasPage() {
   const [equipo, setEquipo] = useState([]);            // Datos del equipo de desarrollo
   const [persons, setPersons] = useState([]);          // Datos de personas de Jira
   const [loading, setLoading] = useState(true);
+  const [linkedSprintMap, setLinkedSprintMap] = useState({}); // jira_key → sprint (para clasificar por actividad vinculada)
 
   /* ─── Estados de filtros ─── */
   const [selectedSprint, setSelectedSprint] = useState(null); // null = aún no inicializado
@@ -458,7 +457,7 @@ export default function ErroresEstadisticasPage() {
       const [ticketsRes, linksRes, equipoRes, personsRes] = await Promise.all([
         supabase
           .from("jira_tickets")
-          .select("jira_key, summary, issue_type, status, sprint, assignee_email, reporter_email")
+          .select("jira_key, summary, issue_type, status, sprint, assignee_email, reporter_email, parent_key")
           .like("jira_key", "PF3QA-%"),
         supabase
           .from("jira_ticket_links")
@@ -485,6 +484,18 @@ export default function ErroresEstadisticasPage() {
           .select("jira_key, summary")
           .in("jira_key", externalKeys);
         setLinkedTickets(extTickets || []);
+      }
+
+      // Obtener sprints de tickets vinculados (para clasificar Desarrollo/Certificación por fallback)
+      const allTargetKeys = [...new Set(lnk.map((l) => l.target_key).filter((k) => !pf3qaKeys.has(k)))];
+      if (allTargetKeys.length > 0) {
+        const { data: linkedSprintData } = await supabase
+          .from("jira_tickets")
+          .select("jira_key, sprint")
+          .in("jira_key", allTargetKeys);
+        const sprintMap = {};
+        (linkedSprintData || []).forEach((t) => { sprintMap[t.jira_key] = t.sprint || ""; });
+        setLinkedSprintMap(sprintMap);
       }
 
       setLoading(false);
@@ -582,6 +593,30 @@ export default function ErroresEstadisticasPage() {
    * Tickets válidos: filtrados por sprint seleccionado y tipos activos (Historia/Error/Excluido).
    * Se recalcula cuando cambian los filtros o el sprint.
    */
+  /**
+   * Clasifica un ticket PF3QA en "Desarrollo" o "Certificación" según su épica padre,
+   * con fallback por sprint de la actividad vinculada.
+   * @returns {"Desarrollo"|"Certificación"|null}
+   */
+  const classifyDevCert = useCallback((t) => {
+    // 1. Por épica padre (prioridad)
+    if (t.parent_key === EPIC_DESARROLLO) return "Desarrollo";
+    if (t.parent_key === EPIC_CERTIFICACION) return "Certificación";
+    // 2. Fallback: por sprint de actividad vinculada
+    const targets = (linksMap[t.jira_key] || []).map((l) => l.target_key);
+    const hasDev = targets.some((tk) => {
+      const s = linkedSprintMap[tk] || "";
+      return s.includes("F3.03") || s.includes("F3.4") || s.includes("F3.5");
+    });
+    if (hasDev) return "Desarrollo";
+    const hasCert = targets.some((tk) => {
+      const s = linkedSprintMap[tk] || "";
+      return s.includes("F3.01") || s.includes("F3.02");
+    });
+    if (hasCert) return "Certificación";
+    return null; // Sin clasificar
+  }, [linksMap, linkedSprintMap]);
+
   const validTickets = useMemo(() => {
     return tickets.filter((t) => {
       if (selectedSprint && t.sprint !== selectedSprint) return false;
@@ -590,18 +625,19 @@ export default function ErroresEstadisticasPage() {
       const isError = !isExcluded && ERROR_TYPES.includes(t.issue_type);
 
       if (isExcluded && activeFilters.has("Excluido")) return true;
-      if (isHistoria && activeFilters.has("Historia")) return true;
-      if (isError && activeFilters.has("Error")) {
-        // Aplicar filtro de categoría de error (Desarrollo / Certificación)
-        const isDev = ERROR_DESARROLLO.includes(t.issue_type);
-        const isCert = ERROR_CERTIFICACION.includes(t.issue_type);
-        if (isDev && errorCategory.has("Desarrollo")) return true;
-        if (isCert && errorCategory.has("Certificación")) return true;
+
+      // Aplicar filtro de categoría por épica (Desarrollo / Certificación) a historias y errores
+      if ((isHistoria && activeFilters.has("Historia")) || (isError && activeFilters.has("Error"))) {
+        const cat = classifyDevCert(t);
+        if (cat === "Desarrollo" && errorCategory.has("Desarrollo")) return true;
+        if (cat === "Certificación" && errorCategory.has("Certificación")) return true;
+        // Tickets sin clasificar: se muestran si ambas categorías están activas
+        if (cat === null && errorCategory.size === 2) return true;
         return false;
       }
       return false;
     });
-  }, [tickets, selectedSprint, activeFilters, errorCategory]);
+  }, [tickets, selectedSprint, activeFilters, errorCategory, classifyDevCert]);
 
   /** Crea un mapa de contadores de estado inicializado en 0 para cada categoría */
   const emptyStatusMap = () => {
@@ -668,8 +704,10 @@ export default function ErroresEstadisticasPage() {
   /* ─── Totales globales (se muestran siempre, independientemente del filtro de tipo activo) ─── */
   const totalHistorias = useMemo(() => sprintTickets.filter((t) => !EXCLUDE_PATTERN.test(t.summary || "") && t.issue_type === "Historia").length, [sprintTickets]);
   const totalErrores = useMemo(() => sprintTickets.filter((t) => !EXCLUDE_PATTERN.test(t.summary || "") && ERROR_TYPES.includes(t.issue_type)).length, [sprintTickets]);
-  const totalErroresDev = useMemo(() => sprintTickets.filter((t) => !EXCLUDE_PATTERN.test(t.summary || "") && ERROR_DESARROLLO.includes(t.issue_type)).length, [sprintTickets]);
-  const totalErroresCert = useMemo(() => sprintTickets.filter((t) => !EXCLUDE_PATTERN.test(t.summary || "") && ERROR_CERTIFICACION.includes(t.issue_type)).length, [sprintTickets]);
+  // Totales por épica (Desarrollo / Certificación) — incluyen tanto historias como errores
+  const nonExcludedTickets = useMemo(() => sprintTickets.filter((t) => !EXCLUDE_PATTERN.test(t.summary || "") && (t.issue_type === "Historia" || ERROR_TYPES.includes(t.issue_type))), [sprintTickets]);
+  const totalDev = useMemo(() => nonExcludedTickets.filter((t) => classifyDevCert(t) === "Desarrollo").length, [nonExcludedTickets, classifyDevCert]);
+  const totalCert = useMemo(() => nonExcludedTickets.filter((t) => classifyDevCert(t) === "Certificación").length, [nonExcludedTickets, classifyDevCert]);
   const totalExcluidos = useMemo(() => sprintTickets.filter((t) => EXCLUDE_PATTERN.test(t.summary || "")).length, [sprintTickets]);
 
   /**
@@ -822,8 +860,8 @@ export default function ErroresEstadisticasPage() {
             <span className="font-semibold text-gray-900 dark:text-gray-100">{totalErrores}</span> error{totalErrores !== 1 ? "es" : ""}
           </span>
         </button>
-        {/* Sub-filtros de categoría de error: Desarrollo / Certificación */}
-        {activeFilters.has("Error") && (
+        {/* Sub-filtros por épica: Desarrollo / Certificación */}
+        {(activeFilters.has("Error") || activeFilters.has("Historia")) && (
           <>
             <button
               onClick={() => {
@@ -839,7 +877,7 @@ export default function ErroresEstadisticasPage() {
             >
               <span className="w-2 h-2 rounded-full bg-orange-500" />
               <span className="text-xs text-gray-600 dark:text-gray-300">
-                <span className="font-semibold text-gray-900 dark:text-gray-100">{totalErroresDev}</span> Desarrollo
+                <span className="font-semibold text-gray-900 dark:text-gray-100">{totalDev}</span> Desarrollo
               </span>
             </button>
             <button
@@ -856,7 +894,7 @@ export default function ErroresEstadisticasPage() {
             >
               <span className="w-2 h-2 rounded-full bg-violet-500" />
               <span className="text-xs text-gray-600 dark:text-gray-300">
-                <span className="font-semibold text-gray-900 dark:text-gray-100">{totalErroresCert}</span> Certificación
+                <span className="font-semibold text-gray-900 dark:text-gray-100">{totalCert}</span> Certificación
               </span>
             </button>
           </>
