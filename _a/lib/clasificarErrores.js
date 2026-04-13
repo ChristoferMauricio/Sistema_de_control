@@ -11,7 +11,7 @@ import { supabase } from "@/lib/supabase";
 import { sortSprints } from "@/lib/utils";
 
 /** Patrón para identificar tickets de prueba/revisión (excluidos) */
-const EXCLUDE_PATTERN = /^(?:prueba|revisión|revision)|pruebas\s+unitarias/i;
+const EXCLUDE_PATTERN = /revisión cruzada|revision cruzada|pruebas unitarias/i;
 
 /**
  * Obtiene todos los tickets PF3QA (Historias + Errores), los clasifica

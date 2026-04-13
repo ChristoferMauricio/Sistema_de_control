@@ -41,10 +41,9 @@ const EPIC_CERTIFICACION = "PF3QA-49";
 
 /**
  * Patrón regex para excluir tickets de prueba/revisión de los conteos principales.
- * Coincide si el resumen EMPIEZA con "prueba", "revisión" o "revision",
- * o contiene "pruebas unitarias". NO coincide con "caso de prueba" u otros usos internos.
+ * Coincide estrictamente si el resumen contiene "Revisión Cruzada" o "Pruebas Unitarias".
  */
-const EXCLUDE_PATTERN = /^(?:prueba|revisión|revision)|pruebas\s+unitarias/i;
+const EXCLUDE_PATTERN = /revisión cruzada|revision cruzada|pruebas unitarias/i;
 
 /** URL base de Jira para construir links directos a tickets */
 const JIRA_BASE = "https://supervisorservicio2020.atlassian.net/browse";
