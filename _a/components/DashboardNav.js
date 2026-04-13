@@ -16,6 +16,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter, usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { getInitials } from "@/lib/utils";
 import { useTheme } from "@/app/dashboard/ThemeContext";
