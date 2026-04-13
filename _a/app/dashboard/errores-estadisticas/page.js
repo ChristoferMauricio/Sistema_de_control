@@ -441,7 +441,7 @@ export default function ErroresEstadisticasPage() {
   /* ─── Estados de filtros ─── */
   const [selectedSprint, setSelectedSprint] = useState(null); // null = aún no inicializado
   const [activeFilters, setActiveFilters] = useState(new Set(["Historia", "Error"])); // Filtros activos por defecto
-  const [errorCategory, setErrorCategory] = useState(new Set(["Desarrollo", "Certificación"])); // Categorías de error activas
+  const [errorCategory, setErrorCategory] = useState(new Set(["Desarrollo", "Certificación", "Otros"])); // Categorías por épica activas
 
   /* ─── Estado del modal de detalle ─── */
   const [modal, setModal] = useState(null); // { title, personName, items }
@@ -631,12 +631,11 @@ export default function ErroresEstadisticasPage() {
         (isError && activeFilters.has("Error"));
       if (!passesType) return false;
 
-      // Aplicar filtro de categoría por épica (Desarrollo / Certificación) a TODOS los tipos
+      // Aplicar filtro de categoría por épica (Desarrollo / Certificación / Otros)
       const cat = classifyDevCert(t);
       if (cat === "Desarrollo" && errorCategory.has("Desarrollo")) return true;
       if (cat === "Certificación" && errorCategory.has("Certificación")) return true;
-      // Tickets sin clasificar: se muestran si ambas categorías están activas
-      if (cat === null && errorCategory.size === 2) return true;
+      if (cat === null && errorCategory.has("Otros")) return true;
       return false;
     });
   }, [tickets, selectedSprint, activeFilters, errorCategory, classifyDevCert]);
@@ -706,10 +705,12 @@ export default function ErroresEstadisticasPage() {
   /* ─── Totales globales (se muestran siempre, independientemente del filtro de tipo activo) ─── */
   const totalHistorias = useMemo(() => sprintTickets.filter((t) => !EXCLUDE_PATTERN.test(t.summary || "") && t.issue_type === "Historia").length, [sprintTickets]);
   const totalErrores = useMemo(() => sprintTickets.filter((t) => !EXCLUDE_PATTERN.test(t.summary || "") && ERROR_TYPES.includes(t.issue_type)).length, [sprintTickets]);
-  // Totales por épica (Desarrollo / Certificación) — incluyen TODOS los tickets (historias + errores + excluidos)
+  const totalExcluidos = useMemo(() => sprintTickets.filter((t) => EXCLUDE_PATTERN.test(t.summary || "")).length, [sprintTickets]);
+  // Totales por épica (Desarrollo / Certificación / Otros) — incluyen TODOS los tickets
   const totalDev = useMemo(() => sprintTickets.filter((t) => classifyDevCert(t) === "Desarrollo").length, [sprintTickets, classifyDevCert]);
   const totalCert = useMemo(() => sprintTickets.filter((t) => classifyDevCert(t) === "Certificación").length, [sprintTickets, classifyDevCert]);
-  const totalExcluidos = useMemo(() => sprintTickets.filter((t) => EXCLUDE_PATTERN.test(t.summary || "")).length, [sprintTickets]);
+  const totalOtros = useMemo(() => sprintTickets.filter((t) => classifyDevCert(t) === null).length, [sprintTickets, classifyDevCert]);
+  const totalGeneral = sprintTickets.length;
 
   /**
    * Manejador de click en barras del gráfico. Abre el modal con tickets filtrados
@@ -825,98 +826,121 @@ export default function ErroresEstadisticasPage() {
         </button>
       </div>
 
-      {/* Stats banner - clickeable toggle filters */}
-      <div className="flex flex-wrap gap-3 animate-fade-in">
-        <button
-          onClick={() => {
-            const next = new Set(activeFilters);
-            next.has("Historia") ? next.delete("Historia") : next.add("Historia");
-            setActiveFilters(next);
-          }}
-          className={`rounded-xl border px-5 py-3 inline-flex items-center gap-3 shadow-sm transition-all duration-200 cursor-pointer ${
-            activeFilters.has("Historia")
-              ? "bg-sky-50 border-sky-400 ring-2 ring-sky-200 dark:bg-sky-900/30 dark:border-sky-600 dark:ring-sky-800"
-              : "bg-white border-gray-200 hover:border-sky-300 hover:bg-sky-50/50 opacity-60 dark:bg-gray-800 dark:border-gray-600 dark:hover:border-sky-600 dark:hover:bg-sky-900/20"
-          }`}
-        >
-          <span className="w-2.5 h-2.5 rounded-full bg-sky-400" />
-          <span className="text-sm text-gray-600 dark:text-gray-300">
-            <span className="font-semibold text-gray-900 dark:text-gray-100">{totalHistorias}</span> historia{totalHistorias !== 1 ? "s" : ""}
-          </span>
-        </button>
-        <button
-          onClick={() => {
-            const next = new Set(activeFilters);
-            next.has("Error") ? next.delete("Error") : next.add("Error");
-            setActiveFilters(next);
-          }}
-          className={`rounded-xl border px-5 py-3 inline-flex items-center gap-3 shadow-sm transition-all duration-200 cursor-pointer ${
-            activeFilters.has("Error")
-              ? "bg-red-50 border-red-400 ring-2 ring-red-200 dark:bg-red-900/30 dark:border-red-600 dark:ring-red-800"
-              : "bg-white border-gray-200 hover:border-red-300 hover:bg-red-50/50 opacity-60 dark:bg-gray-800 dark:border-gray-600 dark:hover:border-red-600 dark:hover:bg-red-900/20"
-          }`}
-        >
-          <span className="w-2.5 h-2.5 rounded-full bg-red-400/80" />
-          <span className="text-sm text-gray-600 dark:text-gray-300">
-            <span className="font-semibold text-gray-900 dark:text-gray-100">{totalErrores}</span> error{totalErrores !== 1 ? "es" : ""}
-          </span>
-        </button>
-        {/* Sub-filtros por épica: Desarrollo / Certificación */}
-        {(activeFilters.has("Error") || activeFilters.has("Historia")) && (
-          <>
-            <button
-              onClick={() => {
-                const next = new Set(errorCategory);
-                next.has("Desarrollo") ? next.delete("Desarrollo") : next.add("Desarrollo");
-                setErrorCategory(next);
-              }}
-              className={`rounded-xl border px-4 py-3 inline-flex items-center gap-2.5 shadow-sm transition-all duration-200 cursor-pointer ${
-                errorCategory.has("Desarrollo")
-                  ? "bg-orange-50 border-orange-400 ring-2 ring-orange-200 dark:bg-orange-900/30 dark:border-orange-600 dark:ring-orange-800"
-                  : "bg-white border-gray-200 hover:border-orange-300 hover:bg-orange-50/50 opacity-60 dark:bg-gray-800 dark:border-gray-600 dark:hover:border-orange-600 dark:hover:bg-orange-900/20"
-              }`}
-            >
-              <span className="w-2 h-2 rounded-full bg-orange-500" />
-              <span className="text-xs text-gray-600 dark:text-gray-300">
-                <span className="font-semibold text-gray-900 dark:text-gray-100">{totalDev}</span> Desarrollo
-              </span>
-            </button>
-            <button
-              onClick={() => {
-                const next = new Set(errorCategory);
-                next.has("Certificación") ? next.delete("Certificación") : next.add("Certificación");
-                setErrorCategory(next);
-              }}
-              className={`rounded-xl border px-4 py-3 inline-flex items-center gap-2.5 shadow-sm transition-all duration-200 cursor-pointer ${
-                errorCategory.has("Certificación")
-                  ? "bg-violet-50 border-violet-400 ring-2 ring-violet-200 dark:bg-violet-900/30 dark:border-violet-600 dark:ring-violet-800"
-                  : "bg-white border-gray-200 hover:border-violet-300 hover:bg-violet-50/50 opacity-60 dark:bg-gray-800 dark:border-gray-600 dark:hover:border-violet-600 dark:hover:bg-violet-900/20"
-              }`}
-            >
-              <span className="w-2 h-2 rounded-full bg-violet-500" />
-              <span className="text-xs text-gray-600 dark:text-gray-300">
-                <span className="font-semibold text-gray-900 dark:text-gray-100">{totalCert}</span> Certificación
-              </span>
-            </button>
-          </>
-        )}
-        <button
-          onClick={() => {
-            const next = new Set(activeFilters);
-            next.has("Excluido") ? next.delete("Excluido") : next.add("Excluido");
-            setActiveFilters(next);
-          }}
-          className={`rounded-xl border px-5 py-3 inline-flex items-center gap-3 shadow-sm transition-all duration-200 cursor-pointer ${
-            activeFilters.has("Excluido")
-              ? "bg-amber-50 border-amber-400 ring-2 ring-amber-200 dark:bg-amber-900/30 dark:border-amber-600 dark:ring-amber-800"
-              : "bg-white border-gray-200 hover:border-amber-300 hover:bg-amber-50/50 opacity-60 dark:bg-gray-800 dark:border-gray-600 dark:hover:border-amber-600 dark:hover:bg-amber-900/20"
-          }`}
-        >
-          <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
-          <span className="text-sm text-gray-600 dark:text-gray-300">
-            <span className="font-semibold text-gray-900 dark:text-gray-100">{totalExcluidos}</span> excluido{totalExcluidos !== 1 ? "s" : ""} (Prueba/Revisión)
-          </span>
-        </button>
+      {/* Stats banner - dos grupos de filtros */}
+      <div className="flex flex-wrap items-stretch gap-4 animate-fade-in">
+        {/* ── GRUPO IZQUIERDO: Por tipo (Historias + Errores + Excluidos) ── */}
+        <div className="flex flex-wrap items-center gap-2 pr-4 border-r-2 border-gray-200 dark:border-gray-600">
+          <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mr-1">Tipo</span>
+          <button
+            onClick={() => {
+              const next = new Set(activeFilters);
+              next.has("Historia") ? next.delete("Historia") : next.add("Historia");
+              setActiveFilters(next);
+            }}
+            className={`rounded-xl border px-4 py-2.5 inline-flex items-center gap-2.5 shadow-sm transition-all duration-200 cursor-pointer ${
+              activeFilters.has("Historia")
+                ? "bg-sky-50 border-sky-400 ring-2 ring-sky-200 dark:bg-sky-900/30 dark:border-sky-600 dark:ring-sky-800"
+                : "bg-white border-gray-200 hover:border-sky-300 hover:bg-sky-50/50 opacity-60 dark:bg-gray-800 dark:border-gray-600 dark:hover:border-sky-600 dark:hover:bg-sky-900/20"
+            }`}
+          >
+            <span className="w-2 h-2 rounded-full bg-sky-400" />
+            <span className="text-xs text-gray-600 dark:text-gray-300">
+              <span className="font-semibold text-gray-900 dark:text-gray-100">{totalHistorias}</span> Historias
+            </span>
+          </button>
+          <button
+            onClick={() => {
+              const next = new Set(activeFilters);
+              next.has("Error") ? next.delete("Error") : next.add("Error");
+              setActiveFilters(next);
+            }}
+            className={`rounded-xl border px-4 py-2.5 inline-flex items-center gap-2.5 shadow-sm transition-all duration-200 cursor-pointer ${
+              activeFilters.has("Error")
+                ? "bg-red-50 border-red-400 ring-2 ring-red-200 dark:bg-red-900/30 dark:border-red-600 dark:ring-red-800"
+                : "bg-white border-gray-200 hover:border-red-300 hover:bg-red-50/50 opacity-60 dark:bg-gray-800 dark:border-gray-600 dark:hover:border-red-600 dark:hover:bg-red-900/20"
+            }`}
+          >
+            <span className="w-2 h-2 rounded-full bg-red-400/80" />
+            <span className="text-xs text-gray-600 dark:text-gray-300">
+              <span className="font-semibold text-gray-900 dark:text-gray-100">{totalErrores}</span> Errores
+            </span>
+          </button>
+          <button
+            onClick={() => {
+              const next = new Set(activeFilters);
+              next.has("Excluido") ? next.delete("Excluido") : next.add("Excluido");
+              setActiveFilters(next);
+            }}
+            className={`rounded-xl border px-4 py-2.5 inline-flex items-center gap-2.5 shadow-sm transition-all duration-200 cursor-pointer ${
+              activeFilters.has("Excluido")
+                ? "bg-amber-50 border-amber-400 ring-2 ring-amber-200 dark:bg-amber-900/30 dark:border-amber-600 dark:ring-amber-800"
+                : "bg-white border-gray-200 hover:border-amber-300 hover:bg-amber-50/50 opacity-60 dark:bg-gray-800 dark:border-gray-600 dark:hover:border-amber-600 dark:hover:bg-amber-900/20"
+            }`}
+          >
+            <span className="w-2 h-2 rounded-full bg-amber-400" />
+            <span className="text-xs text-gray-600 dark:text-gray-300">
+              <span className="font-semibold text-gray-900 dark:text-gray-100">{totalExcluidos}</span> Excluidos
+            </span>
+          </button>
+          <span className="text-xs font-bold text-gray-400 dark:text-gray-500 ml-1">= {totalGeneral}</span>
+        </div>
+
+        {/* ── GRUPO DERECHO: Por épica (Desarrollo + Certificación + Otros) ── */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mr-1">Épica</span>
+          <button
+            onClick={() => {
+              const next = new Set(errorCategory);
+              next.has("Desarrollo") ? next.delete("Desarrollo") : next.add("Desarrollo");
+              setErrorCategory(next);
+            }}
+            className={`rounded-xl border px-4 py-2.5 inline-flex items-center gap-2.5 shadow-sm transition-all duration-200 cursor-pointer ${
+              errorCategory.has("Desarrollo")
+                ? "bg-orange-50 border-orange-400 ring-2 ring-orange-200 dark:bg-orange-900/30 dark:border-orange-600 dark:ring-orange-800"
+                : "bg-white border-gray-200 hover:border-orange-300 hover:bg-orange-50/50 opacity-60 dark:bg-gray-800 dark:border-gray-600 dark:hover:border-orange-600 dark:hover:bg-orange-900/20"
+            }`}
+          >
+            <span className="w-2 h-2 rounded-full bg-orange-500" />
+            <span className="text-xs text-gray-600 dark:text-gray-300">
+              <span className="font-semibold text-gray-900 dark:text-gray-100">{totalDev}</span> Desarrollo
+            </span>
+          </button>
+          <button
+            onClick={() => {
+              const next = new Set(errorCategory);
+              next.has("Certificación") ? next.delete("Certificación") : next.add("Certificación");
+              setErrorCategory(next);
+            }}
+            className={`rounded-xl border px-4 py-2.5 inline-flex items-center gap-2.5 shadow-sm transition-all duration-200 cursor-pointer ${
+              errorCategory.has("Certificación")
+                ? "bg-violet-50 border-violet-400 ring-2 ring-violet-200 dark:bg-violet-900/30 dark:border-violet-600 dark:ring-violet-800"
+                : "bg-white border-gray-200 hover:border-violet-300 hover:bg-violet-50/50 opacity-60 dark:bg-gray-800 dark:border-gray-600 dark:hover:border-violet-600 dark:hover:bg-violet-900/20"
+            }`}
+          >
+            <span className="w-2 h-2 rounded-full bg-violet-500" />
+            <span className="text-xs text-gray-600 dark:text-gray-300">
+              <span className="font-semibold text-gray-900 dark:text-gray-100">{totalCert}</span> Certificación
+            </span>
+          </button>
+          <button
+            onClick={() => {
+              const next = new Set(errorCategory);
+              next.has("Otros") ? next.delete("Otros") : next.add("Otros");
+              setErrorCategory(next);
+            }}
+            className={`rounded-xl border px-4 py-2.5 inline-flex items-center gap-2.5 shadow-sm transition-all duration-200 cursor-pointer ${
+              errorCategory.has("Otros")
+                ? "bg-gray-100 border-gray-400 ring-2 ring-gray-200 dark:bg-gray-700/50 dark:border-gray-500 dark:ring-gray-600"
+                : "bg-white border-gray-200 hover:border-gray-400 hover:bg-gray-50/50 opacity-60 dark:bg-gray-800 dark:border-gray-600 dark:hover:border-gray-500 dark:hover:bg-gray-700/30"
+            }`}
+          >
+            <span className="w-2 h-2 rounded-full bg-gray-400" />
+            <span className="text-xs text-gray-600 dark:text-gray-300">
+              <span className="font-semibold text-gray-900 dark:text-gray-100">{totalOtros}</span> Otros
+            </span>
+          </button>
+          <span className="text-xs font-bold text-gray-400 dark:text-gray-500 ml-1">= {totalGeneral}</span>
+        </div>
       </div>
 
       {/* Tabla 1: Reporters */}
