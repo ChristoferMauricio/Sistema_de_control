@@ -602,6 +602,9 @@ export default function ErroresEstadisticasPage() {
    * @returns {"Desarrollo"|"Certificación"|null}
    */
   const classifyDevCert = useCallback((t) => {
+    // 0. Si el ticket está en la lista de excluidos, no es ni Desarrollo ni Certificación
+    if (EXCLUDE_PATTERN.test(t.summary || "")) return null;
+
     // 1. Por épica padre (prioridad)
     if (t.parent_key === EPIC_DESARROLLO) return "Desarrollo";
     if (t.parent_key === EPIC_CERTIFICACION) return "Certificación";
