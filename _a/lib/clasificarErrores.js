@@ -82,18 +82,21 @@ export async function fetchAndClassify() {
     if (ticket.parent_key === "PF3QA-50") { desarrollo.push(enriched); return; }
     if (ticket.parent_key === "PF3QA-49") { certificacion.push(enriched); return; }
 
-    // Clasificación por sprint de actividad vinculada
-    const hasDes = targets.some((tk) => {
-      const s = linkedSprintMap[tk] || "";
-      return s.includes("F3.03") || s.includes("F3.4") || s.includes("F3.5");
-    });
-    const hasCert = targets.some((tk) => {
-      const s = linkedSprintMap[tk] || "";
-      return s.includes("F3.01") || s.includes("F3.02");
-    });
-
-    if (hasDes) { desarrollo.push(enriched); return; }
-    if (hasCert) { certificacion.push(enriched); return; }
+    // Clasificación por sprint de actividad vinculada (Iteración F3.XX)
+    // Certificación = sprints 01, 02 | Desarrollo = sprints 03 en adelante
+    let classified = false;
+    for (const tk of targets) {
+      const sprint = linkedSprintMap[tk] || "";
+      const match = sprint.match(/F3\.(\d+)/);
+      if (match) {
+        const num = parseInt(match[1]);
+        if (num <= 2) { certificacion.push(enriched); }
+        else { desarrollo.push(enriched); }
+        classified = true;
+        break;
+      }
+    }
+    if (classified) return;
 
     // Sin clasificar → Revisión QA
     revision.push(enriched);

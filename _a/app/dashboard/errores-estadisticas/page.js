@@ -606,18 +606,17 @@ export default function ErroresEstadisticasPage() {
     // 1. Por épica padre (prioridad)
     if (t.parent_key === EPIC_DESARROLLO) return "Desarrollo";
     if (t.parent_key === EPIC_CERTIFICACION) return "Certificación";
-    // 2. Fallback: por sprint de actividad vinculada
+    // 2. Fallback: por sprint de actividad vinculada (Iteración F3.XX)
+    //    Certificación = sprints 01, 02 | Desarrollo = sprints 03 en adelante
     const targets = (linksMap[t.jira_key] || []).map((l) => l.target_key);
-    const hasDev = targets.some((tk) => {
-      const s = linkedSprintMap[tk] || "";
-      return s.includes("F3.03") || s.includes("F3.4") || s.includes("F3.5");
-    });
-    if (hasDev) return "Desarrollo";
-    const hasCert = targets.some((tk) => {
-      const s = linkedSprintMap[tk] || "";
-      return s.includes("F3.01") || s.includes("F3.02");
-    });
-    if (hasCert) return "Certificación";
+    for (const tk of targets) {
+      const sprint = linkedSprintMap[tk] || "";
+      const match = sprint.match(/F3\.(\d+)/);
+      if (match) {
+        const num = parseInt(match[1]);
+        return num <= 2 ? "Certificación" : "Desarrollo";
+      }
+    }
     return null; // Sin clasificar
   }, [linksMap, linkedSprintMap]);
 
