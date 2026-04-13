@@ -624,17 +624,19 @@ export default function ErroresEstadisticasPage() {
       const isHistoria = !isExcluded && t.issue_type === "Historia";
       const isError = !isExcluded && ERROR_TYPES.includes(t.issue_type);
 
-      if (isExcluded && activeFilters.has("Excluido")) return true;
+      // Verificar filtro de tipo (Historia/Error/Excluido)
+      const passesType =
+        (isExcluded && activeFilters.has("Excluido")) ||
+        (isHistoria && activeFilters.has("Historia")) ||
+        (isError && activeFilters.has("Error"));
+      if (!passesType) return false;
 
-      // Aplicar filtro de categoría por épica (Desarrollo / Certificación) a historias y errores
-      if ((isHistoria && activeFilters.has("Historia")) || (isError && activeFilters.has("Error"))) {
-        const cat = classifyDevCert(t);
-        if (cat === "Desarrollo" && errorCategory.has("Desarrollo")) return true;
-        if (cat === "Certificación" && errorCategory.has("Certificación")) return true;
-        // Tickets sin clasificar: se muestran si ambas categorías están activas
-        if (cat === null && errorCategory.size === 2) return true;
-        return false;
-      }
+      // Aplicar filtro de categoría por épica (Desarrollo / Certificación) a TODOS los tipos
+      const cat = classifyDevCert(t);
+      if (cat === "Desarrollo" && errorCategory.has("Desarrollo")) return true;
+      if (cat === "Certificación" && errorCategory.has("Certificación")) return true;
+      // Tickets sin clasificar: se muestran si ambas categorías están activas
+      if (cat === null && errorCategory.size === 2) return true;
       return false;
     });
   }, [tickets, selectedSprint, activeFilters, errorCategory, classifyDevCert]);
@@ -704,10 +706,9 @@ export default function ErroresEstadisticasPage() {
   /* ─── Totales globales (se muestran siempre, independientemente del filtro de tipo activo) ─── */
   const totalHistorias = useMemo(() => sprintTickets.filter((t) => !EXCLUDE_PATTERN.test(t.summary || "") && t.issue_type === "Historia").length, [sprintTickets]);
   const totalErrores = useMemo(() => sprintTickets.filter((t) => !EXCLUDE_PATTERN.test(t.summary || "") && ERROR_TYPES.includes(t.issue_type)).length, [sprintTickets]);
-  // Totales por épica (Desarrollo / Certificación) — incluyen tanto historias como errores
-  const nonExcludedTickets = useMemo(() => sprintTickets.filter((t) => !EXCLUDE_PATTERN.test(t.summary || "") && (t.issue_type === "Historia" || ERROR_TYPES.includes(t.issue_type))), [sprintTickets]);
-  const totalDev = useMemo(() => nonExcludedTickets.filter((t) => classifyDevCert(t) === "Desarrollo").length, [nonExcludedTickets, classifyDevCert]);
-  const totalCert = useMemo(() => nonExcludedTickets.filter((t) => classifyDevCert(t) === "Certificación").length, [nonExcludedTickets, classifyDevCert]);
+  // Totales por épica (Desarrollo / Certificación) — incluyen TODOS los tickets (historias + errores + excluidos)
+  const totalDev = useMemo(() => sprintTickets.filter((t) => classifyDevCert(t) === "Desarrollo").length, [sprintTickets, classifyDevCert]);
+  const totalCert = useMemo(() => sprintTickets.filter((t) => classifyDevCert(t) === "Certificación").length, [sprintTickets, classifyDevCert]);
   const totalExcluidos = useMemo(() => sprintTickets.filter((t) => EXCLUDE_PATTERN.test(t.summary || "")).length, [sprintTickets]);
 
   /**
