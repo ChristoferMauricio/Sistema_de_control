@@ -35,6 +35,12 @@ import { exportUnifiedExcel } from "@/lib/exportExcel";
 /** Tipos de issue que se consideran "errores" en Jira */
 const ERROR_TYPES = ["Bug", "Error", "Error Desarrollo", "Error Certificación", "Error en Certificación"];
 
+/** Tipos de errores de Desarrollo */
+const ERROR_DESARROLLO = ["Bug", "Error", "Error Desarrollo"];
+
+/** Tipos de errores de Certificación */
+const ERROR_CERTIFICACION = ["Error Certificación", "Error en Certificación"];
+
 /** Patrón regex para excluir tickets de prueba/revisión de los conteos principales */
 const EXCLUDE_PATTERN = /prueba|revisión|revision/i;
 
@@ -436,6 +442,7 @@ export default function ErroresEstadisticasPage() {
   /* ─── Estados de filtros ─── */
   const [selectedSprint, setSelectedSprint] = useState(null); // null = aún no inicializado
   const [activeFilters, setActiveFilters] = useState(new Set(["Historia", "Error"])); // Filtros activos por defecto
+  const [errorCategory, setErrorCategory] = useState(new Set(["Desarrollo", "Certificación"])); // Categorías de error activas
 
   /* ─── Estado del modal de detalle ─── */
   const [modal, setModal] = useState(null); // { title, personName, items }
@@ -584,10 +591,17 @@ export default function ErroresEstadisticasPage() {
 
       if (isExcluded && activeFilters.has("Excluido")) return true;
       if (isHistoria && activeFilters.has("Historia")) return true;
-      if (isError && activeFilters.has("Error")) return true;
+      if (isError && activeFilters.has("Error")) {
+        // Aplicar filtro de categoría de error (Desarrollo / Certificación)
+        const isDev = ERROR_DESARROLLO.includes(t.issue_type);
+        const isCert = ERROR_CERTIFICACION.includes(t.issue_type);
+        if (isDev && errorCategory.has("Desarrollo")) return true;
+        if (isCert && errorCategory.has("Certificación")) return true;
+        return false;
+      }
       return false;
     });
-  }, [tickets, selectedSprint, activeFilters]);
+  }, [tickets, selectedSprint, activeFilters, errorCategory]);
 
   /** Crea un mapa de contadores de estado inicializado en 0 para cada categoría */
   const emptyStatusMap = () => {
@@ -654,6 +668,8 @@ export default function ErroresEstadisticasPage() {
   /* ─── Totales globales (se muestran siempre, independientemente del filtro de tipo activo) ─── */
   const totalHistorias = useMemo(() => sprintTickets.filter((t) => !EXCLUDE_PATTERN.test(t.summary || "") && t.issue_type === "Historia").length, [sprintTickets]);
   const totalErrores = useMemo(() => sprintTickets.filter((t) => !EXCLUDE_PATTERN.test(t.summary || "") && ERROR_TYPES.includes(t.issue_type)).length, [sprintTickets]);
+  const totalErroresDev = useMemo(() => sprintTickets.filter((t) => !EXCLUDE_PATTERN.test(t.summary || "") && ERROR_DESARROLLO.includes(t.issue_type)).length, [sprintTickets]);
+  const totalErroresCert = useMemo(() => sprintTickets.filter((t) => !EXCLUDE_PATTERN.test(t.summary || "") && ERROR_CERTIFICACION.includes(t.issue_type)).length, [sprintTickets]);
   const totalExcluidos = useMemo(() => sprintTickets.filter((t) => EXCLUDE_PATTERN.test(t.summary || "")).length, [sprintTickets]);
 
   /**
@@ -806,6 +822,45 @@ export default function ErroresEstadisticasPage() {
             <span className="font-semibold text-gray-900 dark:text-gray-100">{totalErrores}</span> error{totalErrores !== 1 ? "es" : ""}
           </span>
         </button>
+        {/* Sub-filtros de categoría de error: Desarrollo / Certificación */}
+        {activeFilters.has("Error") && (
+          <>
+            <button
+              onClick={() => {
+                const next = new Set(errorCategory);
+                next.has("Desarrollo") ? next.delete("Desarrollo") : next.add("Desarrollo");
+                setErrorCategory(next);
+              }}
+              className={`rounded-xl border px-4 py-3 inline-flex items-center gap-2.5 shadow-sm transition-all duration-200 cursor-pointer ${
+                errorCategory.has("Desarrollo")
+                  ? "bg-orange-50 border-orange-400 ring-2 ring-orange-200 dark:bg-orange-900/30 dark:border-orange-600 dark:ring-orange-800"
+                  : "bg-white border-gray-200 hover:border-orange-300 hover:bg-orange-50/50 opacity-60 dark:bg-gray-800 dark:border-gray-600 dark:hover:border-orange-600 dark:hover:bg-orange-900/20"
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-orange-500" />
+              <span className="text-xs text-gray-600 dark:text-gray-300">
+                <span className="font-semibold text-gray-900 dark:text-gray-100">{totalErroresDev}</span> Desarrollo
+              </span>
+            </button>
+            <button
+              onClick={() => {
+                const next = new Set(errorCategory);
+                next.has("Certificación") ? next.delete("Certificación") : next.add("Certificación");
+                setErrorCategory(next);
+              }}
+              className={`rounded-xl border px-4 py-3 inline-flex items-center gap-2.5 shadow-sm transition-all duration-200 cursor-pointer ${
+                errorCategory.has("Certificación")
+                  ? "bg-violet-50 border-violet-400 ring-2 ring-violet-200 dark:bg-violet-900/30 dark:border-violet-600 dark:ring-violet-800"
+                  : "bg-white border-gray-200 hover:border-violet-300 hover:bg-violet-50/50 opacity-60 dark:bg-gray-800 dark:border-gray-600 dark:hover:border-violet-600 dark:hover:bg-violet-900/20"
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-violet-500" />
+              <span className="text-xs text-gray-600 dark:text-gray-300">
+                <span className="font-semibold text-gray-900 dark:text-gray-100">{totalErroresCert}</span> Certificación
+              </span>
+            </button>
+          </>
+        )}
         <button
           onClick={() => {
             const next = new Set(activeFilters);
