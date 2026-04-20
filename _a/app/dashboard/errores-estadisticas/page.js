@@ -461,6 +461,7 @@ export default function ErroresEstadisticasPage() {
         supabase
           .from("jira_tickets")
           .select("jira_key, summary, issue_type, status, sprint, assignee_email, reporter_email, parent_key")
+          .is("deleted_at", null)
           .like("jira_key", "PF3QA-%"),
         supabase
           .from("jira_ticket_links")
@@ -485,6 +486,7 @@ export default function ErroresEstadisticasPage() {
         const { data: extTickets } = await supabase
           .from("jira_tickets")
           .select("jira_key, summary")
+          .is("deleted_at", null)
           .in("jira_key", externalKeys);
         setLinkedTickets(extTickets || []);
       }
@@ -495,6 +497,7 @@ export default function ErroresEstadisticasPage() {
         const { data: linkedSprintData } = await supabase
           .from("jira_tickets")
           .select("jira_key, sprint")
+          .is("deleted_at", null)
           .in("jira_key", allTargetKeys);
         const sprintMap = {};
         (linkedSprintData || []).forEach((t) => { sprintMap[t.jira_key] = t.sprint || ""; });

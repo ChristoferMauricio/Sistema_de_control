@@ -178,6 +178,7 @@ export default function MisPendientesPage() {
       const { data, error } = await supabase
         .from("jira_tickets")
         .select("jira_key, summary, status, issue_type, sprint, story_points, assignee_name, assignee_email, reporter_name, reporter_email, parent_key, subtask_keys, linked_keys, created_at, updated_at, comentario, priority")
+        .is("deleted_at", null)
         .eq("assignee_email", email)
         .order("updated_at", { ascending: false });
 

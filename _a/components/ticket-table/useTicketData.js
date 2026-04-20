@@ -205,6 +205,7 @@ export function useTicketData({ tickets = [], externalFilterType = "", defaultFi
         const { data: targetTickets } = await supabase
           .from("jira_tickets")
           .select("jira_key, summary")
+          .is("deleted_at", null)
           .in("jira_key", allTargets);
         const sMap = {};
         (targetTickets || []).forEach((t) => {

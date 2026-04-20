@@ -458,6 +458,7 @@ export async function exportUnifiedExcel(selectedSprint) {
       const { data, error } = await supabase
         .from("jira_tickets")
         .select("jira_key, summary, status, issue_type, sprint, story_points, assignee_email, reporter_email, parent_key, created_at, updated_at, comentario, priority, labels")
+        .is("deleted_at", null)
         .order("updated_at", { ascending: false })
         .range(from, from + pageSize - 1);
       if (error) { console.error("[exportExcel] Supabase error:", error); hasMore = false; break; }

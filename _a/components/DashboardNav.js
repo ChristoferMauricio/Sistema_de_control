@@ -236,6 +236,7 @@ export default function DashboardNav({ user, role }) {
           supabase
             .from("jira_tickets")
             .select("comentario")
+            .is("deleted_at", null)
             .not("comentario", "is", null)
             .neq("comentario", "")
         ]);
@@ -263,6 +264,7 @@ export default function DashboardNav({ user, role }) {
           const { data: myTickets } = await supabase
             .from("jira_tickets")
             .select("jira_key")
+            .is("deleted_at", null)
             .eq("assignee_email", user.email);
 
           if (myTickets && myTickets.length > 0) {

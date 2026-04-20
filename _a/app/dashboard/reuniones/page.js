@@ -65,6 +65,7 @@ export default function ReunionesPage() {
             const { data } = await supabase
                 .from("jira_tickets")
                 .select("sprint")
+                .is("deleted_at", null)
                 .not("sprint", "is", null)
                 .range(from, from + pageSize - 1);
             if (!data || data.length === 0) { hasMore = false; break; }

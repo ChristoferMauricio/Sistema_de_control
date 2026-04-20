@@ -25,6 +25,7 @@ export async function fetchAndClassify() {
     .from("jira_tickets")
     .select("jira_key, summary, status, issue_type, sprint, story_points, assignee_email, reporter_email, parent_key, created_at, updated_at, comentario, priority, labels")
     .like("jira_key", "PF3QA-%")
+    .is("deleted_at", null)
     .in("issue_type", ["Historia", "Bug", "Error", "Error Desarrollo", "Error Certificación", "Error en Certificación"])
     .order("updated_at", { ascending: false });
 
@@ -52,6 +53,7 @@ export async function fetchAndClassify() {
     const { data: linkedTickets } = await supabase
       .from("jira_tickets")
       .select("jira_key, sprint")
+      .is("deleted_at", null)
       .in("jira_key", allTargetKeys);
     (linkedTickets || []).forEach((st) => {
       linkedSprintMap[st.jira_key] = st.sprint || "";

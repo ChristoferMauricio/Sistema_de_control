@@ -48,6 +48,7 @@ export default function ObservacionesSupervisorPage() {
           supabase
             .from("jira_tickets")
             .select("jira_key, summary, status, issue_type, sprint, story_points, assignee_email, reporter_email, parent_key, created_at, updated_at, comentario")
+            .is("deleted_at", null)
             .not("comentario", "is", null)
             .neq("comentario", ""),
           // Tabla de nombres para resolución de emails a nombres completos

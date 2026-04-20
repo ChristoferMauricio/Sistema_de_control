@@ -50,6 +50,7 @@ export default function IncidenciasPage() {
       const { data: parentStories, error: parentsError } = await supabase
         .from("jira_tickets")
         .select("jira_key, summary")
+        .is("deleted_at", null)
         .ilike("summary", "%(Iteraci%n %)%");
 
       if (parentsError || !parentStories || parentStories.length === 0) {
@@ -72,6 +73,7 @@ export default function IncidenciasPage() {
       const { data: subtasks, error: subtasksError } = await supabase
         .from("jira_tickets")
         .select("jira_key, summary, status, assignee_email, created_at, parent_key, description")
+        .is("deleted_at", null)
         .eq("issue_type", "Subtarea")
         .in("parent_key", parentKeys)
         .order("created_at", { ascending: false });

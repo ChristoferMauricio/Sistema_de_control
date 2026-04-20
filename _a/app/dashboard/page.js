@@ -116,6 +116,7 @@ export default function DashboardPage() {
       const { data, error } = await supabase
         .from("jira_tickets")
         .select("jira_key, summary, status, issue_type, sprint, story_points, assignee_email, reporter_email, parent_key, created_at, updated_at, synced_at, comentario, priority, labels")
+        .is("deleted_at", null)
         .order("updated_at", { ascending: false })
         .range(from, from + pageSize - 1);
 
@@ -298,7 +299,7 @@ export default function DashboardPage() {
       } else {
         setSyncResult({
           type: "success",
-          message: `${data.synced} tickets sincronizados, ${data.statusChanges} cambio(s) de estado`,
+          message: `${data.synced} tickets sincronizados, ${data.statusChanges} cambio(s) de estado${data.deleted ? `, ${data.deleted} eliminado(s)` : ""}`,
         });
         // Refrescar datos del dashboard y limpiar caché del router
         await fetchData();

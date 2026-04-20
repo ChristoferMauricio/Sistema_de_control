@@ -400,11 +400,80 @@ async function runSync() {
       }
     }
 
+    // Paso 9: Eliminación lógica — marcar tickets eliminados en Jira con deleted_at
+    // Los tickets se mantienen en Supabase para registro, pero con un timestamp que
+    // indica cuándo fueron detectados como eliminados en Jira.
+    const jiraKeySet = new Set(jiraKeys);
+    let deletedCount = 0;
+    let revivedCount = 0;
+
+    if (JIRA_PROJECT_KEY) {
+      const projectPrefixes = JIRA_PROJECT_KEY.split(",").map(p => `${p.trim()}-`);
+      let existingKeys = [];
+
+      for (const prefix of projectPrefixes) {
+        let from = 0;
+        let hasMore = true;
+        while (hasMore) {
+          const { data: existingBatch } = await supabaseAdmin
+            .from("jira_tickets")
+            .select("jira_key, deleted_at")
+            .like("jira_key", `${prefix}%`)
+            .range(from, from + batchSize - 1);
+
+          if (!existingBatch || existingBatch.length === 0) {
+            hasMore = false;
+            break;
+          }
+          existingKeys.push(...existingBatch);
+          from += batchSize;
+          hasMore = existingBatch.length === batchSize;
+        }
+      }
+
+      // Tickets que existen en Supabase (sin deleted_at) pero ya no en Jira → marcar como eliminados
+      const toSoftDelete = existingKeys
+        .filter(t => !t.deleted_at && !jiraKeySet.has(t.jira_key))
+        .map(t => t.jira_key);
+      deletedCount = toSoftDelete.length;
+
+      if (toSoftDelete.length > 0) {
+        console.log(`Marcando ${toSoftDelete.length} ticket(s) como eliminados:`, toSoftDelete);
+        for (let i = 0; i < toSoftDelete.length; i += batchSize) {
+          const batch = toSoftDelete.slice(i, i + batchSize);
+          const { error } = await supabaseAdmin
+            .from("jira_tickets")
+            .update({ deleted_at: now })
+            .in("jira_key", batch);
+          if (error) console.warn("Error en soft-delete:", error.message);
+        }
+      }
+
+      // Tickets que tenían deleted_at pero reaparecieron en Jira → revivir (limpiar deleted_at)
+      const toRevive = existingKeys
+        .filter(t => t.deleted_at && jiraKeySet.has(t.jira_key))
+        .map(t => t.jira_key);
+      revivedCount = toRevive.length;
+
+      if (toRevive.length > 0) {
+        console.log(`Reviviendo ${toRevive.length} ticket(s) que reaparecieron en Jira:`, toRevive);
+        for (let i = 0; i < toRevive.length; i += batchSize) {
+          const batch = toRevive.slice(i, i + batchSize);
+          const { error } = await supabaseAdmin
+            .from("jira_tickets")
+            .update({ deleted_at: null })
+            .in("jira_key", batch);
+          if (error) console.warn("Error reviviendo tickets:", error.message);
+        }
+      }
+    }
+
     // Retornar resumen de la sincronizacion exitosa
     return Response.json({
       success:          true,
       message:          "Sincronización completada",
       synced:           tickets.length,
+      deleted:          deletedCount,
       statusChanges:    statusChanges.length,
       persons:          allPersons.length,
       subtasks:         allSubtasks.length,
