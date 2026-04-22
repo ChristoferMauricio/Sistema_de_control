@@ -310,22 +310,40 @@ export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
                       {getStatusBadge(inc.estado)}
                     </td>
                     <td className="px-3 py-3 text-right whitespace-nowrap">
-                      <input
-                        type="date"
-                        className="bg-transparent border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-xs text-gray-700 dark:text-gray-300 focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition-colors cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 w-[115px]"
-                        value={localFechas[inc.id]?.fecha_inicio !== undefined ? localFechas[inc.id].fecha_inicio : (inc.fecha_inicio || "")}
-                        onChange={(e) => handleDateChange(inc.id, "fecha_inicio", e.target.value)}
-                        onBlur={(e) => handleDateBlur(inc.clave, "fecha_inicio", e.target.value)}
-                      />
+                      {(() => {
+                        const val = localFechas[inc.id]?.fecha_inicio !== undefined ? localFechas[inc.id].fecha_inicio : (inc.fecha_inicio || "");
+                        return (
+                          <input
+                            type="date"
+                            className={`border rounded px-2 py-1 text-xs focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition-colors cursor-pointer w-[115px] ${
+                              !val
+                                ? "bg-red-50 border-red-200 text-red-700 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400 hover:bg-red-100"
+                                : "bg-transparent border-gray-200 text-gray-700 dark:border-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                            }`}
+                            value={val}
+                            onChange={(e) => handleDateChange(inc.id, "fecha_inicio", e.target.value)}
+                            onBlur={(e) => handleDateBlur(inc.clave, "fecha_inicio", e.target.value)}
+                          />
+                        );
+                      })()}
                     </td>
                     <td className="px-3 py-3 text-right whitespace-nowrap">
-                      <input
-                        type="date"
-                        className="bg-transparent border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-xs text-gray-700 dark:text-gray-300 focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition-colors cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 w-[115px]"
-                        value={localFechas[inc.id]?.fecha_solucion !== undefined ? localFechas[inc.id].fecha_solucion : (inc.fecha_solucion || "")}
-                        onChange={(e) => handleDateChange(inc.id, "fecha_solucion", e.target.value)}
-                        onBlur={(e) => handleDateBlur(inc.clave, "fecha_solucion", e.target.value)}
-                      />
+                      {(() => {
+                        const val = localFechas[inc.id]?.fecha_solucion !== undefined ? localFechas[inc.id].fecha_solucion : (inc.fecha_solucion || "");
+                        return (
+                          <input
+                            type="date"
+                            className={`border rounded px-2 py-1 text-xs focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition-colors cursor-pointer w-[115px] ${
+                              !val
+                                ? "bg-red-50 border-red-200 text-red-700 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400 hover:bg-red-100"
+                                : "bg-transparent border-gray-200 text-gray-700 dark:border-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                            }`}
+                            value={val}
+                            onChange={(e) => handleDateChange(inc.id, "fecha_solucion", e.target.value)}
+                            onBlur={(e) => handleDateBlur(inc.clave, "fecha_solucion", e.target.value)}
+                          />
+                        );
+                      })()}
                     </td>
                   </tr>
                 ))
