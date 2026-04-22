@@ -13,7 +13,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Search, Filter, AlertCircle, Calendar } from "lucide-react";
+import { Search, Filter, AlertCircle, Calendar, Info } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { getCurrentSprint } from "@/lib/cronogramaData";
@@ -39,6 +39,31 @@ export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
     return "Todas";
   });
   const [selectedProfile, setSelectedProfile] = useState(null);
+  const [localFechas, setLocalFechas] = useState({});
+
+  const handleDateChange = (incId, field, value) => {
+    setLocalFechas(prev => ({
+      ...prev,
+      [incId]: {
+        ...(prev[incId] || {}),
+        [field]: value
+      }
+    }));
+  };
+
+  const handleDateBlur = async (jira_key, field, value) => {
+    try {
+      const payload = { jira_key, [field]: value };
+      const res = await fetch("/api/save-fechas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error("Error guardando fecha");
+    } catch(e) {
+      console.error(e);
+    }
+  };
 
   // Extrae iteraciones unicas de los datos, ordenadas descendentemente (mas reciente primero)
   const iteraciones = useMemo(() => {
@@ -91,6 +116,12 @@ export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
     }
     // Default / To Do
     return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700">{status}</span>;
+  };
+
+  const isClosed = (status) => {
+    if (!status) return false;
+    const s = status.toLowerCase();
+    return s.includes("done") || s.includes("listo") || s.includes("completado") || s.includes("cancelado") || s.includes("cerrado") || s.includes("rechazado");
   };
 
   /**
@@ -193,19 +224,20 @@ export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
           <table className="w-full text-left text-sm whitespace-nowrap">
             <thead className="bg-gray-50/80 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-800 text-gray-500 dark:text-gray-400 font-medium transition-colors">
               <tr>
-                <th className="px-6 py-4">Clave</th>
-                <th className="px-6 py-4 w-1/3">Resumen</th>
-                <th className="px-6 py-4">Reportante</th>
-                <th className="px-6 py-4">Iteración</th>
-                <th className="px-6 py-4">Asignado</th>
-                <th className="px-6 py-4">Estado</th>
-                <th className="px-6 py-4 text-right">Creado</th>
+                <th className="px-3 py-3">Clave</th>
+                <th className="px-3 py-3 w-1/4">Resumen</th>
+                <th className="px-3 py-3">Reportante</th>
+                <th className="px-3 py-3">Iteración</th>
+                <th className="px-3 py-3">Asignado</th>
+                <th className="px-3 py-3">Estado</th>
+                <th className="px-3 py-3 text-right">Fecha Inicio</th>
+                <th className="px-3 py-3 text-right">Fecha Solución</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50 dark:divide-gray-800/60">
               {filteredIncidencias.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                  <td colSpan="8" className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                     <div className="flex flex-col items-center justify-center">
                       <AlertCircle className="w-8 h-8 text-gray-300 dark:text-gray-600 mb-3" />
                       <p>No se encontraron incidencias con estos filtros.</p>
@@ -215,20 +247,30 @@ export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
               ) : (
                 filteredIncidencias.map((inc) => (
                   <tr key={inc.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors">
-                    <td className="px-6 py-4">
-                      <a
-                        href={`https://supervisorservicio2020.atlassian.net/browse/${inc.clave}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="font-semibold text-orange-600 dark:text-orange-500 bg-orange-50 dark:bg-orange-500/10 px-2 py-1 rounded-md text-xs hover:underline hover:text-orange-800 dark:hover:text-orange-400"
-                      >
-                        {inc.clave}
-                      </a>
+                    <td className="px-3 py-3">
+                      <div className="flex items-center gap-1.5">
+                        <a
+                          href={`https://supervisorservicio2020.atlassian.net/browse/${inc.clave}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-semibold text-orange-600 dark:text-orange-500 bg-orange-50 dark:bg-orange-500/10 px-2 py-1 rounded-md text-xs hover:underline hover:text-orange-800 dark:hover:text-orange-400"
+                        >
+                          {inc.clave}
+                        </a>
+                        <div className="group relative flex items-center">
+                          <Info className="w-3.5 h-3.5 text-gray-400 cursor-help" />
+                          <div className="absolute left-6 -top-2 bg-gray-900 dark:bg-gray-800 text-gray-100 text-[10px] px-2 py-1 rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10 border border-gray-700">
+                            F. Creación: {formatDate(inc.creado)}
+                          </div>
+                        </div>
+                      </div>
                     </td>
-                    <td className="px-6 py-4 text-gray-900 dark:text-gray-100 whitespace-normal min-w-[300px]">
-                      {inc.resumen}
+                    <td className="px-3 py-3 text-gray-900 dark:text-gray-100 whitespace-normal min-w-[250px] max-w-[300px]">
+                      <div className="line-clamp-3" title={inc.resumen}>
+                        {inc.resumen}
+                      </div>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-3 py-3">
                       {(() => {
                         if (!inc.description) {
                           return <span className="text-gray-300 dark:text-gray-600 font-bold" title="Sin descripción en BD">—</span>;
@@ -248,27 +290,42 @@ export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
                         return <span className="text-gray-400 dark:text-gray-500 text-xs italic" title="Descripción encontrada pero sin nombre válido">—</span>;
                       })()}
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
+                    <td className="px-3 py-3">
+                      <div className="flex items-center gap-1.5 text-gray-600 dark:text-gray-300">
                         <Calendar className="w-3.5 h-3.5" />
                         <span>{inc.iteracion}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-3 py-3">
                       <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 flex items-center justify-center text-xs font-bold">
+                        <div className="w-6 h-6 shrink-0 rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 flex items-center justify-center text-xs font-bold">
                           {inc.asignado.charAt(0).toUpperCase()}
                         </div>
-                        <span className="text-gray-700 dark:text-gray-300 font-medium">
+                        <span className="text-gray-700 dark:text-gray-300 font-medium truncate max-w-[120px]" title={inc.asignado}>
                           {inc.asignado}
                         </span>
                       </div>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-3 py-3">
                       {getStatusBadge(inc.estado)}
                     </td>
-                    <td className="px-6 py-4 text-right text-gray-500 dark:text-gray-400">
-                      {formatDate(inc.creado)}
+                    <td className="px-3 py-3 text-right whitespace-nowrap">
+                      <input
+                        type="date"
+                        className="bg-transparent border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-xs text-gray-700 dark:text-gray-300 focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition-colors cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 w-[115px]"
+                        value={localFechas[inc.id]?.fecha_inicio !== undefined ? localFechas[inc.id].fecha_inicio : (inc.fecha_inicio || "")}
+                        onChange={(e) => handleDateChange(inc.id, "fecha_inicio", e.target.value)}
+                        onBlur={(e) => handleDateBlur(inc.clave, "fecha_inicio", e.target.value)}
+                      />
+                    </td>
+                    <td className="px-3 py-3 text-right whitespace-nowrap">
+                      <input
+                        type="date"
+                        className="bg-transparent border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-xs text-gray-700 dark:text-gray-300 focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition-colors cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 w-[115px]"
+                        value={localFechas[inc.id]?.fecha_solucion !== undefined ? localFechas[inc.id].fecha_solucion : (inc.fecha_solucion || "")}
+                        onChange={(e) => handleDateChange(inc.id, "fecha_solucion", e.target.value)}
+                        onBlur={(e) => handleDateBlur(inc.clave, "fecha_solucion", e.target.value)}
+                      />
                     </td>
                   </tr>
                 ))

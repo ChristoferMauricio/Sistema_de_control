@@ -72,7 +72,7 @@ export default function IncidenciasPage() {
       /* ─── Paso 2: Obtener subtareas de las historias padre ─── */
       const { data: subtasks, error: subtasksError } = await supabase
         .from("jira_tickets")
-        .select("jira_key, summary, status, assignee_email, created_at, parent_key, description")
+        .select("jira_key, summary, status, assignee_email, created_at, updated_at, parent_key, description, fecha_inicio, fecha_solucion")
         .is("deleted_at", null)
         .eq("issue_type", "Subtarea")
         .in("parent_key", parentKeys)
@@ -144,6 +144,9 @@ export default function IncidenciasPage() {
           resumen: t.summary,
           estado: t.status,
           creado: t.created_at,
+          actualizado: t.updated_at,
+          fecha_inicio: t.fecha_inicio,
+          fecha_solucion: t.fecha_solucion,
           description: t.description,
           iteracion: iterationMap[t.parent_key] || "Iteración Desconocida",
           asignado: resolvedName,
