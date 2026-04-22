@@ -280,8 +280,8 @@ export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
                           return (
                             <button
                               onClick={() => handleProfileClick(reporter)}
-                              className="text-left text-sm text-blue-600 dark:text-blue-400 font-semibold hover:text-blue-800 dark:hover:text-blue-300 hover:underline focus:outline-none transition-colors"
-                              title="Ver información GSM"
+                              className="text-left text-sm text-blue-600 dark:text-blue-400 font-semibold hover:text-blue-800 dark:hover:text-blue-300 hover:underline focus:outline-none transition-colors truncate max-w-[120px]"
+                              title={`Ver información GSM: ${reporter}`}
                             >
                               {reporter}
                             </button>
