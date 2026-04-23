@@ -982,7 +982,7 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                         </div>
 
                         <div className="flex items-center gap-2 border-l border-gray-200 pl-4">
-                            <label className="text-xs font-medium text-gray-500">Carolina:</label>
+                            <label className="text-xs font-medium text-gray-500">Etiqueta:</label>
                             <select
                                 value={hideCarolina ? "reportar" : "todo"}
                                 onChange={(e) => setHideCarolina(e.target.value === "reportar")}
