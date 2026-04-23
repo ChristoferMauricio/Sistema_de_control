@@ -490,14 +490,14 @@ function TicketListModal({ title, assigneeName, items, onClose }) {
                                                 <div className="text-sm text-gray-800 leading-snug">{ticket.summary}</div>
                                                 <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                                                     <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${isSubtask
-                                                            ? "bg-indigo-50 text-indigo-600 border border-indigo-200"
-                                                            : "bg-sky-50 text-sky-600 border border-sky-200"
+                                                        ? "bg-indigo-50 text-indigo-600 border border-indigo-200"
+                                                        : "bg-sky-50 text-sky-600 border border-sky-200"
                                                         }`}>
                                                         {ticket.issue_type}
                                                     </span>
                                                     <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium ${isCompleted
-                                                            ? "bg-green-50 text-green-600 border border-green-200"
-                                                            : "bg-amber-50 text-amber-600 border border-amber-200"
+                                                        ? "bg-green-50 text-green-600 border border-green-200"
+                                                        : "bg-amber-50 text-amber-600 border border-amber-200"
                                                         }`}>
                                                         {ticket.status}
                                                     </span>
@@ -530,7 +530,7 @@ function TicketListModal({ title, assigneeName, items, onClose }) {
  */
 export default function ReportesTable({ tickets = [], nombres = [] }) {
     const [selectedSprint, setSelectedSprint] = useState(() => getCurrentSprint(new Date())?.iteracion || "");
-    const [labelFilter, setLabelFilter] = useState("todo"); // "todo" | "reportar" | "no_reportar"
+    const [labelFilter, setLabelFilter] = useState("reportar"); // "todo" | "reportar" | "no_reportar"
     const [hideCarolina, setHideCarolina] = useState(true);
     const [persons, setPersons] = useState([]);
     const [equipo, setEquipo] = useState([]);
@@ -966,10 +966,10 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                             <label className="text-xs font-medium text-gray-500">Etiqueta:</label>
                             <select
                                 value={labelFilter}
-                                onChange={(e) => setLabelFilter(e.target.value === "reportar")}
+                                onChange={(e) => setLabelFilter(e.target.value)}
                                 className={`px-2.5 py-2 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[120px] ${labelFilter !== "todo"
-                                        ? "border-orange-300 bg-orange-50 text-orange-700 font-medium"
-                                        : "border-gray-200 bg-white text-gray-700"
+                                    ? "border-orange-300 bg-orange-50 text-orange-700 font-medium"
+                                    : "border-gray-200 bg-white text-gray-700"
                                     }`}
                             >
                                 <option value="todo">Todo</option>
@@ -984,8 +984,8 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                                 value={hideCarolina ? "reportar" : "todo"}
                                 onChange={(e) => setHideCarolina(e.target.value === "reportar")}
                                 className={`px-2.5 py-2 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[120px] ${hideCarolina
-                                        ? "border-orange-300 bg-orange-50 text-orange-700 font-medium"
-                                        : "border-gray-200 bg-white text-gray-700"
+                                    ? "border-orange-300 bg-orange-50 text-orange-700 font-medium"
+                                    : "border-gray-200 bg-white text-gray-700"
                                     }`}
                             >
                                 <option value="todo">Todo</option>
