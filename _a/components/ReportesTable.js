@@ -533,6 +533,7 @@ function TicketListModal({ title, assigneeName, items, onClose }) {
 export default function ReportesTable({ tickets = [], nombres = [] }) {
     const [selectedSprint, setSelectedSprint] = useState(() => getCurrentSprint(new Date())?.iteracion || "");
     const [labelFilter, setLabelFilter] = useState("todo"); // "todo" | "reportar" | "no_reportar"
+    const [hideCarolina, setHideCarolina] = useState(true);
     const [persons, setPersons] = useState([]);
     const [equipo,  setEquipo]  = useState([]);
 
@@ -754,11 +755,13 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
             map[realName].subtareasCount += 1;
         });
 
-        return Object.values(map).map(row => ({
-            ...row,
-            puntajeTotal: row.total + row.subtareasCount
-        })).sort((a, b) => a.assignee.localeCompare(b.assignee, "es"));
-    }, [filtered, filteredSubtasks, resolveName]);
+        return Object.values(map)
+            .filter(row => !(hideCarolina && row.assignee.toLowerCase().includes("carolina")))
+            .map(row => ({
+                ...row,
+                puntajeTotal: row.total + row.subtareasCount
+            })).sort((a, b) => a.assignee.localeCompare(b.assignee, "es"));
+    }, [filtered, filteredSubtasks, resolveName, hideCarolina]);
 
     // Totales por columna
     const totals = useMemo(() => {
@@ -807,11 +810,13 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
             }
         });
 
-        return Object.values(map).map(row => ({
-            ...row,
-            puntajeTotal: row.total
-        })).sort((a, b) => a.assignee.localeCompare(b.assignee, "es"));
-    }, [filtered, filteredSubtasks, resolveName]);
+        return Object.values(map)
+            .filter(row => !(hideCarolina && row.assignee.toLowerCase().includes("carolina")))
+            .map(row => ({
+                ...row,
+                puntajeTotal: row.total
+            })).sort((a, b) => a.assignee.localeCompare(b.assignee, "es"));
+    }, [filtered, filteredSubtasks, resolveName, hideCarolina]);
 
     const totalsSP = useMemo(() => {
         const t = { total: 0, puntajeTotal: 0 };
@@ -973,6 +978,22 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                                 <option value="todo">Todo</option>
                                 <option value="reportar">Reportar</option>
                                 <option value="no_reportar">No Reportar</option>
+                            </select>
+                        </div>
+
+                        <div className="flex items-center gap-2 border-l border-gray-200 pl-4">
+                            <label className="text-xs font-medium text-gray-500">Carolina:</label>
+                            <select
+                                value={hideCarolina ? "reportar" : "todo"}
+                                onChange={(e) => setHideCarolina(e.target.value === "reportar")}
+                                className={`px-2.5 py-2 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[120px] ${
+                                    hideCarolina
+                                        ? "border-orange-300 bg-orange-50 text-orange-700 font-medium"
+                                        : "border-gray-200 bg-white text-gray-700"
+                                }`}
+                            >
+                                <option value="todo">Todo</option>
+                                <option value="reportar">Reportar</option>
                             </select>
                         </div>
                     </div>
