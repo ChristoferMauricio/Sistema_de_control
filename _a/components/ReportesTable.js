@@ -411,10 +411,10 @@ function SubtasksModal({ assigneeName, subtasks, onClose }) {
                                     const statusLower = (task.status || "").toLowerCase();
                                     const isCompleted = statusLower.includes("finalizada") || statusLower.includes("terminada") || statusLower.includes("cerrado") || statusLower.includes("done");
                                     const statusColorClass = isCompleted ? "text-green-600 hover:text-green-800" : "text-red-600 hover:text-red-800";
-                                    
+
                                     return (
                                         <li key={task.jira_key} className="p-3 bg-gray-50 rounded-xl border border-gray-100 flex gap-4 items-start">
-                                            <a 
+                                            <a
                                                 href={`https://supervisorservicio2020.atlassian.net/browse/${task.jira_key}`}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
@@ -489,18 +489,16 @@ function TicketListModal({ title, assigneeName, items, onClose }) {
                                             <div className="flex-1 min-w-0">
                                                 <div className="text-sm text-gray-800 leading-snug">{ticket.summary}</div>
                                                 <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${
-                                                        isSubtask
+                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${isSubtask
                                                             ? "bg-indigo-50 text-indigo-600 border border-indigo-200"
                                                             : "bg-sky-50 text-sky-600 border border-sky-200"
-                                                    }`}>
+                                                        }`}>
                                                         {ticket.issue_type}
                                                     </span>
-                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium ${
-                                                        isCompleted
+                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium ${isCompleted
                                                             ? "bg-green-50 text-green-600 border border-green-200"
                                                             : "bg-amber-50 text-amber-600 border border-amber-200"
-                                                    }`}>
+                                                        }`}>
                                                         {ticket.status}
                                                     </span>
                                                     {ticket.story_points != null && (
@@ -535,7 +533,7 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
     const [labelFilter, setLabelFilter] = useState("todo"); // "todo" | "reportar" | "no_reportar"
     const [hideCarolina, setHideCarolina] = useState(true);
     const [persons, setPersons] = useState([]);
-    const [equipo,  setEquipo]  = useState([]);
+    const [equipo, setEquipo] = useState([]);
 
     // Cargar jira_persons + equipo_desarrollo para resolver nombres
     useEffect(() => {
@@ -544,7 +542,7 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
             supabase.from("equipo_desarrollo").select("nombre, nombre_clave, correo_pgim, correo_gcorp"),
         ]).then(([personsRes, equipoRes]) => {
             if (personsRes.data) setPersons(personsRes.data);
-            if (equipoRes.data)  setEquipo(equipoRes.data);
+            if (equipoRes.data) setEquipo(equipoRes.data);
         });
     }, []);
     const [traceModal, setTraceModal] = useState(null); // { assigneeName, stories }
@@ -968,12 +966,11 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                             <label className="text-xs font-medium text-gray-500">Etiqueta:</label>
                             <select
                                 value={labelFilter}
-                                onChange={(e) => setLabelFilter(e.target.value)}
-                                className={`px-2.5 py-2 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[120px] ${
-                                    labelFilter !== "todo"
+                                onChange={(e) => setLabelFilter(e.target.value === "reportar")}
+                                className={`px-2.5 py-2 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[120px] ${labelFilter !== "todo"
                                         ? "border-orange-300 bg-orange-50 text-orange-700 font-medium"
                                         : "border-gray-200 bg-white text-gray-700"
-                                }`}
+                                    }`}
                             >
                                 <option value="todo">Todo</option>
                                 <option value="reportar">Reportar</option>
@@ -986,11 +983,10 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                             <select
                                 value={hideCarolina ? "reportar" : "todo"}
                                 onChange={(e) => setHideCarolina(e.target.value === "reportar")}
-                                className={`px-2.5 py-2 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[120px] ${
-                                    hideCarolina
+                                className={`px-2.5 py-2 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[120px] ${hideCarolina
                                         ? "border-orange-300 bg-orange-50 text-orange-700 font-medium"
                                         : "border-gray-200 bg-white text-gray-700"
-                                }`}
+                                    }`}
                             >
                                 <option value="todo">Todo</option>
                                 <option value="reportar">Reportar</option>
