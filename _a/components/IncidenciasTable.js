@@ -102,17 +102,24 @@ export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
     }
   };
 
-  // Status badge styling
   const getStatusBadge = (status) => {
+    if (!status) return null;
     const s = status.toLowerCase();
-    if (s.includes("en curso") || s.includes("in progress")) {
-      return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200 dark:border-blue-900/50">En Curso</span>;
+    
+    if (s.includes("en curso") || s.includes("in progress") || s.includes("en progreso")) {
+      return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200 dark:border-blue-900/50">{status}</span>;
     }
-    if (s.includes("done") || s.includes("listo") || s.includes("completado")) {
-      return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 dark:border-emerald-900/50">Completado</span>;
+    if (s.includes("done") || s.includes("listo (pase a cert)") || s.includes("completado") || s.includes("finalizada") || s.includes("terminada")) {
+      return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 dark:border-emerald-900/50">{status}</span>;
     }
     if (s.includes("cancelado") || s.includes("cerrado") || s.includes("rechazado")) {
-      return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-200 dark:border-red-900/50">Cerrado</span>;
+      return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-200 dark:border-red-900/50">{status}</span>;
+    }
+    if (s.includes("listo para dev")) {
+      return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-cyan-50 text-cyan-700 border border-cyan-200 dark:border-cyan-900/50">{status}</span>;
+    }
+    if (s.includes("control de calidad") || s.includes("qa") || s.includes("prueba")) {
+      return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 dark:border-amber-900/50">{status}</span>;
     }
     // Default / To Do
     return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700">{status}</span>;
