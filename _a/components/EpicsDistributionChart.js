@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { sortSprints, truncate } from "@/lib/utils";
 import { Filter, Check, ChevronDown } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
 export default function EpicsDistributionChart({ tickets = [], currentSprint = "" }) {
   const [filterSprint, setFilterSprint] = useState(currentSprint);
@@ -13,7 +14,69 @@ export default function EpicsDistributionChart({ tickets = [], currentSprint = "
   const [portalRoot, setPortalRoot] = useState(null);
   const dropdownRef = useRef(null);
 
+  const [nombres, setNombres]   = useState([]);
+  const [persons, setPersons]   = useState([]);
+  const [equipo,  setEquipo]    = useState([]);
+
   useEffect(() => { setPortalRoot(document.body); }, []);
+
+  // Fetch data to resolve assignee names
+  useEffect(() => {
+    async function fetchPersonData() {
+      const [nombresRes, personsRes, equipoRes] = await Promise.all([
+        supabase.from("Nombres").select("Nombre, Programador"),
+        supabase.from("jira_persons").select("email, display_name"),
+        supabase.from("equipo_desarrollo").select("nombre, nombre_clave, correo_pgim, correo_gcorp"),
+      ]);
+      if (nombresRes.data)  setNombres(nombresRes.data);
+      if (personsRes.data)  setPersons(personsRes.data);
+      if (equipoRes.data)   setEquipo(equipoRes.data);
+    }
+    fetchPersonData();
+  }, []);
+
+  // Mapas para resolver nombres
+  const nameMap = useMemo(() => {
+    const map = {};
+    nombres.forEach((n) => { if (n.Programador) map[n.Programador.toLowerCase()] = n.Nombre; });
+    return map;
+  }, [nombres]);
+
+  const personsMap = useMemo(() => {
+    const map = {};
+    persons.forEach((p) => { if (p.email) map[p.email] = p.display_name; });
+    return map;
+  }, [persons]);
+
+  const equipoEmailMap = useMemo(() => {
+    const map = {};
+    equipo.forEach((m) => {
+      if (m.correo_pgim) map[m.correo_pgim.toLowerCase()] = m.nombre;
+      if (m.correo_gcorp && m.correo_gcorp !== "-") map[m.correo_gcorp.toLowerCase()] = m.nombre;
+    });
+    return map;
+  }, [equipo]);
+
+  const equipoKeyMap = useMemo(() => {
+    const map = {};
+    equipo.forEach((m) => {
+      if (m.nombre_clave && m.nombre_clave !== "-") map[m.nombre_clave.toLowerCase()] = m.nombre;
+    });
+    return map;
+  }, [equipo]);
+
+  const NAME_OVERRIDES = { "miguel castillo": "Supervisor de Servicio" };
+
+  const resolveName = (email) => {
+    if (!email || email.trim() === "") return "Sin asignar";
+    const byEmail = equipoEmailMap[email.toLowerCase()];
+    if (byEmail) return NAME_OVERRIDES[byEmail.toLowerCase()] || byEmail;
+    const displayName = personsMap[email] || email;
+    const resolved = equipoKeyMap[displayName.toLowerCase()]
+      || nameMap[displayName.toLowerCase()]
+      || displayName;
+    return NAME_OVERRIDES[resolved.toLowerCase()] || resolved;
+  };
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -356,7 +419,7 @@ export default function EpicsDistributionChart({ tickets = [], currentSprint = "
                           </span>
                         </td>
                         <td className="py-2.5 text-xs text-gray-500 max-w-[150px] truncate" title={t.assignee_email}>
-                          {t.assignee_email?.split('@')[0].replace(/\./g, ' ') || "Sin asignar"}
+                          {resolveName(t.assignee_email)}
                         </td>
                       </tr>
                     ))}
