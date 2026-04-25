@@ -10,6 +10,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import WeeklyCreationChart from "@/components/WeeklyCreationChart";
+import EpicsDistributionChart from "@/components/EpicsDistributionChart";
 import { getCurrentSprint } from "@/lib/cronogramaData";
 
 export default function GraficasPage() {
@@ -81,6 +82,12 @@ export default function GraficasPage() {
 
       {/* Gráfica de creación semanal */}
       <WeeklyCreationChart
+        tickets={tickets}
+        currentSprint={currentSprint?.iteracion || ""}
+      />
+
+      {/* Gráfica de distribución de Épicas */}
+      <EpicsDistributionChart 
         tickets={tickets}
         currentSprint={currentSprint?.iteracion || ""}
       />
