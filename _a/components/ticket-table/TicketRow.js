@@ -10,6 +10,7 @@
  */
 "use client";
 
+import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { formatDate, timeAgo, getStatusColor, getIssueTypeStyle, truncate } from "@/lib/utils";
 import { useRole } from "@/app/dashboard/RoleContext";
@@ -50,6 +51,7 @@ export default function TicketRow({
   const statusColor = getStatusColor(ticket.status);  // Colores CSS segun el estado
   const typeStyle   = getIssueTypeStyle(ticket.issue_type); // Estilo visual segun tipo de issue
   const expanded    = isExpanded;
+  const [showAllSubtasks, setShowAllSubtasks] = useState(false);
 
   // Priorizar el comentario local (editado pero no guardado aun) sobre el de la BD
   const currentComment =
@@ -150,8 +152,8 @@ export default function TicketRow({
         {mode !== "errores" && (
           <td className="px-4 py-3">
             {(subtasksMap[ticket.jira_key]?.length > 0) ? (
-              <div className="flex flex-wrap gap-1">
-                {subtasksMap[ticket.jira_key].map((sk) => (
+              <div className="flex flex-wrap gap-1 max-w-[180px]">
+                {(showAllSubtasks ? subtasksMap[ticket.jira_key] : subtasksMap[ticket.jira_key].slice(0, 2)).map((sk) => (
                   <a
                     key={sk}
                     href={`https://supervisorservicio2020.atlassian.net/browse/${sk}`}
@@ -161,6 +163,14 @@ export default function TicketRow({
                     {sk}
                   </a>
                 ))}
+                {subtasksMap[ticket.jira_key].length > 2 && (
+                  <button
+                    onClick={() => setShowAllSubtasks(!showAllSubtasks)}
+                    className="text-[10px] font-medium text-orange-600 hover:text-orange-800 hover:underline px-1 py-0.5"
+                  >
+                    {showAllSubtasks ? "Menos" : `+${subtasksMap[ticket.jira_key].length - 2}`}
+                  </button>
+                )}
               </div>
             ) : ["Bug", "Error", "Error Desarrollo", "Error Certificación"].includes(ticket.issue_type) ? (
               <span className="text-gray-400 text-xs italic">N/A</span>
