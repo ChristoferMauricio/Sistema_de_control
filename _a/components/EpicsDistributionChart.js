@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { sortSprints, truncate } from "@/lib/utils";
 import { Filter, Check, ChevronDown } from "lucide-react";
 
@@ -8,7 +9,11 @@ export default function EpicsDistributionChart({ tickets = [], currentSprint = "
   const [filterSprint, setFilterSprint] = useState(currentSprint);
   const [excludedEpics, setExcludedEpics] = useState(new Set());
   const [isEpicDropdownOpen, setIsEpicDropdownOpen] = useState(false);
+  const [popup, setPopup] = useState(null);
+  const [portalRoot, setPortalRoot] = useState(null);
   const dropdownRef = useRef(null);
+
+  useEffect(() => { setPortalRoot(document.body); }, []);
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -52,6 +57,7 @@ export default function EpicsDistributionChart({ tickets = [], currentSprint = "
         summary: e.summary,
         hus: 0,
         sp: 0,
+        tickets: []
       };
     });
 
@@ -67,6 +73,7 @@ export default function EpicsDistributionChart({ tickets = [], currentSprint = "
     pf3Stories.forEach(t => {
       map[t.parent_key].hus += 1;
       map[t.parent_key].sp += (parseFloat(t.story_points) || 0);
+      map[t.parent_key].tickets.push(t);
     });
 
     // Quedarse solo con las épicas que tienen al menos 1 HU en este sprint
@@ -165,7 +172,7 @@ export default function EpicsDistributionChart({ tickets = [], currentSprint = "
                     <div className="p-3 text-center text-xs text-gray-400">No hay épicas en este sprint</div>
                   ) : (
                     activeEpicsList.map(epic => (
-                      <label key={epic.key} className="flex items-start gap-2.5 p-2 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors group">
+                      <div key={epic.key} onClick={() => toggleEpic(epic.key)} className="flex items-start gap-2.5 p-2 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors group">
                         <div className={`mt-0.5 w-4 h-4 rounded flex items-center justify-center border transition-colors ${!excludedEpics.has(epic.key) ? 'bg-indigo-500 border-indigo-500 text-white' : 'border-gray-300 bg-white'}`}>
                           {!excludedEpics.has(epic.key) && <Check className="w-3 h-3" />}
                         </div>
@@ -175,7 +182,7 @@ export default function EpicsDistributionChart({ tickets = [], currentSprint = "
                           </span>
                           <span className="text-[10px] text-gray-400 font-mono mt-0.5">{epic.key}</span>
                         </div>
-                      </label>
+                      </div>
                     ))
                   )}
                 </div>
@@ -220,7 +227,12 @@ export default function EpicsDistributionChart({ tickets = [], currentSprint = "
               </tr>
             ) : (
               finalData.map((epic) => (
-                <tr key={epic.key} className="hover:bg-gray-50/50 transition-colors">
+                <tr 
+                  key={epic.key} 
+                  className="hover:bg-gray-50/50 transition-colors cursor-pointer group"
+                  onClick={() => setPopup({ epicName: epic.summary, tickets: epic.tickets })}
+                  title="Ver detalle de las historias de usuario"
+                >
                   <td className="px-5 py-3 whitespace-normal">
                     <div className="font-semibold text-gray-800 text-[13px] leading-tight">
                       {epic.summary}
@@ -272,6 +284,90 @@ export default function EpicsDistributionChart({ tickets = [], currentSprint = "
           </tbody>
         </table>
       </div>
+
+      {/* ── Popup de detalle de Épica (portaleado a body) ── */}
+      {popup && portalRoot && createPortal(
+        <>
+          <div className="fixed inset-0 bg-black/30 backdrop-blur-sm" style={{ zIndex: 99998 }} onClick={() => setPopup(null)} />
+          <div className="fixed inset-0 flex items-center justify-center" style={{ zIndex: 99999, padding: "1.5rem" }} onClick={() => setPopup(null)}>
+            <div
+              className="bg-white rounded-2xl border border-gray-200 shadow-2xl w-full max-w-4xl flex flex-col animate-fade-in"
+              style={{ maxHeight: "calc(100vh - 3rem)" }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between shrink-0">
+                <div>
+                  <h4 className="text-lg font-bold font-[family-name:var(--font-heading)] text-gray-900 line-clamp-1">
+                    Épica: {popup.epicName}
+                  </h4>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {popup.tickets.length} HUs involucradas
+                  </p>
+                </div>
+                <button
+                  onClick={() => setPopup(null)}
+                  className="p-2 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="overflow-y-auto flex-1 min-h-0 px-6 py-3">
+                <table className="w-full text-sm text-left whitespace-nowrap">
+                  <thead className="text-[11px] uppercase text-gray-400 font-semibold border-b border-gray-100 sticky top-0 bg-white z-10">
+                    <tr>
+                      <th className="py-2 pr-3 w-[100px]">Clave</th>
+                      <th className="py-2 pr-3">Resumen</th>
+                      <th className="py-2 pr-3 text-center">SP</th>
+                      <th className="py-2 pr-3">Estado</th>
+                      <th className="py-2">Asignado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {popup.tickets.map((t) => (
+                      <tr key={t.jira_key || t.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+                        <td className="py-2.5 pr-3">
+                          <a
+                            href={`https://supervisorservicio2020.atlassian.net/browse/${t.jira_key}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-mono text-xs font-bold text-blue-600 hover:text-blue-800 hover:underline transition-colors"
+                          >
+                            {t.jira_key}
+                          </a>
+                        </td>
+                        <td className="py-2.5 pr-3 text-gray-700 whitespace-normal min-w-[200px] max-w-[400px]">
+                          <div className="line-clamp-2" title={t.summary}>{t.summary}</div>
+                        </td>
+                        <td className="py-2.5 pr-3 text-center">
+                          {parseFloat(t.story_points) > 0 ? (
+                            <span className="inline-flex items-center justify-center min-w-[24px] px-1.5 py-0.5 rounded-lg text-[10px] font-bold bg-orange-50 text-orange-600 border border-orange-200">
+                              {t.story_points}
+                            </span>
+                          ) : (
+                            <span className="text-[11px] text-gray-300">—</span>
+                          )}
+                        </td>
+                        <td className="py-2.5 pr-3">
+                          <span className="text-[11px] font-medium text-gray-600 bg-gray-100 px-2 py-0.5 rounded border border-gray-200">
+                            {t.status}
+                          </span>
+                        </td>
+                        <td className="py-2.5 text-xs text-gray-500 max-w-[150px] truncate" title={t.assignee_email}>
+                          {t.assignee_email?.split('@')[0].replace(/\./g, ' ') || "Sin asignar"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </>,
+        portalRoot
+      )}
     </div>
   );
 }
