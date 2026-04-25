@@ -297,11 +297,19 @@ export default function EpicsDistributionChart({ tickets = [], currentSprint = "
                   title="Ver detalle de las historias de usuario"
                 >
                   <td className="px-5 py-3 whitespace-normal">
-                    <div className="font-semibold text-gray-800 text-[13px] leading-tight">
-                      {epic.summary}
-                    </div>
-                    <div className="text-[10px] text-gray-400 font-mono mt-1">
-                      {epic.key}
+                    <div className="flex items-start gap-3">
+                      <a
+                        href={`https://supervisorservicio2020.atlassian.net/browse/${epic.key}`}
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="font-mono text-[11px] font-semibold text-blue-600 bg-blue-50 px-2 py-1 rounded-md shrink-0 hover:underline hover:text-blue-800 transition-colors border border-blue-100"
+                      >
+                        {epic.key}
+                      </a>
+                      <span className="font-semibold text-gray-800 text-[13px] leading-tight mt-0.5">
+                        {epic.summary}
+                      </span>
                     </div>
                   </td>
                   <td className="px-3 py-3">
