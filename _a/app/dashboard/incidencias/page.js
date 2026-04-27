@@ -138,10 +138,15 @@ export default function IncidenciasPage() {
       const formattedData = (subtasks || []).map((t) => {
         const resolvedName = resolveName(t.assignee_email);
 
+        // Extraer etiqueta: texto antes del separador "|" en el resumen
+        const pipeIndex = t.summary ? t.summary.indexOf("|") : -1;
+        const etiqueta = pipeIndex !== -1 ? t.summary.substring(0, pipeIndex).trim() : "";
+
         return {
           id: t.jira_key,
           clave: t.jira_key,
           resumen: t.summary,
+          etiqueta,
           estado: t.status,
           creado: t.created_at,
           actualizado: t.updated_at,

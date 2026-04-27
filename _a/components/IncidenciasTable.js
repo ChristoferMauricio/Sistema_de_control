@@ -12,8 +12,9 @@
  */
 "use client";
 
-import { useState, useMemo } from "react";
-import { Search, Filter, AlertCircle, Calendar, Info } from "lucide-react";
+import { useState, useMemo, useCallback } from "react";
+import { Search, Filter, AlertCircle, Calendar, Info, Download, Tag } from "lucide-react";
+import * as XLSX from "xlsx-js-style";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { getCurrentSprint } from "@/lib/cronogramaData";
@@ -38,6 +39,7 @@ export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
     }
     return "Todas";
   });
+  const [filterEtiqueta, setFilterEtiqueta] = useState("Todas");
   const [selectedProfile, setSelectedProfile] = useState(null);
   const [localFechas, setLocalFechas] = useState({});
 
@@ -75,22 +77,58 @@ export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
     return ["Todas", ...iters];
   }, [incidencias]);
 
+  // Extrae etiquetas únicas de los datos, ordenadas alfabéticamente
+  const etiquetas = useMemo(() => {
+    const tags = [...new Set(incidencias.map((inc) => inc.etiqueta).filter(Boolean))].sort();
+    return ["Todas", ...tags];
+  }, [incidencias]);
+
+  // Genera un color consistente para cada etiqueta basado en hash del texto
+  const TAG_PALETTE = [
+    { bg: "bg-violet-100 dark:bg-violet-900/40", text: "text-violet-700 dark:text-violet-300", border: "border-violet-200 dark:border-violet-800" },
+    { bg: "bg-sky-100 dark:bg-sky-900/40", text: "text-sky-700 dark:text-sky-300", border: "border-sky-200 dark:border-sky-800" },
+    { bg: "bg-amber-100 dark:bg-amber-900/40", text: "text-amber-700 dark:text-amber-300", border: "border-amber-200 dark:border-amber-800" },
+    { bg: "bg-rose-100 dark:bg-rose-900/40", text: "text-rose-700 dark:text-rose-300", border: "border-rose-200 dark:border-rose-800" },
+    { bg: "bg-emerald-100 dark:bg-emerald-900/40", text: "text-emerald-700 dark:text-emerald-300", border: "border-emerald-200 dark:border-emerald-800" },
+    { bg: "bg-fuchsia-100 dark:bg-fuchsia-900/40", text: "text-fuchsia-700 dark:text-fuchsia-300", border: "border-fuchsia-200 dark:border-fuchsia-800" },
+    { bg: "bg-cyan-100 dark:bg-cyan-900/40", text: "text-cyan-700 dark:text-cyan-300", border: "border-cyan-200 dark:border-cyan-800" },
+    { bg: "bg-orange-100 dark:bg-orange-900/40", text: "text-orange-700 dark:text-orange-300", border: "border-orange-200 dark:border-orange-800" },
+    { bg: "bg-teal-100 dark:bg-teal-900/40", text: "text-teal-700 dark:text-teal-300", border: "border-teal-200 dark:border-teal-800" },
+    { bg: "bg-indigo-100 dark:bg-indigo-900/40", text: "text-indigo-700 dark:text-indigo-300", border: "border-indigo-200 dark:border-indigo-800" },
+    { bg: "bg-lime-100 dark:bg-lime-900/40", text: "text-lime-700 dark:text-lime-300", border: "border-lime-200 dark:border-lime-800" },
+    { bg: "bg-pink-100 dark:bg-pink-900/40", text: "text-pink-700 dark:text-pink-300", border: "border-pink-200 dark:border-pink-800" },
+  ];
+
+  const getTagColor = useCallback((label) => {
+    if (!label) return null;
+    let hash = 0;
+    for (let i = 0; i < label.length; i++) {
+      hash = label.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return TAG_PALETTE[Math.abs(hash) % TAG_PALETTE.length];
+  }, []);
+
   // ─── Filtrado ───────────────────────────────────────────────────────────────
   // Aplica filtro de texto (clave, resumen, asignado) y filtro de iteracion
   const filteredIncidencias = useMemo(() => {
     return incidencias.filter((inc) => {
       // 1. Text Search
+      const term = searchTerm.toLowerCase();
       const textMatch = 
-        inc.clave.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        inc.resumen.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        inc.asignado.toLowerCase().includes(searchTerm.toLowerCase());
+        inc.clave.toLowerCase().includes(term) ||
+        inc.resumen.toLowerCase().includes(term) ||
+        inc.asignado.toLowerCase().includes(term) ||
+        (inc.etiqueta && inc.etiqueta.toLowerCase().includes(term));
       
       // 2. Iteration Filter
       const iteracionMatch = filterIteracion === "Todas" || inc.iteracion === filterIteracion;
 
-      return textMatch && iteracionMatch;
+      // 3. Etiqueta Filter
+      const etiquetaMatch = filterEtiqueta === "Todas" || inc.etiqueta === filterEtiqueta;
+
+      return textMatch && iteracionMatch && etiquetaMatch;
     });
-  }, [incidencias, searchTerm, filterIteracion]);
+  }, [incidencias, searchTerm, filterIteracion, filterEtiqueta]);
 
   // Format date
   const formatDate = (dateString) => {
@@ -185,6 +223,67 @@ export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
     }
   };
 
+  /**
+   * Exporta las incidencias filtradas a un archivo Excel (.xlsx) con todos los campos.
+   * Usa xlsx-js-style para dar formato profesional al archivo.
+   */
+  const handleExportExcel = useCallback(() => {
+    const dataToExport = filteredIncidencias.map((inc) => {
+      const reporter = parseReporter(inc.description);
+      return {
+        "Clave": inc.clave,
+        "Etiqueta": inc.etiqueta || "-",
+        "Resumen": inc.resumen,
+        "Reportante": reporter || "-",
+        "Iteración": inc.iteracion,
+        "Asignado": inc.asignado,
+        "Estado": inc.estado,
+        "Fecha Creación": inc.creado ? formatDate(inc.creado) : "-",
+        "Fecha Inicio": inc.fecha_inicio || "-",
+        "Fecha Solución": inc.fecha_solucion || "-",
+        "Última Actualización": inc.actualizado ? formatDate(inc.actualizado) : "-",
+      };
+    });
+
+    const ws = XLSX.utils.json_to_sheet(dataToExport);
+
+    // Estilo para encabezados
+    const headerStyle = {
+      font: { bold: true, color: { rgb: "FFFFFF" }, sz: 11 },
+      fill: { fgColor: { rgb: "F97316" } },
+      alignment: { horizontal: "center", vertical: "center" },
+      border: {
+        bottom: { style: "thin", color: { rgb: "E5E7EB" } },
+      },
+    };
+
+    // Aplicar estilo a encabezados
+    const range = XLSX.utils.decode_range(ws["!ref"]);
+    for (let col = range.s.c; col <= range.e.c; col++) {
+      const cell = ws[XLSX.utils.encode_cell({ r: 0, c: col })];
+      if (cell) cell.s = headerStyle;
+    }
+
+    // Anchos de columna
+    ws["!cols"] = [
+      { wch: 12 },  // Clave
+      { wch: 22 },  // Etiqueta
+      { wch: 50 },  // Resumen
+      { wch: 22 },  // Reportante
+      { wch: 14 },  // Iteración
+      { wch: 22 },  // Asignado
+      { wch: 18 },  // Estado
+      { wch: 14 },  // Fecha Creación
+      { wch: 14 },  // Fecha Inicio
+      { wch: 14 },  // Fecha Solución
+      { wch: 14 },  // Última Actualización
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Incidencias");
+    XLSX.writeFile(wb, `Incidencias_${filterIteracion.replace(/\s/g, "_")}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  }, [filteredIncidencias, filterIteracion]);
+
   return (
     <div className="space-y-4">
       {/* Top Bar: Search & Filters */}
@@ -198,14 +297,15 @@ export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
           <input
             type="text"
             className="block w-full pl-10 pr-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm bg-gray-50 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-colors"
-            placeholder="Buscar por clave, resumen o asignado..."
+            placeholder="Buscar por clave, resumen, asignado o etiqueta..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
 
-        {/* Filters */}
+        {/* Filters & Actions */}
         <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+          {/* Iteration Filter */}
           <div className="flex items-center gap-2">
             <Filter className="w-4 h-4 text-gray-500 dark:text-gray-400" />
             <select
@@ -218,10 +318,36 @@ export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
               ))}
             </select>
           </div>
+
+          {/* Etiqueta Filter */}
+          {etiquetas.length > 1 && (
+            <div className="flex items-center gap-2">
+              <Tag className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+              <select
+                value={filterEtiqueta}
+                onChange={(e) => setFilterEtiqueta(e.target.value)}
+                className="text-sm border-gray-200 dark:border-gray-700 rounded-lg py-1.5 pl-3 pr-8 bg-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-colors max-w-[180px]"
+              >
+                {etiquetas.map((et) => (
+                  <option key={et} value={et}>{et}</option>
+                ))}
+              </select>
+            </div>
+          )}
           
           <div className="text-sm text-gray-500 dark:text-gray-400 font-medium px-2">
             {filteredIncidencias.length} incidencias
           </div>
+
+          {/* Export Button */}
+          <button
+            onClick={handleExportExcel}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+            title="Exportar a Excel"
+          >
+            <Download className="w-4 h-4" />
+            <span className="hidden sm:inline">Exportar Excel</span>
+          </button>
         </div>
       </div>
 
@@ -231,6 +357,7 @@ export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
           <table className="w-full text-left text-sm whitespace-nowrap">
             <thead className="bg-gray-50/80 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-800 text-gray-500 dark:text-gray-400 font-medium transition-colors">
               <tr>
+                <th className="px-3 py-3">Etiqueta</th>
                 <th className="px-3 py-3">Clave</th>
                 <th className="px-3 py-3 w-1/4">Resumen</th>
                 <th className="px-3 py-3">Reportante</th>
@@ -244,7 +371,7 @@ export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
             <tbody className="divide-y divide-gray-50 dark:divide-gray-800/60">
               {filteredIncidencias.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                  <td colSpan="9" className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                     <div className="flex flex-col items-center justify-center">
                       <AlertCircle className="w-8 h-8 text-gray-300 dark:text-gray-600 mb-3" />
                       <p>No se encontraron incidencias con estos filtros.</p>
@@ -254,6 +381,23 @@ export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
               ) : (
                 filteredIncidencias.map((inc) => (
                   <tr key={inc.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors">
+                    {/* Etiqueta Column */}
+                    <td className="px-3 py-3">
+                      {inc.etiqueta ? (() => {
+                        const color = getTagColor(inc.etiqueta);
+                        return (
+                          <span
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border whitespace-nowrap max-w-[160px] truncate ${color.bg} ${color.text} ${color.border}`}
+                            title={inc.etiqueta}
+                          >
+                            <Tag className="w-3 h-3 shrink-0" />
+                            {inc.etiqueta}
+                          </span>
+                        );
+                      })() : (
+                        <span className="text-gray-300 dark:text-gray-600">—</span>
+                      )}
+                    </td>
                     <td className="px-3 py-3">
                       <div className="flex items-center gap-1.5">
                         <a
