@@ -228,7 +228,7 @@ export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
    * Usa xlsx-js-style para dar formato profesional al archivo.
    */
   const handleExportExcel = useCallback(() => {
-    const dataToExport = filteredIncidencias.map((inc) => {
+    const dataToExport = incidencias.map((inc) => {
       const reporter = parseReporter(inc.description);
       return {
         "Clave": inc.clave,
@@ -281,8 +281,8 @@ export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Incidencias");
-    XLSX.writeFile(wb, `Incidencias_${filterIteracion.replace(/\s/g, "_")}_${new Date().toISOString().slice(0, 10)}.xlsx`);
-  }, [filteredIncidencias, filterIteracion]);
+    XLSX.writeFile(wb, `Incidencias_Todas_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  }, [incidencias]);
 
   return (
     <div className="space-y-4">
