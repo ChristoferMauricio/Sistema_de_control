@@ -226,36 +226,40 @@ export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
   /**
    * Exporta todas las incidencias a Excel (.xlsx) con:
    *   - Hoja "Incidencias": datos detallados con encabezados naranja
-   *   - Hoja "Resumen": tabla dinámica (conteo por Etiqueta) + gráfico de barras horizontales
+   *   - Hoja "Resumen": tabla dinámica real (PivotTable) + gráfico de barras horizontales
    */
   const handleExportExcel = useCallback(async () => {
     /* ─── Hoja 1: Datos detallados ─── */
-    const dataToExport = incidencias.map((inc) => {
+    const columnNames = [
+      "Clave", "Etiqueta", "Resumen", "Reportante", "Iteración",
+      "Asignado", "Estado", "Fecha Creación", "Fecha Inicio", "Fecha Solución", "Última Actualización",
+    ];
+    const rawRows = incidencias.map((inc) => {
       const reporter = parseReporter(inc.description);
-      return {
-        "Clave": inc.clave,
-        "Etiqueta": inc.etiqueta || "-",
-        "Resumen": inc.resumen,
-        "Reportante": reporter || "-",
-        "Iteración": inc.iteracion,
-        "Asignado": inc.asignado,
-        "Estado": inc.estado,
-        "Fecha Creación": inc.creado ? formatDate(inc.creado) : "-",
-        "Fecha Inicio": inc.fecha_inicio || "-",
-        "Fecha Solución": inc.fecha_solucion || "-",
-        "Última Actualización": inc.actualizado ? formatDate(inc.actualizado) : "-",
-      };
+      return [
+        inc.clave,
+        inc.etiqueta || "-",
+        inc.resumen,
+        reporter || "-",
+        inc.iteracion,
+        inc.asignado,
+        inc.estado,
+        inc.creado ? formatDate(inc.creado) : "-",
+        inc.fecha_inicio || "-",
+        inc.fecha_solucion || "-",
+        inc.actualizado ? formatDate(inc.actualizado) : "-",
+      ];
     });
 
-    const ws = XLSX.utils.json_to_sheet(dataToExport);
+    const wsData = [columnNames, ...rawRows];
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
     const orangeHeader = {
       font: { bold: true, color: { rgb: "FFFFFF" }, sz: 11 },
       fill: { fgColor: { rgb: "F97316" } },
       alignment: { horizontal: "center", vertical: "center" },
       border: { bottom: { style: "thin", color: { rgb: "E5E7EB" } } },
     };
-    const range = XLSX.utils.decode_range(ws["!ref"]);
-    for (let col = range.s.c; col <= range.e.c; col++) {
+    for (let col = 0; col < columnNames.length; col++) {
       const cell = ws[XLSX.utils.encode_cell({ r: 0, c: col })];
       if (cell) cell.s = orangeHeader;
     }
@@ -264,90 +268,47 @@ export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
       { wch: 22 }, { wch: 18 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 },
     ];
 
-    /* ─── Hoja 2: Resumen (tabla dinámica + gráfico) ─── */
+    /* ─── Hoja 2: Resumen (pre-populate para PivotTable + chart) ─── */
     const etiquetaCounts = {};
     incidencias.forEach((inc) => {
-      const tag = inc.etiqueta || "Sin etiqueta";
+      const tag = inc.etiqueta || "-";
       etiquetaCounts[tag] = (etiquetaCounts[tag] || 0) + 1;
     });
     const sortedEntries = Object.entries(etiquetaCounts).sort((a, b) => a[0].localeCompare(b[0]));
     const total = sortedEntries.reduce((sum, [, c]) => sum + c, 0);
     const numEntries = sortedEntries.length;
 
+    // Layout: A1=page label, B1=page value, row 2=empty, A3:B3=header, data, total
     const summaryAoa = [
+      ["Iteración", "(Todas)"],
+      [],
       ["Etiquetas de fila", "Cuenta de Clave"],
       ...sortedEntries,
       ["Total general", total],
     ];
     const wsSummary = XLSX.utils.aoa_to_sheet(summaryAoa);
-
-    // Estilo encabezado verde oscuro
-    const greenHeader = {
-      font: { bold: true, color: { rgb: "FFFFFF" }, sz: 11 },
-      fill: { fgColor: { rgb: "507E32" } },
-      alignment: { vertical: "center" },
-      border: {
-        bottom: { style: "thin", color: { rgb: "A9D18E" } },
-        top: { style: "thin", color: { rgb: "507E32" } },
-        left: { style: "thin", color: { rgb: "507E32" } },
-        right: { style: "thin", color: { rgb: "507E32" } },
-      },
-    };
-    for (let c = 0; c <= 1; c++) {
-      const cell = wsSummary[XLSX.utils.encode_cell({ r: 0, c })];
-      if (cell) cell.s = c === 1
-        ? { ...greenHeader, alignment: { horizontal: "right", vertical: "center" } }
-        : greenHeader;
-    }
-
-    // Filas de datos con bandas verdes alternas
-    const thinBorder = {
-      bottom: { style: "thin", color: { rgb: "E2EFDA" } },
-      left: { style: "thin", color: { rgb: "E2EFDA" } },
-      right: { style: "thin", color: { rgb: "E2EFDA" } },
-    };
-    for (let r = 1; r <= numEntries; r++) {
-      const base = r % 2 === 0
-        ? { fill: { fgColor: { rgb: "E2EFDA" } }, border: thinBorder }
-        : { border: thinBorder };
-      const lCell = wsSummary[XLSX.utils.encode_cell({ r, c: 0 })];
-      const vCell = wsSummary[XLSX.utils.encode_cell({ r, c: 1 })];
-      if (lCell) lCell.s = { ...base, font: { sz: 11 } };
-      if (vCell) vCell.s = { ...base, font: { sz: 11 }, alignment: { horizontal: "right" } };
-    }
-
-    // Fila Total
-    const totalRow = numEntries + 1;
-    const totalStyle = {
-      font: { bold: true, sz: 11 },
-      fill: { fgColor: { rgb: "A9D18E" } },
-      border: {
-        top: { style: "thin", color: { rgb: "507E32" } },
-        bottom: { style: "double", color: { rgb: "507E32" } },
-        left: { style: "thin", color: { rgb: "A9D18E" } },
-        right: { style: "thin", color: { rgb: "A9D18E" } },
-      },
-    };
-    const tl = wsSummary[XLSX.utils.encode_cell({ r: totalRow, c: 0 })];
-    const tv = wsSummary[XLSX.utils.encode_cell({ r: totalRow, c: 1 })];
-    if (tl) tl.s = totalStyle;
-    if (tv) tv.s = { ...totalStyle, alignment: { horizontal: "right" } };
-
     wsSummary["!cols"] = [{ wch: 42 }, { wch: 18 }];
 
-    /* ─── Armar Workbook y generar con chart ─── */
+    /* ─── Armar Workbook ─── */
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Incidencias");
     XLSX.utils.book_append_sheet(wb, wsSummary, "Resumen");
 
     const wbBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
 
-    // Inyectar gráfico de barras nativo en la hoja Resumen
-    const { injectBarChart } = await import("@/lib/excelChartInjector");
-    const blob = await injectBarChart(wbBuffer, {
-      sheetName: "Resumen",
-      sheetIndex: 2,
-      dataRows: numEntries,
+    /* ─── Inyectar PivotTable + Chart ─── */
+    const { injectPivotAndChart } = await import("@/lib/excelChartInjector");
+    const blob = await injectPivotAndChart(wbBuffer, {
+      srcSheetName: "Incidencias",
+      pvtSheetName: "Resumen",
+      pvtSheetIndex: 2,
+      columns: columnNames,
+      dataRows: rawRows,
+      rowFieldIdx: 1,      // Etiqueta
+      dataFieldIdx: 0,     // Clave (count)
+      pageFieldIdx: 4,     // Iteración
+      summaryEntries: sortedEntries,
+      total,
     });
 
     // Descargar archivo
