@@ -224,10 +224,12 @@ export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
   };
 
   /**
-   * Exporta las incidencias filtradas a un archivo Excel (.xlsx) con todos los campos.
-   * Usa xlsx-js-style para dar formato profesional al archivo.
+   * Exporta todas las incidencias a Excel (.xlsx) con:
+   *   - Hoja "Incidencias": datos detallados con encabezados naranja
+   *   - Hoja "Resumen": tabla dinámica (conteo por Etiqueta) + gráfico de barras horizontales
    */
-  const handleExportExcel = useCallback(() => {
+  const handleExportExcel = useCallback(async () => {
+    /* ─── Hoja 1: Datos detallados ─── */
     const dataToExport = incidencias.map((inc) => {
       const reporter = parseReporter(inc.description);
       return {
@@ -246,42 +248,117 @@ export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
     });
 
     const ws = XLSX.utils.json_to_sheet(dataToExport);
-
-    // Estilo para encabezados
-    const headerStyle = {
+    const orangeHeader = {
       font: { bold: true, color: { rgb: "FFFFFF" }, sz: 11 },
       fill: { fgColor: { rgb: "F97316" } },
       alignment: { horizontal: "center", vertical: "center" },
-      border: {
-        bottom: { style: "thin", color: { rgb: "E5E7EB" } },
-      },
+      border: { bottom: { style: "thin", color: { rgb: "E5E7EB" } } },
     };
-
-    // Aplicar estilo a encabezados
     const range = XLSX.utils.decode_range(ws["!ref"]);
     for (let col = range.s.c; col <= range.e.c; col++) {
       const cell = ws[XLSX.utils.encode_cell({ r: 0, c: col })];
-      if (cell) cell.s = headerStyle;
+      if (cell) cell.s = orangeHeader;
     }
-
-    // Anchos de columna
     ws["!cols"] = [
-      { wch: 12 },  // Clave
-      { wch: 22 },  // Etiqueta
-      { wch: 50 },  // Resumen
-      { wch: 22 },  // Reportante
-      { wch: 14 },  // Iteración
-      { wch: 22 },  // Asignado
-      { wch: 18 },  // Estado
-      { wch: 14 },  // Fecha Creación
-      { wch: 14 },  // Fecha Inicio
-      { wch: 14 },  // Fecha Solución
-      { wch: 14 },  // Última Actualización
+      { wch: 12 }, { wch: 22 }, { wch: 50 }, { wch: 22 }, { wch: 14 },
+      { wch: 22 }, { wch: 18 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 },
     ];
 
+    /* ─── Hoja 2: Resumen (tabla dinámica + gráfico) ─── */
+    const etiquetaCounts = {};
+    incidencias.forEach((inc) => {
+      const tag = inc.etiqueta || "Sin etiqueta";
+      etiquetaCounts[tag] = (etiquetaCounts[tag] || 0) + 1;
+    });
+    const sortedEntries = Object.entries(etiquetaCounts).sort((a, b) => a[0].localeCompare(b[0]));
+    const total = sortedEntries.reduce((sum, [, c]) => sum + c, 0);
+    const numEntries = sortedEntries.length;
+
+    const summaryAoa = [
+      ["Etiquetas de fila", "Cuenta de Clave"],
+      ...sortedEntries,
+      ["Total general", total],
+    ];
+    const wsSummary = XLSX.utils.aoa_to_sheet(summaryAoa);
+
+    // Estilo encabezado verde oscuro
+    const greenHeader = {
+      font: { bold: true, color: { rgb: "FFFFFF" }, sz: 11 },
+      fill: { fgColor: { rgb: "507E32" } },
+      alignment: { vertical: "center" },
+      border: {
+        bottom: { style: "thin", color: { rgb: "A9D18E" } },
+        top: { style: "thin", color: { rgb: "507E32" } },
+        left: { style: "thin", color: { rgb: "507E32" } },
+        right: { style: "thin", color: { rgb: "507E32" } },
+      },
+    };
+    for (let c = 0; c <= 1; c++) {
+      const cell = wsSummary[XLSX.utils.encode_cell({ r: 0, c })];
+      if (cell) cell.s = c === 1
+        ? { ...greenHeader, alignment: { horizontal: "right", vertical: "center" } }
+        : greenHeader;
+    }
+
+    // Filas de datos con bandas verdes alternas
+    const thinBorder = {
+      bottom: { style: "thin", color: { rgb: "E2EFDA" } },
+      left: { style: "thin", color: { rgb: "E2EFDA" } },
+      right: { style: "thin", color: { rgb: "E2EFDA" } },
+    };
+    for (let r = 1; r <= numEntries; r++) {
+      const base = r % 2 === 0
+        ? { fill: { fgColor: { rgb: "E2EFDA" } }, border: thinBorder }
+        : { border: thinBorder };
+      const lCell = wsSummary[XLSX.utils.encode_cell({ r, c: 0 })];
+      const vCell = wsSummary[XLSX.utils.encode_cell({ r, c: 1 })];
+      if (lCell) lCell.s = { ...base, font: { sz: 11 } };
+      if (vCell) vCell.s = { ...base, font: { sz: 11 }, alignment: { horizontal: "right" } };
+    }
+
+    // Fila Total
+    const totalRow = numEntries + 1;
+    const totalStyle = {
+      font: { bold: true, sz: 11 },
+      fill: { fgColor: { rgb: "A9D18E" } },
+      border: {
+        top: { style: "thin", color: { rgb: "507E32" } },
+        bottom: { style: "double", color: { rgb: "507E32" } },
+        left: { style: "thin", color: { rgb: "A9D18E" } },
+        right: { style: "thin", color: { rgb: "A9D18E" } },
+      },
+    };
+    const tl = wsSummary[XLSX.utils.encode_cell({ r: totalRow, c: 0 })];
+    const tv = wsSummary[XLSX.utils.encode_cell({ r: totalRow, c: 1 })];
+    if (tl) tl.s = totalStyle;
+    if (tv) tv.s = { ...totalStyle, alignment: { horizontal: "right" } };
+
+    wsSummary["!cols"] = [{ wch: 42 }, { wch: 18 }];
+
+    /* ─── Armar Workbook y generar con chart ─── */
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Incidencias");
-    XLSX.writeFile(wb, `Incidencias_Todas_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, wsSummary, "Resumen");
+
+    const wbBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+
+    // Inyectar gráfico de barras nativo en la hoja Resumen
+    const { injectBarChart } = await import("@/lib/excelChartInjector");
+    const blob = await injectBarChart(wbBuffer, {
+      sheetName: "Resumen",
+      sheetIndex: 2,
+      dataRows: numEntries,
+    });
+
+    // Descargar archivo
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Incidencias_Todas_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }, [incidencias]);
 
   return (
