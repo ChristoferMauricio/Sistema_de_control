@@ -79,7 +79,7 @@ function buildPivotTable(cols, allShared, rowIdx, dataIdx, pageIdx, summaryEntri
 <rowFields count="1"><field x="${rowIdx}"/></rowFields>
 <rowItems count="${N + 1}">${rowItems}<i t="grand"><x/></i></rowItems>
 <colItems count="1"><i/></colItems>
-<pageFields count="1"><field x="${pageIdx}" hier="-1"/></pageFields>
+<pageFields count="1"><pageField fld="${pageIdx}" item="${allShared[pageIdx].length}" hier="-1"/></pageFields>
 <dataFields count="1"><dataField name="Cuenta de Clave" fld="${dataIdx}" subtotal="count" baseField="0" baseItem="0"/></dataFields>
 <pivotTableStyleInfo name="PivotStyleMedium9" showRowHeaders="1" showColHeaders="1" showRowStripes="0" showColStripes="0" showLastColumn="1"/>
 </pivotTableDefinition>`;
