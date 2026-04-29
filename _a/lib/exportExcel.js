@@ -559,7 +559,7 @@ export async function exportUnifiedExcel(selectedSprint) {
     // ─── Hoja "Osi" (sheet2) — todos los tickets ────────────────────
     const headersOsi = [
       "Tipo", "Clave", "Resumen", "Subtareas", "Principal",
-      "Épica", "Historia", "Sprint", "Persona asignada", "Story Points",
+      "Épica", "Codigo HU", "Historia", "Sprint", "Persona asignada", "Story Points",
       "Estado", "Informador", "Creada", "Etiquetas",
     ];
     const rowsOsi = allTickets.map((t) => ({
@@ -569,6 +569,7 @@ export async function exportUnifiedExcel(selectedSprint) {
       Subtareas: (subtaskMap[t.jira_key] || []).join(", "),
       Principal: t.parent_key || "",
       "Épica": resolveEpic(t)?.summary || "",
+      "Codigo HU": resolveParentStory(t)?.jira_key || "",
       Historia: resolveParentStory(t)?.summary || "",
       Sprint: t.sprint || "",
       "Persona asignada": resolveName(t.assignee_email),
@@ -579,7 +580,7 @@ export async function exportUnifiedExcel(selectedSprint) {
       Etiquetas: Array.isArray(t.labels) ? t.labels.join(", ") : "",
     }));
     const osiXml = buildSheetXml(headersOsi, rowsOsi,
-      [16, 13, 52, 20, 13, 32, 40, 22, 24, 13, 20, 24, 18, 20], sst);
+      [16, 13, 52, 20, 13, 32, 13, 40, 22, 24, 13, 20, 24, 18, 20], sst);
     console.log(`[exportExcel] ✅ Hoja Osi: ${rowsOsi.length} filas`);
 
     // ─── Hoja "Datos QA" (sheet4) — TODOS los tickets PF3QA ────────
