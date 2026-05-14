@@ -224,3 +224,104 @@ export function sortSprints(sprints) {
     return a.localeCompare(b);
   });
 }
+
+// ─── Configuración centralizada de estados Jira ─────────────────────────────
+//
+// IMPORTANTE: Cuando Jira tenga un nuevo nombre de estado (ej: un estado en
+// inglés o un estado personalizado del tablero PF3QA), agregar ÚNICAMENTE aquí
+// en el array `jiraStatuses` de la columna correspondiente. Todos los módulos
+// (ReportesTable, exportExcel, IncidenciasTable, etc.) lo heredarán
+// automáticamente a través de `normalizeStatus()`.
+
+/**
+ * Columnas canónicas de estado con sus variantes de Jira.
+ * Cada entry mapea N nombres de Jira → 1 columna canónica.
+ *
+ * - key:          identificador interno (para pivots, objetos JS)
+ * - label:        etiqueta visible en la UI
+ * - canonical:    nombre canónico que se usa en exports y normalizaciones
+ * - jiraStatuses: TODOS los nombres exactos que Jira puede devolver para este estado
+ * - color:        clase CSS para la tabla pivot
+ * - chartColor:   color hex para la gráfica Gantt de trazabilidad
+ */
+export const STATUS_COLUMNS = [
+  {
+    key: "tareas_por_hacer",
+    label: "1. Tareas por hacer",
+    canonical: "Tareas por hacer",
+    jiraStatuses: ["Tareas por hacer", "POR HACER"],
+    color: "bg-gray-100 text-gray-700",
+    chartColor: "#9ca3af",
+  },
+  {
+    key: "en_curso",
+    label: "2. En curso",
+    canonical: "En curso",
+    jiraStatuses: ["En curso"],
+    color: "bg-blue-100 text-blue-700",
+    chartColor: "#3b82f6",
+  },
+  {
+    key: "listo_para_dev",
+    label: "3. Listo para dev",
+    canonical: "LISTO PARA DEV",
+    jiraStatuses: ["LISTO PARA DEV", "Ready for Dev"],
+    color: "bg-cyan-100 text-cyan-700",
+    chartColor: "#06b6d4",
+  },
+  {
+    key: "control_calidad",
+    label: "4. Control de calidad",
+    canonical: "Control de calidad",
+    jiraStatuses: ["Control de calidad", "QA EN DEV", "QA en DEV o CERT", "Control Calidad (Dev o Cert)"],
+    color: "bg-amber-100 text-amber-700",
+    chartColor: "#f59e0b",
+  },
+  {
+    key: "finalizada",
+    label: "5. Finalizada",
+    canonical: "Finalizada",
+    jiraStatuses: ["Finalizada", "LISTO (PASE A CERT)"],
+    color: "bg-green-100 text-green-700",
+    chartColor: "#22c55e",
+  },
+];
+
+/**
+ * Mapa plano de status Jira → color hex, construido automáticamente desde
+ * STATUS_COLUMNS. Usar para la gráfica Gantt de trazabilidad.
+ */
+export const CHART_STATUS_COLORS = (() => {
+  const map = {};
+  STATUS_COLUMNS.forEach(col => {
+    col.jiraStatuses.forEach(s => { map[s] = col.chartColor; });
+  });
+  return map;
+})();
+
+/**
+ * Mapa plano de key → clase CSS, construido desde STATUS_COLUMNS.
+ */
+export const STATUS_COLORS = (() => {
+  const map = {};
+  STATUS_COLUMNS.forEach(col => { map[col.key] = col.color; });
+  return map;
+})();
+
+/**
+ * Normaliza un status crudo de Jira a su nombre canónico.
+ * Esto garantiza que el Excel y la UI muestren los mismos nombres de estado.
+ *
+ * @param {string} rawStatus - Status tal como viene de Jira (ej: "Ready for Dev")
+ * @returns {string} Nombre canónico (ej: "LISTO PARA DEV") o el original si no se reconoce
+ */
+export function normalizeStatus(rawStatus) {
+  if (!rawStatus) return "";
+  const lower = rawStatus.toLowerCase();
+  for (const col of STATUS_COLUMNS) {
+    if (col.jiraStatuses.some(s => s.toLowerCase() === lower)) {
+      return col.canonical;
+    }
+  }
+  return rawStatus; // Devolver tal cual si no se reconoce
+}

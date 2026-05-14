@@ -21,43 +21,8 @@ import { useState, useMemo, useCallback, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { Download } from "lucide-react";
 import { getCurrentSprint } from "@/lib/cronogramaData";
-import { sortSprints } from "@/lib/utils";
+import { sortSprints, STATUS_COLUMNS, STATUS_COLORS, CHART_STATUS_COLORS } from "@/lib/utils";
 import { exportUnifiedExcel } from "@/lib/exportExcel";
-
-/**
- * Mapeo de estados internos de Jira a columnas del reporte.
- * Cada entrada tiene una clave interna, un label legible y los estados Jira que agrupa.
- */
-const STATUS_COLUMNS = [
-    { key: "tareas_por_hacer", label: "1. Tareas por hacer", jiraStatuses: ["Tareas por hacer", "POR HACER"] },
-    { key: "en_curso", label: "2. En curso", jiraStatuses: ["En curso"] },
-    { key: "listo_para_dev", label: "3. Listo para dev", jiraStatuses: ["LISTO PARA DEV", "Ready for Dev"] },
-    { key: "control_calidad", label: "4. Control de calidad", jiraStatuses: ["Control de calidad", "QA EN DEV", "QA en DEV o CERT", "Control Calidad (Dev o Cert)"] },
-    { key: "finalizada", label: "5. Finalizada", jiraStatuses: ["Finalizada", "LISTO (PASE A CERT)"] },
-];
-
-const STATUS_COLORS = {
-    tareas_por_hacer: "bg-gray-100 text-gray-700",
-    en_curso: "bg-blue-100 text-blue-700",
-    listo_para_dev: "bg-cyan-100 text-cyan-700",
-    control_calidad: "bg-amber-100 text-amber-700",
-    finalizada: "bg-green-100 text-green-700",
-};
-
-// Colores para la gráfica de trazabilidad
-const CHART_STATUS_COLORS = {
-    "Tareas por hacer": "#9ca3af",
-    "POR HACER": "#9ca3af",
-    "En curso": "#3b82f6",
-    "LISTO PARA DEV": "#06b6d4",
-    "Ready for Dev": "#06b6d4",
-    "Control de calidad": "#f59e0b",
-    "QA EN DEV": "#f59e0b",
-    "QA en DEV o CERT": "#f59e0b",
-    "Control Calidad (Dev o Cert)": "#f59e0b",
-    "Finalizada": "#22c55e",
-    "LISTO (PASE A CERT)": "#22c55e",
-};
 
 function getStatusColor(status) {
     return CHART_STATUS_COLORS[status] || "#d1d5db";
