@@ -124,19 +124,29 @@ export default function EpicsDistributionChart({ tickets = [], currentSprint = "
       };
     });
 
+    // Bucket virtual para historias sin Épica asignada
+    const NO_EPIC_KEY = "__sin_epica__";
+    map[NO_EPIC_KEY] = {
+      key: NO_EPIC_KEY,
+      summary: "Sin Épica asignada",
+      hus: 0,
+      sp: 0,
+      tickets: []
+    };
+
     const pf3Stories = tickets.filter(t => {
       if (!t.jira_key?.startsWith("PF3-")) return false;
       const type = (t.issue_type || "").toLowerCase();
       if (!type.includes("histori") && type !== "story") return false;
       if (filterSprint && t.sprint !== filterSprint) return false;
-      if (!t.parent_key || !map[t.parent_key]) return false;
       return true;
     });
 
     pf3Stories.forEach(t => {
-      map[t.parent_key].hus += 1;
-      map[t.parent_key].sp += (parseFloat(t.story_points) || 0);
-      map[t.parent_key].tickets.push(t);
+      const bucket = (t.parent_key && map[t.parent_key]) ? t.parent_key : NO_EPIC_KEY;
+      map[bucket].hus += 1;
+      map[bucket].sp += (parseFloat(t.story_points) || 0);
+      map[bucket].tickets.push(t);
     });
 
     // Quedarse solo con las épicas que tienen al menos 1 HU en este sprint
@@ -298,15 +308,21 @@ export default function EpicsDistributionChart({ tickets = [], currentSprint = "
                 >
                   <td className="px-5 py-3 whitespace-normal">
                     <div className="flex items-start gap-3">
-                      <a
-                        href={`https://supervisorservicio2020.atlassian.net/browse/${epic.key}`}
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="font-mono text-[11px] font-semibold text-blue-600 bg-blue-50 px-2 py-1 rounded-md shrink-0 hover:underline hover:text-blue-800 transition-colors border border-blue-100"
-                      >
-                        {epic.key}
-                      </a>
+                      {epic.key.startsWith("__") ? (
+                        <span className="font-mono text-[11px] font-semibold text-gray-500 bg-gray-100 px-2 py-1 rounded-md shrink-0 border border-gray-200">
+                          —
+                        </span>
+                      ) : (
+                        <a
+                          href={`https://supervisorservicio2020.atlassian.net/browse/${epic.key}`}
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="font-mono text-[11px] font-semibold text-blue-600 bg-blue-50 px-2 py-1 rounded-md shrink-0 hover:underline hover:text-blue-800 transition-colors border border-blue-100"
+                        >
+                          {epic.key}
+                        </a>
+                      )}
                       <span className="font-semibold text-gray-800 text-[13px] leading-tight mt-0.5">
                         {epic.summary}
                       </span>

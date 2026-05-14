@@ -31,8 +31,8 @@ import { exportUnifiedExcel } from "@/lib/exportExcel";
 const STATUS_COLUMNS = [
     { key: "tareas_por_hacer", label: "1. Tareas por hacer", jiraStatuses: ["Tareas por hacer", "POR HACER"] },
     { key: "en_curso", label: "2. En curso", jiraStatuses: ["En curso"] },
-    { key: "listo_para_dev", label: "3. Listo para dev", jiraStatuses: ["LISTO PARA DEV"] },
-    { key: "control_calidad", label: "4. Control de calidad", jiraStatuses: ["Control de calidad", "QA EN DEV"] },
+    { key: "listo_para_dev", label: "3. Listo para dev", jiraStatuses: ["LISTO PARA DEV", "Ready for Dev"] },
+    { key: "control_calidad", label: "4. Control de calidad", jiraStatuses: ["Control de calidad", "QA EN DEV", "QA en DEV o CERT", "Control Calidad (Dev o Cert)"] },
     { key: "finalizada", label: "5. Finalizada", jiraStatuses: ["Finalizada", "LISTO (PASE A CERT)"] },
 ];
 
@@ -50,8 +50,11 @@ const CHART_STATUS_COLORS = {
     "POR HACER": "#9ca3af",
     "En curso": "#3b82f6",
     "LISTO PARA DEV": "#06b6d4",
+    "Ready for Dev": "#06b6d4",
     "Control de calidad": "#f59e0b",
     "QA EN DEV": "#f59e0b",
+    "QA en DEV o CERT": "#f59e0b",
+    "Control Calidad (Dev o Cert)": "#f59e0b",
     "Finalizada": "#22c55e",
     "LISTO (PASE A CERT)": "#22c55e",
 };
