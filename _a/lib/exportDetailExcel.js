@@ -133,10 +133,19 @@ function buildSheetXml(headers, rows, colWidths, sst, headerStyle = "6") {
       const val = row[h];
       if (val === "" || val == null) return;
       const ref = `${colLetter(c)}${r}`;
+
+      let sAttr = "";
+      if (h === "Categoría") {
+        if (val === "Sin detalle") sAttr = ' s="7"';
+        else if (val === "Detalle insuficiente") sAttr = ' s="8"';
+        else if (val === "Solo adjunto") sAttr = ' s="9"';
+        else if (val === "Detalle adecuado") sAttr = ' s="10"';
+      }
+
       if (typeof val === "number") {
-        xml += `<c r="${ref}"><v>${val}</v></c>`;
+        xml += `<c r="${ref}"${sAttr}><v>${val}</v></c>`;
       } else {
-        xml += `<c r="${ref}" t="s"><v>${sst.getIndex(String(val))}</v></c>`;
+        xml += `<c r="${ref}"${sAttr} t="s"><v>${sst.getIndex(String(val))}</v></c>`;
       }
     });
     xml += "</row>";
@@ -155,16 +164,19 @@ function buildDetailCacheAndPivot(rowsDetail, selectedSprint) {
   const sets = {
     sprint: new Set(),
     asignado: new Set(),
+    etiqueta: new Set(),
   };
-  const blanks = { sprint: false, asignado: false };
+  const blanks = { sprint: false, asignado: false, etiqueta: false };
 
   rowsDetail.forEach((r) => {
     if (r.Sprint) sets.sprint.add(r.Sprint); else blanks.sprint = true;
     const a = r["Persona asignada"];
     if (a && a !== "—" && a !== "Sin asignar") sets.asignado.add(a); else blanks.asignado = true;
+    const e = r.Etiquetas;
+    if (e && e.trim()) sets.etiqueta.add(e); else blanks.etiqueta = true;
   });
 
-  // Ordenar sprints numéricamente al final
+  // Ordenar
   const sprintItems = [...sets.sprint].sort((a, b) => {
     const nA = parseInt(a.match(/(\d+)\s*$/)?.[1] || "0");
     const nB = parseInt(b.match(/(\d+)\s*$/)?.[1] || "0");
@@ -172,6 +184,7 @@ function buildDetailCacheAndPivot(rowsDetail, selectedSprint) {
   });
   const asignadoItems = [...sets.asignado].sort();
   const categoriaItems = CATEGORY_ORDER;
+  const etiquetaItems = [...sets.etiqueta].sort();
 
   function makeSI(items, hasBlank, extra = "") {
     const count = items.length + (hasBlank ? 1 : 0);
@@ -185,7 +198,8 @@ function buildDetailCacheAndPivot(rowsDetail, selectedSprint) {
   const si = {
     sprint: makeSI(sprintItems, blanks.sprint),
     asignado: makeSI(asignadoItems, blanks.asignado),
-    categoria: makeSI(categoriaItems, false), // Las categorías están fijas, no tienen en blanco
+    categoria: makeSI(categoriaItems, false),
+    etiqueta: makeSI(etiquetaItems, blanks.etiqueta),
   };
 
   // 1. Pivot Cache Definition (8 campos)
@@ -203,7 +217,7 @@ function buildDetailCacheAndPivot(rowsDetail, selectedSprint) {
   defXml += `<cacheField name="Persona asignada" numFmtId="0">${si.asignado.xml}</cacheField>`;    // 3
   defXml += '<cacheField name="Estado" numFmtId="0"><sharedItems containsBlank="1"/></cacheField>'; // 4
   defXml += `<cacheField name="Categoría" numFmtId="0">${si.categoria.xml}</cacheField>`;          // 5
-  defXml += '<cacheField name="Etiquetas" numFmtId="0"><sharedItems containsBlank="1"/></cacheField>'; // 6
+  defXml += `<cacheField name="Etiquetas" numFmtId="0">${si.etiqueta.xml}</cacheField>`;            // 6
   defXml += '<cacheField name="Detalle (Preview)" numFmtId="0"><sharedItems containsBlank="1" longText="1"/></cacheField>'; // 7
   defXml += '</cacheFields></pivotCacheDefinition>';
 
@@ -227,7 +241,7 @@ function buildDetailCacheAndPivot(rowsDetail, selectedSprint) {
     recXml += `<x v="${getIdx(si.asignado, a, !a || a === "—" || a === "Sin asignar")}"/>`; // 3 Persona asignada
     recXml += `<s v="${escXml(r.Estado)}"/>`;                           // 4 Estado
     recXml += `<x v="${getIdx(si.categoria, r["Categoría"], !r["Categoría"])}"/>`; // 5 Categoría
-    recXml += `<s v="${escXml(r.Etiquetas)}"/>`;                       // 6 Etiquetas
+    recXml += `<x v="${getIdx(si.etiqueta, r.Etiquetas, !r.Etiquetas || !r.Etiquetas.trim())}"/>`; // 6 Etiquetas
     recXml += `<s v="${escXml(r["Detalle (Preview)"])}"/>`;             // 7 Detalle
     recXml += "</r>";
   });
@@ -252,17 +266,12 @@ function buildDetailCacheAndPivot(rowsDetail, selectedSprint) {
   // Pre-filtrar sprint en la tabla dinámica si hay uno seleccionado
   const sprintHidden = new Set(selectedSprint ? sprintItems.filter((v) => v !== selectedSprint) : []);
   const sprintFieldItems = makeFieldItems(si.sprint, sprintHidden, false);
-  const asignadoFieldItems = makeFieldItems(si.asignado, new Set(), true);
   const categoriaFieldItems = makeFieldItems(si.categoria, new Set(), true);
+  const etiquetaFieldItems = makeFieldItems(si.etiqueta, new Set(), false);
 
   const visibleCategoria = categoriaItems;
-  let colItemsXml = `<colItems count="${visibleCategoria.length + 1}">`;
-  visibleCategoria.forEach((_, i) => { colItemsXml += `<i><x v="${i}"/></i>`; });
-  colItemsXml += '<i t="grand"><x/></i></colItems>';
-
-  const visibleAsignado = asignadoItems;
-  let rowItemsXml = `<rowItems count="${visibleAsignado.length + 1}">`;
-  visibleAsignado.forEach((_, i) => { rowItemsXml += `<i><x v="${i}"/></i>`; });
+  let rowItemsXml = `<rowItems count="${visibleCategoria.length + 1}">`;
+  visibleCategoria.forEach((_, i) => { rowItemsXml += `<i><x v="${i}"/></i>`; });
   rowItemsXml += '<i t="grand"><x/></i></rowItems>';
 
   const ptAttrs =
@@ -275,22 +284,24 @@ function buildDetailCacheAndPivot(rowsDetail, selectedSprint) {
 
   let pt1 = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
   pt1 += `<pivotTableDefinition xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" name="TablaDinámica_Detalle" cacheId="0"${ptAttrs}>`;
-  pt1 += '<location ref="A4:F14" firstHeaderRow="1" firstDataRow="2" firstDataCol="1" rowPageCount="1" colPageCount="1"/>';
+  pt1 += '<location ref="A4:B9" firstHeaderRow="1" firstDataRow="2" firstDataCol="1" rowPageCount="2" colPageCount="1"/>';
   pt1 += '<pivotFields count="8">';
   pt1 += '<pivotField dataField="1" showAll="0"/>';                                                    // 0 Clave
   pt1 += '<pivotField showAll="0"/>';                                                                  // 1 Resumen
   pt1 += `<pivotField axis="axisPage" multipleItemSelectionAllowed="1" showAll="0">${sprintFieldItems}</pivotField>`; // 2 Sprint
-  pt1 += `<pivotField axis="axisRow" showAll="0">${asignadoFieldItems}</pivotField>`;                 // 3 Persona asignada
+  pt1 += '<pivotField showAll="0"/>';                                                                  // 3 Persona asignada
   pt1 += '<pivotField showAll="0"/>';                                                                  // 4 Estado
-  pt1 += `<pivotField axis="axisCol" showAll="0">${categoriaFieldItems}</pivotField>`;                 // 5 Categoría
-  pt1 += '<pivotField showAll="0"/>';                                                                  // 6 Etiquetas
+  pt1 += `<pivotField axis="axisRow" showAll="0">${categoriaFieldItems}</pivotField>`;                 // 5 Categoría
+  pt1 += `<pivotField axis="axisPage" multipleItemSelectionAllowed="1" showAll="0">${etiquetaFieldItems}</pivotField>`; // 6 Etiquetas
   pt1 += '<pivotField showAll="0"/>';                                                                  // 7 Detalle
   pt1 += '</pivotFields>';
-  pt1 += '<rowFields count="1"><field x="3"/></rowFields>';
+  pt1 += '<rowFields count="1"><field x="5"/></rowFields>';
   pt1 += rowItemsXml;
-  pt1 += '<colFields count="1"><field x="5"/></colFields>';
-  pt1 += colItemsXml;
-  pt1 += '<pageFields count="1"><pageField fld="2" hier="-1"/></pageFields>';
+  pt1 += '<colItems count="1"><i><x/></i></colItems>';
+  pt1 += '<pageFields count="2">';
+  pt1 += '<pageField fld="2" hier="-1"/>';
+  pt1 += '<pageField fld="6" hier="-1"/>';
+  pt1 += '</pageFields>';
   pt1 += '<dataFields count="1"><dataField name="Cuenta de Clave" fld="0" subtotal="count" baseField="0" baseItem="0"/></dataFields>';
   pt1 += styleXml;
   pt1 += '</pivotTableDefinition>';
@@ -324,15 +335,25 @@ async function customizeTemplate(zip) {
   // Cargar y personalizar estilos a azul
   let sty = await zip.file("xl/styles.xml").async("string");
 
-  // fontId=3: blanca, negrita
-  sty = sty.replace('<fonts count="3"', '<fonts count="4"');
+  // fontId=3: blanca, negrita. fonts 4,5,6,7 para categorías (pasteles legibles)
+  sty = sty.replace('<fonts count="3"', '<fonts count="8"');
   sty = sty.replace("</fonts>",
-    '<font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/><family val="2"/><scheme val="minor"/></font></fonts>');
+    '<font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/><family val="2"/><scheme val="minor"/></font>' + // index 3
+    '<font><b/><sz val="10"/><color rgb="FF991B1B"/><name val="Calibri"/><family val="2"/><scheme val="minor"/></font>' + // index 4 (red text)
+    '<font><b/><sz val="10"/><color rgb="FF92400E"/><name val="Calibri"/><family val="2"/><scheme val="minor"/></font>' + // index 5 (yellow text)
+    '<font><b/><sz val="10"/><color rgb="FF9A3412"/><name val="Calibri"/><family val="2"/><scheme val="minor"/></font>' + // index 6 (orange text)
+    '<font><b/><sz val="10"/><color rgb="FF065F46"/><name val="Calibri"/><family val="2"/><scheme val="minor"/></font>' + // index 7 (green text)
+    "</fonts>");
 
-  // fillId=3: azul corporativo
-  sty = sty.replace('<fills count="3"', '<fills count="4"');
+  // fillId=3: azul corporativo. fills 4,5,6,7 para celdas de categoría
+  sty = sty.replace('<fills count="3"', '<fills count="8"');
   sty = sty.replace("</fills>",
-    '<fill><patternFill patternType="solid"><fgColor rgb="FF4472C4"/><bgColor indexed="64"/></patternFill></fill></fills>');
+    '<fill><patternFill patternType="solid"><fgColor rgb="FF4472C4"/><bgColor indexed="64"/></patternFill></fill>' + // index 3
+    '<fill><patternFill patternType="solid"><fgColor rgb="FFFEE2E2"/><bgColor indexed="64"/></patternFill></fill>' + // index 4 (red fill)
+    '<fill><patternFill patternType="solid"><fgColor rgb="FFFEF3C7"/><bgColor indexed="64"/></patternFill></fill>' + // index 5 (yellow fill)
+    '<fill><patternFill patternType="solid"><fgColor rgb="FFFFEDD5"/><bgColor indexed="64"/></patternFill></fill>' + // index 6 (orange fill)
+    '<fill><patternFill patternType="solid"><fgColor rgb="FFD1FAE5"/><bgColor indexed="64"/></patternFill></fill>' + // index 7 (green fill)
+    "</fills>");
 
   // borderId=1: borde delgado
   sty = sty.replace('<borders count="1"', '<borders count="2"');
@@ -344,11 +365,23 @@ async function customizeTemplate(zip) {
     '<bottom style="thin"><color indexed="64"/></bottom>' +
     "<diagonal/></border></borders>");
 
-  // xfId=6: encabezado azul + blanco + centrado + borde
-  sty = sty.replace('<cellXfs count="6"', '<cellXfs count="7"');
+  // xfId=6: encabezado azul + blanco + centrado + borde. xf 7,8,9,10 para las celdas de categoría
+  sty = sty.replace('<cellXfs count="6"', '<cellXfs count="11"');
   sty = sty.replace("</cellXfs>",
-    '<xf numFmtId="0" fontId="3" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1">' +
+    '<xf numFmtId="0" fontId="3" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1">' + // index 6 (header)
     '<alignment horizontal="center" vertical="center" wrapText="1"/>' +
+    "</xf>" +
+    '<xf numFmtId="0" fontId="4" fillId="4" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1">' + // index 7 (red category)
+    '<alignment horizontal="center" vertical="center"/>' +
+    "</xf>" +
+    '<xf numFmtId="0" fontId="5" fillId="5" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1">' + // index 8 (yellow category)
+    '<alignment horizontal="center" vertical="center"/>' +
+    "</xf>" +
+    '<xf numFmtId="0" fontId="6" fillId="6" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1">' + // index 9 (orange category)
+    '<alignment horizontal="center" vertical="center"/>' +
+    "</xf>" +
+    '<xf numFmtId="0" fontId="7" fillId="7" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1">' + // index 10 (green category)
+    '<alignment horizontal="center" vertical="center"/>' +
     "</xf></cellXfs>");
 
   zip.file("xl/styles.xml", sty);
@@ -397,6 +430,17 @@ export async function exportDetailExcel(classifiedStories, selectedSprint) {
     const ptData = buildDetailCacheAndPivot(rows, selectedSprint);
 
     // 6. Inyectar archivos XML en el ZIP
+    // Construir hoja Reporte Detalle (sheet1.xml) limpia para que Excel la dibuje dinámicamente sin celdas corruptas
+    let sheet1Xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+    sheet1Xml += '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">';
+    sheet1Xml += '<dimension ref="A1:B9"/>';
+    sheet1Xml += '<sheetViews><sheetView tabSelected="1" workbookViewId="0"/></sheetViews>';
+    sheet1Xml += '<sheetFormatPr defaultRowHeight="15"/>';
+    sheet1Xml += '<sheetData/>';
+    sheet1Xml += '<pivotTables><pivotTable r:id="rId1"/></pivotTables>';
+    sheet1Xml += '</worksheet>';
+
+    zip.file("xl/worksheets/sheet1.xml", sheet1Xml);
     zip.file("xl/worksheets/sheet2.xml", osiXml);
     zip.file("xl/sharedStrings.xml", sst.toXml());
 
