@@ -207,7 +207,8 @@ export default function DetailReviewTable({ tickets = [] }) {
         (s) =>
           s.jira_key.toLowerCase().includes(q) ||
           (s.summary || "").toLowerCase().includes(q) ||
-          s.assigneeName.toLowerCase().includes(q)
+          s.assigneeName.toLowerCase().includes(q) ||
+          (s.labels || []).some((lbl) => lbl.toLowerCase().includes(q))
       );
     }
 
@@ -232,162 +233,8 @@ export default function DetailReviewTable({ tickets = [] }) {
   const handleExport = useCallback(async () => {
     setExporting(true);
     try {
-      const XLSX = (await import("xlsx-js-style")).default;
-
-      // Preparar datos para la hoja de datos
-      const dataRows = classifiedStories.map((s) => ({
-        "Clave": s.jira_key,
-        "Resumen": s.summary || "",
-        "Sprint": s.sprint || "",
-        "Persona asignada": s.assigneeName,
-        "Estado": s.normalizedStatus || s.status || "",
-        "Categoría": CATEGORY_MAP[s.category]?.label || s.category,
-        "Detalle (Preview)": s.preview || "—",
-      }));
-
-      // Crear workbook
-      const wb = XLSX.utils.book_new();
-
-      // ── Hoja 1: Datos Detalle ──────────────────────────────────────────
-      const ws = XLSX.utils.json_to_sheet(dataRows);
-
-      // Estilos de encabezado
-      const headerStyle = {
-        font: { bold: true, color: { rgb: "FFFFFF" }, sz: 11 },
-        fill: { fgColor: { rgb: "4472C4" } },
-        alignment: { horizontal: "center", vertical: "center", wrapText: true },
-        border: {
-          top: { style: "thin", color: { rgb: "000000" } },
-          bottom: { style: "thin", color: { rgb: "000000" } },
-          left: { style: "thin", color: { rgb: "000000" } },
-          right: { style: "thin", color: { rgb: "000000" } },
-        },
-      };
-
-      // Aplicar estilos a encabezados
-      const headers = ["A", "B", "C", "D", "E", "F", "G"];
-      headers.forEach((col) => {
-        const cell = ws[`${col}1`];
-        if (cell) cell.s = headerStyle;
-      });
-
-      // Anchos de columna
-      ws["!cols"] = [
-        { wch: 12 }, // Clave
-        { wch: 50 }, // Resumen
-        { wch: 22 }, // Sprint
-        { wch: 22 }, // Persona asignada
-        { wch: 20 }, // Estado
-        { wch: 22 }, // Categoría
-        { wch: 50 }, // Detalle
-      ];
-
-      // Colores condicionales por categoría
-      const categoryColors = {
-        "Sin detalle": { rgb: "FEE2E2" },
-        "Detalle insuficiente": { rgb: "FEF3C7" },
-        "Solo adjunto": { rgb: "FFEDD5" },
-        "Detalle adecuado": { rgb: "D1FAE5" },
-      };
-
-      dataRows.forEach((row, idx) => {
-        const r = idx + 2;
-        const catCell = ws[`F${r}`];
-        if (catCell && categoryColors[row["Categoría"]]) {
-          catCell.s = {
-            fill: { fgColor: categoryColors[row["Categoría"]] },
-            font: { bold: true },
-          };
-        }
-      });
-
-      XLSX.utils.book_append_sheet(wb, ws, "Datos Detalle");
-
-      // ── Hoja 2: Resumen Pivot (manual) ─────────────────────────────────
-      // Crear tabla pivot manual: Persona asignada × Categoría
-      const pivotMap = {};
-      classifiedStories.forEach((s) => {
-        if (!pivotMap[s.assigneeName]) {
-          pivotMap[s.assigneeName] = {};
-          DETAIL_CATEGORIES.forEach((c) => { pivotMap[s.assigneeName][c.label] = 0; });
-          pivotMap[s.assigneeName]["Total"] = 0;
-        }
-        const catLabel = CATEGORY_MAP[s.category]?.label || s.category;
-        pivotMap[s.assigneeName][catLabel]++;
-        pivotMap[s.assigneeName]["Total"]++;
-      });
-
-      const pivotHeaders = ["Persona asignada", ...DETAIL_CATEGORIES.map((c) => c.label), "Total"];
-      const pivotRows = Object.entries(pivotMap)
-        .sort(([a], [b]) => a.localeCompare(b, "es"))
-        .map(([name, counts]) => {
-          const row = { "Persona asignada": name };
-          DETAIL_CATEGORIES.forEach((c) => { row[c.label] = counts[c.label] || 0; });
-          row["Total"] = counts["Total"] || 0;
-          return row;
-        });
-
-      // Fila de totales
-      const totalRow = { "Persona asignada": "TOTAL" };
-      DETAIL_CATEGORIES.forEach((c) => {
-        totalRow[c.label] = pivotRows.reduce((sum, r) => sum + (r[c.label] || 0), 0);
-      });
-      totalRow["Total"] = pivotRows.reduce((sum, r) => sum + (r["Total"] || 0), 0);
-      pivotRows.push(totalRow);
-
-      const wsPivot = XLSX.utils.json_to_sheet(pivotRows, { header: pivotHeaders });
-
-      // Estilos de encabezado del pivot
-      const pivotHeaderCols = ["A", "B", "C", "D", "E", "F"];
-      pivotHeaderCols.forEach((col) => {
-        const cell = wsPivot[`${col}1`];
-        if (cell) cell.s = headerStyle;
-      });
-
-      // Colorear columnas de categoría en el encabezado
-      const catHeaderColors = [
-        { col: "B", rgb: "FCA5A5" }, // Sin detalle - rojo
-        { col: "C", rgb: "FCD34D" }, // Insuficiente - amarillo
-        { col: "D", rgb: "FDBA74" }, // Solo adjunto - naranja
-        { col: "E", rgb: "6EE7B7" }, // Adecuado - verde
-      ];
-      catHeaderColors.forEach(({ col, rgb }) => {
-        const cell = wsPivot[`${col}1`];
-        if (cell) {
-          cell.s = {
-            ...headerStyle,
-            fill: { fgColor: { rgb } },
-            font: { ...headerStyle.font, color: { rgb: "000000" } },
-          };
-        }
-      });
-
-      // Fila de totales en negrita
-      const lastRow = pivotRows.length + 1;
-      pivotHeaderCols.forEach((col) => {
-        const cell = wsPivot[`${col}${lastRow}`];
-        if (cell) {
-          cell.s = {
-            font: { bold: true },
-            fill: { fgColor: { rgb: "E5E7EB" } },
-          };
-        }
-      });
-
-      wsPivot["!cols"] = [
-        { wch: 28 }, // Persona asignada
-        { wch: 15 }, // Sin detalle
-        { wch: 22 }, // Detalle insuficiente
-        { wch: 16 }, // Solo adjunto
-        { wch: 18 }, // Detalle adecuado
-        { wch: 10 }, // Total
-      ];
-
-      XLSX.utils.book_append_sheet(wb, wsPivot, "Reporte Detalle");
-
-      // Descargar
-      const fileName = `Revision_Detalle_${selectedSprint || "Todos"}_${new Date().toISOString().slice(0, 10)}.xlsx`;
-      XLSX.writeFile(wb, fileName);
+      const { exportDetailExcel } = await import("@/lib/exportDetailExcel");
+      await exportDetailExcel(classifiedStories, selectedSprint);
     } catch (err) {
       console.error("Error exportando Excel:", err);
       alert("Error al exportar el Excel. Revisa la consola para más detalles.");
@@ -656,6 +503,7 @@ export default function DetailReviewTable({ tickets = [] }) {
                     <th className="text-left py-3 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Asignado</th>
                     <th className="text-left py-3 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Estado</th>
                     <th className="text-left py-3 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Categoría</th>
+                    <th className="text-left py-3 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Etiquetas</th>
                     <th className="text-left py-3 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden xl:table-cell">Preview del Detalle</th>
                   </tr>
                 </thead>
@@ -699,6 +547,21 @@ export default function DetailReviewTable({ tickets = [] }) {
                             <span className={`w-1.5 h-1.5 rounded-full ${cat.dotColor}`} />
                             {cat.label}
                           </span>
+                        </td>
+
+                        {/* Etiquetas */}
+                        <td className="py-3 px-3 whitespace-nowrap">
+                          <div className="flex flex-wrap gap-1 max-w-[150px]">
+                            {story.labels && story.labels.length > 0 ? (
+                              story.labels.map((lbl) => (
+                                <span key={lbl} className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-600 border border-blue-100">
+                                  {lbl}
+                                </span>
+                              ))
+                            ) : (
+                              <span className="text-gray-400 text-xs">—</span>
+                            )}
+                          </div>
                         </td>
 
                         {/* Preview */}
