@@ -414,7 +414,7 @@ export async function exportDetailExcel(classifiedStories, selectedSprint) {
     const rows = classifiedStories.map((s) => ({
       "Clave": s.jira_key || "",
       "Resumen": s.summary || "",
-      "Sprint": s.sprint || "",
+      "Sprint": s.sprint || "Backlog",
       "Persona asignada": s.assigneeName || "Sin asignar",
       "Estado": s.normalizedStatus || s.status || "",
       "Categoría": CATEGORY_MAP[s.category]?.label || s.category,

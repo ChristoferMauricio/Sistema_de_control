@@ -160,21 +160,22 @@ export default function DetailReviewTable({ tickets = [] }) {
     return sortSprints([...s]);
   }, [historias]);
 
-  // ── Clasificar todas las historias del sprint ──────────────────────────
-  const classifiedStories = useMemo(() => {
-    let filtered = historias;
-    if (selectedSprint) {
-      filtered = filtered.filter((t) => t.sprint === selectedSprint);
-    }
-
-    return filtered.map((t) => ({
+  // ── Clasificar todas las historias del proyecto (incluye sprints y backlog) ──
+  const allClassifiedStories = useMemo(() => {
+    return historias.map((t) => ({
       ...t,
       category: classifyDescription(t.description),
       assigneeName: resolveName(t.assignee_email),
       preview: getPlainPreview(t.description, 100),
       normalizedStatus: normalizeStatus(t.status),
     }));
-  }, [historias, selectedSprint, resolveName]);
+  }, [historias, resolveName]);
+
+  // ── Filtrar historias clasificados por el sprint seleccionado para la UI ──
+  const classifiedStories = useMemo(() => {
+    if (!selectedSprint) return allClassifiedStories;
+    return allClassifiedStories.filter((t) => t.sprint === selectedSprint);
+  }, [allClassifiedStories, selectedSprint]);
 
   // ── Conteos por categoría ──────────────────────────────────────────────
   const categoryCounts = useMemo(() => {
@@ -234,13 +235,13 @@ export default function DetailReviewTable({ tickets = [] }) {
     setExporting(true);
     try {
       const { exportDetailExcel } = await import("@/lib/exportDetailExcel");
-      await exportDetailExcel(classifiedStories, selectedSprint);
+      await exportDetailExcel(allClassifiedStories, selectedSprint);
     } catch (err) {
       console.error("Error exportando Excel:", err);
       alert("Error al exportar el Excel. Revisa la consola para más detalles.");
     }
     setExporting(false);
-  }, [classifiedStories, selectedSprint]);
+  }, [allClassifiedStories, selectedSprint]);
 
   // ── Tooltip personalizado para el gráfico de dona ──────────────────────
   const CustomTooltip = ({ active, payload }) => {
