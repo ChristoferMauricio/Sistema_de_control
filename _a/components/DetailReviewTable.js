@@ -81,6 +81,7 @@ export default function DetailReviewTable({ tickets = [] }) {
   const [showOnlyWithoutEpic, setShowOnlyWithoutEpic] = useState(false);
   const [hideNoReportar, setHideNoReportar] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState(null);
+  const [activeTab, setActiveTab] = useState("detalle"); // "detalle" | "epicas"
   const [columnFilters, setColumnFilters] = useState({
     assigneeName: [],
     status: [],
@@ -200,6 +201,36 @@ export default function DetailReviewTable({ tickets = [] }) {
   const storiesWithoutEpic = useMemo(() => {
     return classifiedStories.filter((s) => !s.parent_key);
   }, [classifiedStories]);
+
+  // ── Datos para el gráfico de Épicas ────────────────────────────────────
+  const epicChartData = useMemo(() => {
+    const epicCounts = {};
+    classifiedStories.forEach((s) => {
+      const epicKey = s.parent_key || "Sin Épica";
+      epicCounts[epicKey] = (epicCounts[epicKey] || 0) + 1;
+    });
+
+    return Object.entries(epicCounts)
+      .map(([name, value]) => ({
+        name,
+        value,
+        color: name === "Sin Épica" ? "#f59e0b" : "#3b82f6",
+      }))
+      .sort((a, b) => b.value - a.value);
+  }, [classifiedStories]);
+
+  // ── Estadísticas para el reporte de Épicas ─────────────────────────────
+  const epicStats = useMemo(() => {
+    const total = classifiedStories.length;
+    const withoutEpic = storiesWithoutEpic.length;
+    const withEpic = total - withoutEpic;
+    return {
+      total,
+      withEpic,
+      withoutEpic,
+      coverage: total > 0 ? ((withEpic / total) * 100).toFixed(1) : "0.0",
+    };
+  }, [classifiedStories, storiesWithoutEpic]);
 
   // ── Obtener valores únicos para los filtros de columna ─────────────────
   const uniqueFilterValues = useMemo(() => {
@@ -397,24 +428,29 @@ export default function DetailReviewTable({ tickets = [] }) {
   const handleExport = useCallback(async () => {
     setExporting(true);
     try {
-      const { exportDetailExcel } = await import("@/lib/exportDetailExcel");
-      await exportDetailExcel(allClassifiedStories, selectedSprint);
+      const { exportDetailExcel, exportEpicExcel } = await import("@/lib/exportDetailExcel");
+      if (activeTab === "detalle") {
+        await exportDetailExcel(allClassifiedStories, selectedSprint);
+      } else {
+        await exportEpicExcel(allClassifiedStories, selectedSprint);
+      }
     } catch (err) {
       console.error("Error exportando Excel:", err);
       alert("Error al exportar el Excel. Revisa la consola para más detalles.");
     }
     setExporting(false);
-  }, [allClassifiedStories, selectedSprint]);
+  }, [allClassifiedStories, selectedSprint, activeTab]);
 
-  // ── Tooltip personalizado para el gráfico de dona ──────────────────────
+  // ── Tooltip personalizado para los gráficos ───────────────────────────
   const CustomTooltip = ({ active, payload }) => {
     if (active && payload && payload.length) {
       const data = payload[0];
+      const valText = activeTab === "detalle" ? "historia" : "HU";
       return (
         <div className="bg-white rounded-xl shadow-lg border border-gray-200 px-4 py-3">
           <p className="text-sm font-semibold text-gray-900">{data.name}</p>
           <p className="text-sm text-gray-600 mt-0.5">
-            {data.value} historia{data.value !== 1 ? "s" : ""}{" "}
+            {data.value} {valText}{data.value !== 1 ? "s" : ""}{" "}
             <span className="text-gray-400">({getPercentage(data.value)}%)</span>
           </p>
         </div>
@@ -467,47 +503,161 @@ export default function DetailReviewTable({ tickets = [] }) {
         </button>
       </div>
 
-      {/* ── KPI Cards ───────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {DETAIL_CATEGORIES.map((cat, index) => {
-          const count = categoryCounts[cat.key];
-          const isActive = categoryFilter === cat.key;
-          return (
-            <Card
-              key={cat.key}
-              hover
-              className={`animate-slide-up stagger-${index + 1} cursor-pointer ${
-                isActive ? `ring-2 ring-offset-1 ${cat.borderColor} ${cat.bgColor}` : ""
-              }`}
-              onClick={() =>
-                setCategoryFilter(isActive ? null : cat.key)
-              }
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-gray-500 text-sm font-medium">{cat.label}</p>
-                  <div className="flex items-baseline gap-2 mt-1">
-                    <span className="text-3xl font-bold font-[family-name:var(--font-heading)] text-gray-900">
-                      {count}
-                    </span>
-                    <span className={`text-sm font-semibold ${cat.color}`}>
-                      {getPercentage(count)}%
+      {/* ── Tabs de Reporte ────────────────────────────────────────────── */}
+      <div className="flex border-b border-gray-200">
+        <button
+          onClick={() => {
+            setActiveTab("detalle");
+            setCategoryFilter(null);
+          }}
+          className={`px-5 py-3 border-b-2 text-sm font-semibold transition-all ${
+            activeTab === "detalle"
+              ? "border-orange-500 text-orange-600"
+              : "border-transparent text-gray-500 hover:text-gray-900"
+          }`}
+        >
+          Reporte por Detalle de Historia
+        </button>
+        <button
+          onClick={() => {
+            setActiveTab("epicas");
+            setCategoryFilter(null);
+          }}
+          className={`px-5 py-3 border-b-2 text-sm font-semibold transition-all ${
+            activeTab === "epicas"
+              ? "border-orange-500 text-orange-600"
+              : "border-transparent text-gray-500 hover:text-gray-900"
+          }`}
+        >
+          Reporte de Épica
+        </button>
+      </div>
+
+      {/* ── KPI Cards Condicionales ────────────────────────────────────── */}
+      {activeTab === "detalle" ? (
+        /* KPI Cards Detalle */
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {DETAIL_CATEGORIES.map((cat, index) => {
+            const count = categoryCounts[cat.key];
+            const isActive = categoryFilter === cat.key;
+            return (
+              <Card
+                key={cat.key}
+                hover
+                className={`animate-slide-up stagger-${index + 1} cursor-pointer ${
+                  isActive ? `ring-2 ring-offset-1 ${cat.borderColor} ${cat.bgColor}` : ""
+                }`}
+                onClick={() =>
+                  setCategoryFilter(isActive ? null : cat.key)
+                }
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-gray-500 text-sm font-medium">{cat.label}</p>
+                    <div className="flex items-baseline gap-2 mt-1">
+                      <span className="text-3xl font-bold font-[family-name:var(--font-heading)] text-gray-900">
+                        {count}
+                      </span>
+                      <span className={`text-sm font-semibold ${cat.color}`}>
+                        {getPercentage(count)}%
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-gray-400 mt-1.5 leading-snug">
+                      {cat.description}
+                    </p>
+                  </div>
+                  <div className={`p-2.5 rounded-xl ${cat.iconBg}`}>
+                    <span className={cat.iconColor}>
+                      {CATEGORY_ICONS[cat.key]}
                     </span>
                   </div>
-                  <p className="text-[11px] text-gray-400 mt-1.5 leading-snug">
-                    {cat.description}
-                  </p>
                 </div>
-                <div className={`p-2.5 rounded-xl ${cat.iconBg}`}>
-                  <span className={cat.iconColor}>
-                    {CATEGORY_ICONS[cat.key]}
+              </Card>
+            );
+          })}
+        </div>
+      ) : (
+        /* KPI Cards Épicas */
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {/* Total Historias */}
+          <Card className="animate-slide-up cursor-default">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-gray-500 text-sm font-medium">Total Historias</p>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <span className="text-3xl font-bold font-[family-name:var(--font-heading)] text-gray-900">
+                    {epicStats.total}
+                  </span>
+                  <span className="text-sm font-semibold text-gray-400">100%</span>
+                </div>
+                <p className="text-[11px] text-gray-400 mt-1.5 leading-snug">
+                  Total de Historias de Usuario registradas en el sprint actual
+                </p>
+              </div>
+              <div className="p-2.5 rounded-xl bg-blue-50 text-blue-500">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+            </div>
+          </Card>
+
+          {/* HUs con Épica */}
+          <Card className="animate-slide-up cursor-default">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-gray-500 text-sm font-medium">HUs vinculadas a Épica</p>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <span className="text-3xl font-bold font-[family-name:var(--font-heading)] text-gray-900 text-emerald-600">
+                    {epicStats.withEpic}
+                  </span>
+                  <span className="text-sm font-semibold text-emerald-500">
+                    {getPercentage(epicStats.withEpic)}%
                   </span>
                 </div>
+                <p className="text-[11px] text-gray-400 mt-1.5 leading-snug">
+                  Historias de Usuario asociadas correctamente a una Épica en Jira
+                </p>
               </div>
-            </Card>
-          );
-        })}
-      </div>
+              <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-500">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+            </div>
+          </Card>
+
+          {/* HUs sin Épica */}
+          <Card className={`animate-slide-up cursor-pointer transition-all ${
+            showOnlyWithoutEpic ? "ring-2 ring-amber-500 ring-offset-0" : ""
+          }`}
+          onClick={() => setShowOnlyWithoutEpic(!showOnlyWithoutEpic)}
+          title="Haz clic para mostrar sólo las HUs sin Épica"
+          >
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-gray-500 text-sm font-medium">HUs sin Épica</p>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <span className="text-3xl font-bold font-[family-name:var(--font-heading)] text-amber-600">
+                    {epicStats.withoutEpic}
+                  </span>
+                  <span className="text-sm font-semibold text-amber-500">
+                    {getPercentage(epicStats.withoutEpic)}%
+                  </span>
+                </div>
+                <p className="text-[11px] text-gray-400 mt-1.5 leading-snug">
+                  Historias huérfanas que no tienen ninguna Épica asociada. Haz clic para filtrar
+                </p>
+              </div>
+              <div className="p-2.5 rounded-xl bg-amber-50 text-amber-500">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
 
       {/* Badge de filtro activo */}
       {categoryFilter && (
@@ -528,10 +678,10 @@ export default function DetailReviewTable({ tickets = [] }) {
         </div>
       )}
 
-      {/* ── Gráfico de Dona + Resumen ───────────────────────────────────── */}
-      {total > 0 && (
+      {/* ── Gráficas y Resumen Condicionales ────────────────────────────── */}
+      {total > 0 && activeTab === "detalle" && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Dona */}
+          {/* Dona Detalle */}
           <Card className="lg:col-span-1 animate-fade-in">
             <h3 className="text-sm font-semibold text-gray-700 mb-4">Distribución de Calidad</h3>
             <div className="h-[260px]">
@@ -574,10 +724,10 @@ export default function DetailReviewTable({ tickets = [] }) {
             </div>
           </Card>
 
-          {/* Resumen de métricas */}
+          {/* Resumen de métricas Detalle */}
           <Card className="lg:col-span-2 animate-fade-in">
             <h3 className="text-sm font-semibold text-gray-700 mb-4">Resumen de Revisión</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
               {/* Total de historias */}
               <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 flex flex-col justify-between">
                 <div>
@@ -609,29 +759,6 @@ export default function DetailReviewTable({ tickets = [] }) {
                 <p className="text-xs text-emerald-500 mt-1">{getPercentage(categoryCounts.detalle_adecuado)}% del total</p>
               </div>
 
-              {/* Historias sin Épica */}
-              <div
-                className={`rounded-xl p-4 border transition-all cursor-pointer flex flex-col justify-between hover:scale-[1.02] active:scale-[0.98] ${
-                  storiesWithoutEpic.length > 0
-                    ? "bg-amber-50 border-amber-200 hover:bg-amber-100/50"
-                    : "bg-gray-50 border-gray-100"
-                } ${showOnlyWithoutEpic ? "ring-2 ring-amber-500 ring-offset-0" : ""}`}
-                onClick={() => setShowOnlyWithoutEpic(!showOnlyWithoutEpic)}
-                title="Haz clic para filtrar historias sin épica"
-              >
-                <div>
-                  <p className={`text-xs font-semibold uppercase tracking-wider ${
-                    storiesWithoutEpic.length > 0 ? "text-amber-500" : "text-gray-400"
-                  }`}>HUs sin Épica</p>
-                  <p className={`text-2xl font-bold mt-1 ${
-                    storiesWithoutEpic.length > 0 ? "text-amber-700" : "text-gray-900"
-                  }`}>{storiesWithoutEpic.length}</p>
-                </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  {getPercentage(storiesWithoutEpic.length)}% del total
-                </p>
-              </div>
-
               {/* Barra de progreso */}
               <div className="bg-white rounded-xl p-4 border border-gray-200 flex flex-col justify-center">
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Completitud</p>
@@ -644,6 +771,118 @@ export default function DetailReviewTable({ tickets = [] }) {
                 <p className="text-sm font-bold text-gray-700 mt-2">
                   {getPercentage(categoryCounts.detalle_adecuado)}%
                   <span className="text-xs font-normal text-gray-400 ml-1">completado</span>
+                </p>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {total > 0 && activeTab === "epicas" && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Dona Épicas */}
+          <Card className="lg:col-span-1 animate-fade-in">
+            <h3 className="text-sm font-semibold text-gray-700 mb-4">HUs por Épica</h3>
+            <div className="h-[260px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={epicChartData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={55}
+                    outerRadius={90}
+                    paddingAngle={3}
+                    dataKey="value"
+                    strokeWidth={2}
+                    stroke="#fff"
+                  >
+                    {epicChartData.map((entry, i) => (
+                      <Cell key={i} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<CustomTooltip />} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            {/* Leyenda manual Épicas */}
+            <div className="space-y-2 mt-2 max-h-36 overflow-y-auto pr-1">
+              {epicChartData.map((epic) => {
+                if (epic.value === 0) return null;
+                return (
+                  <div key={epic.name} className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: epic.color }} />
+                      <span className="text-gray-600 truncate max-w-[140px]" title={epic.name}>
+                        {epic.name}
+                      </span>
+                    </div>
+                    <span className="font-semibold text-gray-800">{epic.value}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+
+          {/* Resumen de Épicas */}
+          <Card className="lg:col-span-2 animate-fade-in">
+            <h3 className="text-sm font-semibold text-gray-700 mb-4">Resumen de Épicas</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+              {/* Total de historias */}
+              <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 flex flex-col justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Total Historias</p>
+                  <p className="text-2xl font-bold text-gray-900 mt-1">{epicStats.total}</p>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">en {selectedSprint || "todos los sprints"}</p>
+              </div>
+
+              {/* Con Épica */}
+              <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-100 flex flex-col justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">Con Épica</p>
+                  <p className="text-2xl font-bold text-emerald-700 mt-1">{epicStats.withEpic}</p>
+                </div>
+                <p className="text-xs text-emerald-500 mt-1">
+                  {getPercentage(epicStats.withEpic)}% del total
+                </p>
+              </div>
+
+              {/* Sin Épica */}
+              <div
+                className={`rounded-xl p-4 border transition-all cursor-pointer flex flex-col justify-between hover:scale-[1.02] active:scale-[0.98] ${
+                  epicStats.withoutEpic > 0
+                    ? "bg-amber-50 border-amber-200 hover:bg-amber-100/50"
+                    : "bg-gray-50 border-gray-100"
+                } ${showOnlyWithoutEpic ? "ring-2 ring-amber-500 ring-offset-0" : ""}`}
+                onClick={() => setShowOnlyWithoutEpic(!showOnlyWithoutEpic)}
+                title="Haz clic para filtrar historias sin épica"
+              >
+                <div>
+                  <p className={`text-xs font-semibold uppercase tracking-wider ${
+                    epicStats.withoutEpic > 0 ? "text-amber-500" : "text-gray-400"
+                  }`}>HUs sin Épica</p>
+                  <p className={`text-2xl font-bold mt-1 ${
+                    epicStats.withoutEpic > 0 ? "text-amber-700" : "text-gray-900"
+                  }`}>{epicStats.withoutEpic}</p>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  {getPercentage(epicStats.withoutEpic)}% del total
+                </p>
+              </div>
+
+              {/* Cobertura de Épicas */}
+              <div className="bg-white rounded-xl p-4 border border-gray-200 flex flex-col justify-center">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Cobertura</p>
+                <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-blue-400 to-blue-500 rounded-full transition-all duration-500"
+                    style={{ width: `${epicStats.coverage}%` }}
+                  />
+                </div>
+                <p className="text-sm font-bold text-gray-700 mt-2">
+                  {epicStats.coverage}%
+                  <span className="text-xs font-normal text-gray-400 ml-1">vinculado</span>
                 </p>
               </div>
             </div>
@@ -719,10 +958,16 @@ export default function DetailReviewTable({ tickets = [] }) {
                     <th className="text-left py-3 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Resumen</th>
                     <th className="text-left py-3 px-3">{renderHeaderFilter("assigneeName", "Asignado")}</th>
                     <th className="text-left py-3 px-3">{renderHeaderFilter("status", "Estado")}</th>
-                    <th className="text-left py-3 px-3">{renderHeaderFilter("parent_key", "Épica")}</th>
-                    <th className="text-left py-3 px-3">{renderHeaderFilter("category", "Categoría")}</th>
+                    {activeTab === "epicas" && (
+                      <th className="text-left py-3 px-3">{renderHeaderFilter("parent_key", "Épica")}</th>
+                    )}
+                    {activeTab === "detalle" && (
+                      <th className="text-left py-3 px-3">{renderHeaderFilter("category", "Categoría")}</th>
+                    )}
                     <th className="text-left py-3 px-3">{renderHeaderFilter("labels", "Etiquetas")}</th>
-                    <th className="text-left py-3 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden xl:table-cell">Preview del Detalle</th>
+                    {activeTab === "detalle" && (
+                      <th className="text-left py-3 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden xl:table-cell">Preview del Detalle</th>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -760,30 +1005,34 @@ export default function DetailReviewTable({ tickets = [] }) {
                         </td>
 
                         {/* Épica */}
-                        <td className="py-3 px-3 whitespace-nowrap">
-                          {story.parent_key ? (
-                            <a
-                              href={`${JIRA_BASE}/${story.parent_key}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="font-mono font-semibold text-blue-600 hover:text-blue-800 hover:underline text-[12px]"
-                            >
-                              {story.parent_key}
-                            </a>
-                          ) : (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-                              ⚠️ Sin Épica
-                            </span>
-                          )}
-                        </td>
+                        {activeTab === "epicas" && (
+                          <td className="py-3 px-3 whitespace-nowrap">
+                            {story.parent_key ? (
+                              <a
+                                href={`${JIRA_BASE}/${story.parent_key}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="font-mono font-semibold text-blue-600 hover:text-blue-800 hover:underline text-[12px]"
+                              >
+                                {story.parent_key}
+                              </a>
+                            ) : (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                                Sin Épica
+                              </span>
+                            )}
+                          </td>
+                        )}
 
                         {/* Categoría */}
-                        <td className="py-3 px-3 whitespace-nowrap">
-                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold ${cat.bgColor} ${cat.color} border ${cat.borderColor}`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${cat.dotColor}`} />
-                            {cat.label}
-                          </span>
-                        </td>
+                        {activeTab === "detalle" && (
+                          <td className="py-3 px-3 whitespace-nowrap">
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold ${cat.bgColor} ${cat.color} border ${cat.borderColor}`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${cat.dotColor}`} />
+                              {cat.label}
+                            </span>
+                          </td>
+                        )}
 
                         {/* Etiquetas */}
                         <td className="py-3 px-3 whitespace-nowrap">
@@ -801,11 +1050,13 @@ export default function DetailReviewTable({ tickets = [] }) {
                         </td>
 
                         {/* Preview */}
-                        <td className="py-3 px-3 max-w-[280px] hidden xl:table-cell">
-                          <span className="text-gray-400 text-xs leading-relaxed line-clamp-2">
-                            {story.preview}
-                          </span>
-                        </td>
+                        {activeTab === "detalle" && (
+                          <td className="py-3 px-3 max-w-[280px] hidden xl:table-cell">
+                            <span className="text-gray-400 text-xs leading-relaxed line-clamp-2">
+                              {story.preview}
+                            </span>
+                          </td>
+                        )}
                       </tr>
                     );
                   })}

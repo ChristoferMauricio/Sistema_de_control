@@ -160,6 +160,21 @@ function buildSheetXml(headers, rows, colWidths, sst, headerStyle = "6") {
 /**
  * Reconstruye la pivot cache y la pivot table
  */
+function makeFieldItems(info, hiddenVals, hideBlank) {
+  const count = info.items.length + (info.hasBlank ? 1 : 0) + 1; // +1 default
+  let x = `<items count="${count}">`;
+  info.items.forEach((v, i) => {
+    const h = hiddenVals.has(v) ? ' h="1"' : "";
+    x += `<item${h} x="${i}"/>`;
+  });
+  if (info.hasBlank) {
+    x += `<item${hideBlank ? ' h="1"' : ""} x="${info.blankIdx}"/>`;
+  }
+  x += '<item t="default"/>';
+  x += "</items>";
+  return x;
+}
+
 function buildDetailCacheAndPivot(rowsDetail, selectedSprint) {
   const sets = {
     sprint: new Set(),
@@ -252,21 +267,6 @@ function buildDetailCacheAndPivot(rowsDetail, selectedSprint) {
   recXml += "</pivotCacheRecords>";
 
   // 3. Pivot Table
-  function makeFieldItems(info, hiddenVals, hideBlank) {
-    const count = info.items.length + (info.hasBlank ? 1 : 0) + 1; // +1 default
-    let x = `<items count="${count}">`;
-    info.items.forEach((v, i) => {
-      const h = hiddenVals.has(v) ? ' h="1"' : "";
-      x += `<item${h} x="${i}"/>`;
-    });
-    if (info.hasBlank) {
-      x += `<item${hideBlank ? ' h="1"' : ""} x="${info.blankIdx}"/>`;
-    }
-    x += '<item t="default"/>';
-    x += "</items>";
-    return x;
-  }
-
   // Pre-filtrar sprint en la tabla dinámica si hay uno seleccionado
   const sprintHidden = new Set(selectedSprint ? sprintItems.filter((v) => v !== selectedSprint) : []);
   const sprintFieldItems = makeFieldItems(si.sprint, sprintHidden, false);
@@ -488,6 +488,227 @@ export async function exportDetailExcel(classifiedStories, selectedSprint) {
 
   } catch (err) {
     console.error("Error al exportar reporte de detalle a Excel:", err);
+    alert("Error al exportar a Excel. Revisa la consola para más detalles.");
+  }
+}
+
+/**
+ * Reconstruye la pivot cache y la pivot table para el reporte de Épicas
+ */
+function buildEpicCacheAndPivot(rows, selectedSprint) {
+  const sets = {
+    sprint: new Set(),
+    asignado: new Set(),
+    etiqueta: new Set(),
+    epic: new Set(),
+  };
+  const blanks = { sprint: false, asignado: false, etiqueta: false, epic: false };
+
+  rows.forEach((r) => {
+    if (r.Sprint) sets.sprint.add(r.Sprint); else blanks.sprint = true;
+    const a = r["Persona asignada"];
+    if (a && a !== "—" && a !== "Sin asignar") sets.asignado.add(a); else blanks.asignado = true;
+    const e = r.Etiquetas;
+    if (e && e.trim()) sets.etiqueta.add(e); else blanks.etiqueta = true;
+    const ep = r.Épica;
+    if (ep && ep !== "—") sets.epic.add(ep); else blanks.epic = true;
+  });
+
+  const sprintItems = [...sets.sprint].sort();
+  const asignadoItems = [...sets.asignado].sort();
+  const epicItems = [...sets.epic].sort();
+  const etiquetaItems = [...sets.etiqueta].sort();
+
+  function makeSI(items, hasBlank, extra = "") {
+    const count = items.length + (hasBlank ? 1 : 0);
+    let x = `<sharedItems${hasBlank ? ' containsBlank="1"' : ""} count="${count}"${extra}>`;
+    items.forEach((v) => { x += `<s v="${escXml(v)}"/>`; });
+    if (hasBlank) x += "<m/>";
+    x += "</sharedItems>";
+    return { xml: x, items, hasBlank, blankIdx: hasBlank ? items.length : -1 };
+  }
+
+  const si = {
+    sprint: makeSI(sprintItems, blanks.sprint),
+    asignado: makeSI(asignadoItems, blanks.asignado),
+    epic: makeSI(epicItems, blanks.epic),
+    etiqueta: makeSI(etiquetaItems, blanks.etiqueta),
+  };
+
+  // 1. Pivot Cache Definition
+  let defXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+  defXml += '<pivotCacheDefinition refreshOnLoad="1" xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"';
+  defXml += ' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
+  defXml += ` r:id="rId1" refreshedBy="Sistema" refreshedDate="46098"`;
+  defXml += ` createdVersion="8" refreshedVersion="8" minRefreshableVersion="3"`;
+  defXml += ` recordCount="${rows.length}">`;
+  defXml += '<cacheSource type="worksheet"><worksheetSource ref="A1:J1048576" sheet="Datos Detalle"/></cacheSource>';
+  defXml += '<cacheFields count="10">';
+  defXml += '<cacheField name="Clave" numFmtId="0"><sharedItems containsBlank="1"/></cacheField>';  // 0
+  defXml += '<cacheField name="Resumen" numFmtId="0"><sharedItems containsBlank="1" longText="1"/></cacheField>'; // 1
+  defXml += `<cacheField name="Sprint" numFmtId="0">${si.sprint.xml}</cacheField>`;                // 2
+  defXml += `<cacheField name="Persona asignada" numFmtId="0">${si.asignado.xml}</cacheField>`;    // 3
+  defXml += '<cacheField name="Estado" numFmtId="0"><sharedItems containsBlank="1"/></cacheField>'; // 4
+  defXml += '<cacheField name="Categoría" numFmtId="0"><sharedItems containsBlank="1"/></cacheField>'; // 5
+  defXml += '<cacheField name="¿Tiene Épica?" numFmtId="0"><sharedItems count="2"><s v="Sí"/><s v="No"/></sharedItems></cacheField>'; // 6
+  defXml += `<cacheField name="Épica" numFmtId="0">${si.epic.xml}</cacheField>`;                    // 7
+  defXml += `<cacheField name="Etiquetas" numFmtId="0">${si.etiqueta.xml}</cacheField>`;            // 8
+  defXml += '<cacheField name="Detalle (Preview)" numFmtId="0"><sharedItems containsBlank="1" longText="1"/></cacheField>'; // 9
+  defXml += '</cacheFields></pivotCacheDefinition>';
+
+  // 2. Records
+  let recXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+  recXml += '<pivotCacheRecords xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"';
+  recXml += ' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
+  recXml += ` count="${rows.length}">`;
+  rows.forEach((r) => {
+    recXml += "<r>";
+    recXml += `<s v="${escXml(r.Clave)}"/>`;                           // 0 Clave
+    recXml += `<s v="${escXml(r.Resumen)}"/>`;                         // 1 Resumen
+    recXml += `<x v="${getIdx(si.sprint, r.Sprint, !r.Sprint)}"/>`;    // 2 Sprint
+    const a = r["Persona asignada"];
+    recXml += `<x v="${getIdx(si.asignado, a, !a || a === "—" || a === "Sin asignar")}"/>`; // 3 Persona asignada
+    recXml += `<s v="${escXml(r.Estado)}"/>`;                           // 4 Estado
+    recXml += `<s v="${escXml(r.Categoría)}"/>`;                         // 5 Categoría
+    recXml += `<x v="${r["¿Tiene Épica?"] === "Sí" ? 0 : 1}"/>`;        // 6 ¿Tiene Épica?
+    recXml += `<x v="${getIdx(si.epic, r.Épica, !r.Épica || r.Épica === "—")}"/>`; // 7 Épica
+    recXml += `<x v="${getIdx(si.etiqueta, r.Etiquetas, !r.Etiquetas || !r.Etiquetas.trim())}"/>`; // 8 Etiquetas
+    recXml += `<s v="${escXml(r["Detalle (Preview)"])}"/>`;             // 9 Detalle
+    recXml += "</r>";
+  });
+  recXml += "</pivotCacheRecords>";
+
+  // 3. Table
+  const sprintHidden = new Set(selectedSprint ? sprintItems.filter((v) => v !== selectedSprint) : []);
+  const sprintFieldItems = makeFieldItems(si.sprint, sprintHidden, false);
+  const epicFieldItems = makeFieldItems(si.epic, new Set(), true);
+  const etiquetaFieldItems = makeFieldItems(si.etiqueta, new Set(), false);
+
+  const visibleEpic = epicItems;
+  let rowItemsXml = `<rowItems count="${visibleEpic.length + 1}">`;
+  visibleEpic.forEach((_, i) => { rowItemsXml += `<i><x v="${i}"/></i>`; });
+  rowItemsXml += '<i t="grand"><x/></i></rowItems>';
+
+  const ptAttrs =
+    ' applyNumberFormats="0" applyBorderFormats="0" applyFontFormats="0"' +
+    ' applyPatternFormats="0" applyAlignmentFormats="0" applyWidthHeightFormats="1"' +
+    ' dataCaption="Valores" updatedVersion="8" minRefreshableVersion="3"' +
+    ' useAutoFormatting="1" itemPrintTitles="1" createdVersion="8"' +
+    ' indent="0" outline="1" outlineData="1" multipleFieldFilters="0"';
+  const styleXml = '<pivotTableStyleInfo name="PivotStyleMedium4" showRowHeaders="1" showColHeaders="1" showRowStripes="0" showColStripes="0" showLastColumn="1"/>';
+
+  let pt1 = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+  pt1 += `<pivotTableDefinition xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" name="TablaDinámica_Épicas" cacheId="0"${ptAttrs}>`;
+  pt1 += '<location ref="A4:B9" firstHeaderRow="1" firstDataRow="2" firstDataCol="1" rowPageCount="2" colPageCount="1"/>';
+  pt1 += '<pivotFields count="10">';
+  pt1 += '<pivotField dataField="1" showAll="0"/>';                                                    // 0 Clave
+  pt1 += '<pivotField showAll="0"/>';                                                                  // 1 Resumen
+  pt1 += `<pivotField axis="axisPage" multipleItemSelectionAllowed="1" showAll="0">${sprintFieldItems}</pivotField>`; // 2 Sprint
+  pt1 += '<pivotField showAll="0"/>';                                                                  // 3 Persona asignada
+  pt1 += '<pivotField showAll="0"/>';                                                                  // 4 Estado
+  pt1 += '<pivotField showAll="0"/>';                                                                  // 5 Categoría
+  pt1 += '<pivotField showAll="0"/>';                                                                  // 6 ¿Tiene Épica?
+  pt1 += `<pivotField axis="axisRow" showAll="0">${epicFieldItems}</pivotField>`;                     // 7 Épica
+  pt1 += `<pivotField axis="axisPage" multipleItemSelectionAllowed="1" showAll="0">${etiquetaFieldItems}</pivotField>`; // 8 Etiquetas
+  pt1 += '<pivotField showAll="0"/>';                                                                  // 9 Detalle
+  pt1 += '</pivotFields>';
+  pt1 += '<rowFields count="1"><field x="7"/></rowFields>';
+  pt1 += rowItemsXml;
+  pt1 += '<colItems count="1"><i><x/></i></colItems>';
+  pt1 += '<pageFields count="2">';
+  pt1 += '<pageField fld="2" hier="-1"/>';
+  pt1 += '<pageField fld="8" hier="-1"/>';
+  pt1 += '</pageFields>';
+  pt1 += '<dataFields count="1"><dataField name="Cuenta de Clave" fld="0" subtotal="count" baseField="0" baseItem="0"/></dataFields>';
+  pt1 += styleXml;
+  pt1 += '</pivotTableDefinition>';
+
+  return { cacheDefXml: defXml, cacheRecXml: recXml, pt1Xml: pt1 };
+}
+
+/**
+ * Función principal para exportar el reporte de Épicas con Tabla Dinámica real
+ */
+export async function exportEpicExcel(classifiedStories, selectedSprint) {
+  try {
+    console.log("[exportEpicExcel] ▶ Iniciando exportación de épicas...");
+
+    const templateRes = await fetch("/templates/reporte_template.xlsx?t=" + Date.now());
+    if (!templateRes.ok) throw new Error(`Error al obtener template: ${templateRes.status}`);
+    const templateBuf = await templateRes.arrayBuffer();
+    const zip = await JSZip.loadAsync(templateBuf);
+
+    const origSstXml = await zip.file("xl/sharedStrings.xml")?.async("string");
+    if (!origSstXml) throw new Error("sharedStrings.xml no encontrado");
+    const sst = new SharedStrings(origSstXml);
+
+    const headers = [
+      "Clave", "Resumen", "Sprint", "Persona asignada",
+      "Estado", "Categoría", "¿Tiene Épica?", "Épica", "Etiquetas", "Detalle (Preview)"
+    ];
+
+    const rows = classifiedStories.map((s) => ({
+      "Clave": s.jira_key || "",
+      "Resumen": s.summary || "",
+      "Sprint": s.sprint || "Backlog",
+      "Persona asignada": s.assigneeName || "Sin asignar",
+      "Estado": s.normalizedStatus || s.status || "",
+      "Categoría": CATEGORY_MAP[s.category]?.label || s.category,
+      "¿Tiene Épica?": s.parent_key ? "Sí" : "No",
+      "Épica": s.parent_key || "—",
+      "Etiquetas": Array.isArray(s.labels) ? s.labels.join(", ") : "",
+      "Detalle (Preview)": s.preview || "—"
+    }));
+
+    const osiXml = buildSheetXml(headers, rows, [14, 45, 22, 24, 18, 22, 14, 16, 20, 50], sst);
+
+    const ptData = buildEpicCacheAndPivot(rows, selectedSprint);
+
+    let sheet1Xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+    sheet1Xml += '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">';
+    sheet1Xml += '<dimension ref="A1:B9"/>';
+    sheet1Xml += '<sheetViews><sheetView tabSelected="1" workbookViewId="0"/></sheetViews>';
+    sheet1Xml += '<sheetFormatPr defaultRowHeight="15"/>';
+    sheet1Xml += '<sheetData/>';
+    sheet1Xml += '<pivotTables><pivotTable r:id="rId1"/></pivotTables>';
+    sheet1Xml += '</worksheet>';
+
+    zip.file("xl/worksheets/sheet1.xml", sheet1Xml);
+    zip.file("xl/worksheets/sheet2.xml", osiXml);
+    zip.file("xl/sharedStrings.xml", sst.toXml());
+
+    zip.file("xl/pivotCache/pivotCacheDefinition1.xml", ptData.cacheDefXml);
+    zip.file("xl/pivotCache/pivotCacheRecords1.xml", ptData.cacheRecXml);
+    zip.file("xl/pivotTables/pivotTable1.xml", ptData.pt1Xml);
+
+    const sheet1Rels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotTable" Target="../pivotTables/pivotTable1.xml"/>
+</Relationships>`;
+    zip.file("xl/worksheets/_rels/sheet1.xml.rels", sheet1Rels);
+
+    await customizeTemplate(zip);
+
+    const blob = await zip.generateAsync({
+      type: "blob",
+      compression: "DEFLATE",
+      compressionOptions: { level: 6 }
+    });
+
+    console.log(`[exportEpicExcel] ✅ Excel generado: ${blob.size} bytes`);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const dateStr = new Date().toLocaleDateString("es-PE").replace(/\//g, "-");
+    a.download = `Reporte_Epicas_${selectedSprint ? selectedSprint.replace(/\s+/g, "_") : "Todos"}_${dateStr}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    console.log("[exportEpicExcel] ✅ Descarga completada!");
+
+  } catch (err) {
+    console.error("Error al exportar reporte de épicas a Excel:", err);
     alert("Error al exportar a Excel. Revisa la consola para más detalles.");
   }
 }
