@@ -627,9 +627,8 @@ export default function DetailReviewTable({ tickets = [] }) {
                     storiesWithoutEpic.length > 0 ? "text-amber-700" : "text-gray-900"
                   }`}>{storiesWithoutEpic.length}</p>
                 </div>
-                <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-                  <span>{getPercentage(storiesWithoutEpic.length)}% del total</span>
-                  {storiesWithoutEpic.length > 0 && <span className="text-[10px] animate-pulse">⚠️</span>}
+                <p className="text-xs text-gray-500 mt-1">
+                  {getPercentage(storiesWithoutEpic.length)}% del total
                 </p>
               </div>
 
@@ -671,9 +670,7 @@ export default function DetailReviewTable({ tickets = [] }) {
                 onChange={(e) => setShowOnlyWithoutEpic(e.target.checked)}
                 className="w-4 h-4 rounded text-orange-500 border-gray-300 focus:ring-orange-500 focus:ring-2 focus:ring-offset-0 accent-orange-500 cursor-pointer"
               />
-              <span className="flex items-center gap-1">
-                Mostrar solo sin Épica {storiesWithoutEpic.length > 0 && <span className="text-[11px]">⚠️</span>}
-              </span>
+              <span>Mostrar solo sin Épica</span>
             </label>
 
             {/* Filtro No_Reportar */}
@@ -684,9 +681,7 @@ export default function DetailReviewTable({ tickets = [] }) {
                 onChange={(e) => setHideNoReportar(e.target.checked)}
                 className="w-4 h-4 rounded text-orange-500 border-gray-300 focus:ring-orange-500 focus:ring-2 focus:ring-offset-0 accent-orange-500 cursor-pointer"
               />
-              <span className="flex items-center gap-1">
-                Ocultar "No_Reportar" 🚫
-              </span>
+              <span>Ocultar "No_Reportar"</span>
             </label>
 
             {/* Búsqueda */}
