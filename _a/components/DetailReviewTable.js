@@ -80,6 +80,23 @@ export default function DetailReviewTable({ tickets = [] }) {
   const [exporting, setExporting] = useState(false);
   const [showOnlyWithoutEpic, setShowOnlyWithoutEpic] = useState(false);
   const [hideNoReportar, setHideNoReportar] = useState(false);
+  const [activeDropdown, setActiveDropdown] = useState(null);
+  const [columnFilters, setColumnFilters] = useState({
+    assigneeName: [],
+    status: [],
+    parent_key: [],
+    category: [],
+    labels: [],
+  });
+
+  // Escucha clics fuera de los dropdowns para cerrarlos
+  useEffect(() => {
+    function handleOutsideClick() {
+      setActiveDropdown(null);
+    }
+    window.addEventListener("click", handleOutsideClick);
+    return () => window.removeEventListener("click", handleOutsideClick);
+  }, []);
 
   // Datos auxiliares para resolución de nombres
   const [persons, setPersons] = useState([]);
@@ -184,6 +201,137 @@ export default function DetailReviewTable({ tickets = [] }) {
     return classifiedStories.filter((s) => !s.parent_key);
   }, [classifiedStories]);
 
+  // ── Obtener valores únicos para los filtros de columna ─────────────────
+  const uniqueFilterValues = useMemo(() => {
+    const assignees = new Set();
+    const statuses = new Set();
+    const epics = new Set();
+    const categories = new Set();
+    const labels = new Set();
+
+    classifiedStories.forEach((s) => {
+      if (s.assigneeName) assignees.add(s.assigneeName);
+      if (s.status) statuses.add(s.status);
+      epics.add(s.parent_key || "Sin Épica");
+      if (s.category) categories.add(s.category);
+      if (s.labels && Array.isArray(s.labels)) {
+        s.labels.forEach((l) => labels.add(l));
+      }
+    });
+
+    return {
+      assigneeName: [...assignees].sort(),
+      status: [...statuses].sort(),
+      parent_key: [...epics].sort(),
+      category: [...categories].sort(),
+      labels: [...labels].sort(),
+    };
+  }, [classifiedStories]);
+
+  const handleColumnFilterToggle = useCallback((column, value) => {
+    setColumnFilters((prev) => {
+      const current = prev[column] || [];
+      const updated = current.includes(value)
+        ? current.filter((v) => v !== value)
+        : [...current, value];
+      return { ...prev, [column]: updated };
+    });
+  }, []);
+
+  const handleColumnFilterClear = useCallback((column) => {
+    setColumnFilters((prev) => ({ ...prev, [column]: [] }));
+  }, []);
+
+  const handleColumnFilterSelectAll = useCallback((column) => {
+    setColumnFilters((prev) => ({
+      ...prev,
+      [column]: uniqueFilterValues[column] || [],
+    }));
+  }, [uniqueFilterValues]);
+
+  // ── Renderizador de cabeceras con filtro ──────────────────────────────
+  const renderHeaderFilter = useCallback((columnKey, label) => {
+    const values = uniqueFilterValues[columnKey] || [];
+    const selected = columnFilters[columnKey] || [];
+    const isOpen = activeDropdown === columnKey;
+    const isFiltered = selected.length > 0;
+
+    return (
+      <div className="relative inline-flex items-center gap-1.5">
+        <span className="font-semibold text-gray-500 uppercase tracking-wider text-xs whitespace-nowrap">
+          {label}
+        </span>
+        {values.length > 0 && (
+          <div className="relative">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setActiveDropdown(isOpen ? null : columnKey);
+              }}
+              className={`p-1 rounded-md hover:bg-gray-100 transition-colors ${
+                isFiltered ? "text-orange-500 bg-orange-50" : "text-gray-400"
+              }`}
+              title={`Filtrar por ${label}`}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={isFiltered ? 2.5 : 2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+              </svg>
+            </button>
+
+            {isOpen && (
+              <div
+                className="absolute left-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-200 py-3 z-50 animate-fade-in text-left text-sm text-gray-700"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="px-3 pb-2 border-b border-gray-100 flex items-center justify-between text-[11px] text-gray-500">
+                  <span>{selected.length} seleccionados</span>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleColumnFilterSelectAll(columnKey)}
+                      className="text-orange-500 hover:text-orange-600 font-semibold"
+                    >
+                      Todos
+                    </button>
+                    <span>|</span>
+                    <button
+                      onClick={() => handleColumnFilterClear(columnKey)}
+                      className="text-gray-400 hover:text-gray-600"
+                    >
+                      Limpiar
+                    </button>
+                  </div>
+                </div>
+                <div className="max-h-48 overflow-y-auto px-1 py-1 mt-1 space-y-1">
+                  {values.map((val) => {
+                    const isChecked = selected.includes(val);
+                    let valLabel = val;
+                    if (columnKey === "category") {
+                      valLabel = CATEGORY_MAP[val]?.label || val;
+                    }
+                    return (
+                      <label
+                        key={val}
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors text-xs"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => handleColumnFilterToggle(columnKey, val)}
+                          className="w-3.5 h-3.5 rounded text-orange-500 border-gray-300 focus:ring-orange-500 accent-orange-500 cursor-pointer"
+                        />
+                        <span className="truncate">{valLabel}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }, [uniqueFilterValues, columnFilters, activeDropdown, handleColumnFilterToggle, handleColumnFilterClear, handleColumnFilterSelectAll]);
+
   // ── Conteos por categoría ──────────────────────────────────────────────
   const categoryCounts = useMemo(() => {
     const counts = {};
@@ -239,7 +387,7 @@ export default function DetailReviewTable({ tickets = [] }) {
   }, [filteredStories, currentPage]);
 
   // Reset de página cuando cambian los filtros
-  useEffect(() => { setCurrentPage(1); }, [categoryFilter, searchQuery, selectedSprint, showOnlyWithoutEpic, hideNoReportar]);
+  useEffect(() => { setCurrentPage(1); }, [categoryFilter, searchQuery, selectedSprint, showOnlyWithoutEpic, hideNoReportar, columnFilters]);
 
   // ── Porcentaje para KPI cards ──────────────────────────────────────────
   const total = classifiedStories.length;
@@ -574,11 +722,11 @@ export default function DetailReviewTable({ tickets = [] }) {
                   <tr className="border-b border-gray-200">
                     <th className="text-left py-3 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Clave</th>
                     <th className="text-left py-3 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Resumen</th>
-                    <th className="text-left py-3 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Asignado</th>
-                    <th className="text-left py-3 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Estado</th>
-                    <th className="text-left py-3 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Épica</th>
-                    <th className="text-left py-3 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Categoría</th>
-                    <th className="text-left py-3 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Etiquetas</th>
+                    <th className="text-left py-3 px-3">{renderHeaderFilter("assigneeName", "Asignado")}</th>
+                    <th className="text-left py-3 px-3">{renderHeaderFilter("status", "Estado")}</th>
+                    <th className="text-left py-3 px-3">{renderHeaderFilter("parent_key", "Épica")}</th>
+                    <th className="text-left py-3 px-3">{renderHeaderFilter("category", "Categoría")}</th>
+                    <th className="text-left py-3 px-3">{renderHeaderFilter("labels", "Etiquetas")}</th>
                     <th className="text-left py-3 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden xl:table-cell">Preview del Detalle</th>
                   </tr>
                 </thead>
