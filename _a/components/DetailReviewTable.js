@@ -78,6 +78,7 @@ export default function DetailReviewTable({ tickets = [] }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [exporting, setExporting] = useState(false);
+  const [showOnlyWithoutEpic, setShowOnlyWithoutEpic] = useState(false);
 
   // Datos auxiliares para resolución de nombres
   const [persons, setPersons] = useState([]);
@@ -177,6 +178,11 @@ export default function DetailReviewTable({ tickets = [] }) {
     return allClassifiedStories.filter((t) => t.sprint === selectedSprint);
   }, [allClassifiedStories, selectedSprint]);
 
+  // ── Historias sin Épica en el sprint activo ────────────────────────────
+  const storiesWithoutEpic = useMemo(() => {
+    return classifiedStories.filter((s) => !s.parent_key);
+  }, [classifiedStories]);
+
   // ── Conteos por categoría ──────────────────────────────────────────────
   const categoryCounts = useMemo(() => {
     const counts = {};
@@ -194,12 +200,16 @@ export default function DetailReviewTable({ tickets = [] }) {
     })).filter((d) => d.value > 0);
   }, [categoryCounts]);
 
-  // ── Filtrar tabla por categoría y búsqueda ─────────────────────────────
+  // ── Filtrar tabla por categoría, épica y búsqueda ─────────────────────
   const filteredStories = useMemo(() => {
     let result = classifiedStories;
 
     if (categoryFilter) {
       result = result.filter((s) => s.category === categoryFilter);
+    }
+
+    if (showOnlyWithoutEpic) {
+      result = result.filter((s) => !s.parent_key);
     }
 
     if (searchQuery.trim()) {
@@ -214,7 +224,7 @@ export default function DetailReviewTable({ tickets = [] }) {
     }
 
     return result;
-  }, [classifiedStories, categoryFilter, searchQuery]);
+  }, [classifiedStories, categoryFilter, showOnlyWithoutEpic, searchQuery]);
 
   // ── Paginación ─────────────────────────────────────────────────────────
   const totalPages = Math.ceil(filteredStories.length / PAGE_SIZE);
@@ -224,7 +234,7 @@ export default function DetailReviewTable({ tickets = [] }) {
   }, [filteredStories, currentPage]);
 
   // Reset de página cuando cambian los filtros
-  useEffect(() => { setCurrentPage(1); }, [categoryFilter, searchQuery, selectedSprint]);
+  useEffect(() => { setCurrentPage(1); }, [categoryFilter, searchQuery, selectedSprint, showOnlyWithoutEpic]);
 
   // ── Porcentaje para KPI cards ──────────────────────────────────────────
   const total = classifiedStories.length;
@@ -414,30 +424,60 @@ export default function DetailReviewTable({ tickets = [] }) {
           {/* Resumen de métricas */}
           <Card className="lg:col-span-2 animate-fade-in">
             <h3 className="text-sm font-semibold text-gray-700 mb-4">Resumen de Revisión</h3>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
               {/* Total de historias */}
-              <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Total Historias</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">{total}</p>
+              <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 flex flex-col justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Total Historias</p>
+                  <p className="text-2xl font-bold text-gray-900 mt-1">{total}</p>
+                </div>
                 <p className="text-xs text-gray-500 mt-1">en {selectedSprint || "todos los sprints"}</p>
               </div>
 
               {/* Necesitan revisión */}
-              <div className="bg-red-50 rounded-xl p-4 border border-red-100">
-                <p className="text-xs font-semibold text-red-400 uppercase tracking-wider">Necesitan Revisión</p>
-                <p className="text-2xl font-bold text-red-700 mt-1">
-                  {categoryCounts.sin_detalle + categoryCounts.detalle_insuficiente + categoryCounts.solo_adjunto}
-                </p>
+              <div className="bg-red-50 rounded-xl p-4 border border-red-100 flex flex-col justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-red-400 uppercase tracking-wider">Necesitan Revisión</p>
+                  <p className="text-2xl font-bold text-red-700 mt-1">
+                    {categoryCounts.sin_detalle + categoryCounts.detalle_insuficiente + categoryCounts.solo_adjunto}
+                  </p>
+                </div>
                 <p className="text-xs text-red-500 mt-1">
                   {getPercentage(categoryCounts.sin_detalle + categoryCounts.detalle_insuficiente + categoryCounts.solo_adjunto)}% del total
                 </p>
               </div>
 
               {/* Con buen detalle */}
-              <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-100">
-                <p className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">Con Buen Detalle</p>
-                <p className="text-2xl font-bold text-emerald-700 mt-1">{categoryCounts.detalle_adecuado}</p>
+              <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-100 flex flex-col justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">Con Buen Detalle</p>
+                  <p className="text-2xl font-bold text-emerald-700 mt-1">{categoryCounts.detalle_adecuado}</p>
+                </div>
                 <p className="text-xs text-emerald-500 mt-1">{getPercentage(categoryCounts.detalle_adecuado)}% del total</p>
+              </div>
+
+              {/* Historias sin Épica */}
+              <div
+                className={`rounded-xl p-4 border transition-all cursor-pointer flex flex-col justify-between hover:scale-[1.02] active:scale-[0.98] ${
+                  storiesWithoutEpic.length > 0
+                    ? "bg-amber-50 border-amber-200 hover:bg-amber-100/50"
+                    : "bg-gray-50 border-gray-100"
+                } ${showOnlyWithoutEpic ? "ring-2 ring-amber-500 ring-offset-0" : ""}`}
+                onClick={() => setShowOnlyWithoutEpic(!showOnlyWithoutEpic)}
+                title="Haz clic para filtrar historias sin épica"
+              >
+                <div>
+                  <p className={`text-xs font-semibold uppercase tracking-wider ${
+                    storiesWithoutEpic.length > 0 ? "text-amber-500" : "text-gray-400"
+                  }`}>HUs sin Épica</p>
+                  <p className={`text-2xl font-bold mt-1 ${
+                    storiesWithoutEpic.length > 0 ? "text-amber-700" : "text-gray-900"
+                  }`}>{storiesWithoutEpic.length}</p>
+                </div>
+                <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                  <span>{getPercentage(storiesWithoutEpic.length)}% del total</span>
+                  {storiesWithoutEpic.length > 0 && <span className="text-[10px] animate-pulse">⚠️</span>}
+                </p>
               </div>
 
               {/* Barra de progreso */}
@@ -469,19 +509,34 @@ export default function DetailReviewTable({ tickets = [] }) {
             </span>
           </h3>
 
-          {/* Búsqueda */}
-          <div className="relative">
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            <input
-              id="search-detail-review"
-              type="text"
-              placeholder="Buscar clave, resumen o asignado..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 pr-4 py-2 rounded-xl border border-gray-200 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-400 transition-all w-full sm:w-[300px]"
-            />
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+            {/* Filtro sin épica */}
+            <label className="inline-flex items-center gap-2 cursor-pointer text-sm font-medium text-gray-600 hover:text-orange-500 transition-colors">
+              <input
+                type="checkbox"
+                checked={showOnlyWithoutEpic}
+                onChange={(e) => setShowOnlyWithoutEpic(e.target.checked)}
+                className="w-4 h-4 rounded text-orange-500 border-gray-300 focus:ring-orange-500 focus:ring-2 focus:ring-offset-0 accent-orange-500 cursor-pointer"
+              />
+              <span className="flex items-center gap-1">
+                Mostrar solo sin Épica {storiesWithoutEpic.length > 0 && <span className="text-[11px]">⚠️</span>}
+              </span>
+            </label>
+
+            {/* Búsqueda */}
+            <div className="relative">
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input
+                id="search-detail-review"
+                type="text"
+                placeholder="Buscar clave, resumen o asignado..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 pr-4 py-2 rounded-xl border border-gray-200 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-400 transition-all w-full sm:w-[300px]"
+              />
+            </div>
           </div>
         </div>
 
@@ -503,6 +558,7 @@ export default function DetailReviewTable({ tickets = [] }) {
                     <th className="text-left py-3 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Resumen</th>
                     <th className="text-left py-3 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Asignado</th>
                     <th className="text-left py-3 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Estado</th>
+                    <th className="text-left py-3 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Épica</th>
                     <th className="text-left py-3 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Categoría</th>
                     <th className="text-left py-3 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Etiquetas</th>
                     <th className="text-left py-3 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden xl:table-cell">Preview del Detalle</th>
@@ -540,6 +596,24 @@ export default function DetailReviewTable({ tickets = [] }) {
                           <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-gray-100 text-gray-600">
                             {story.status}
                           </span>
+                        </td>
+
+                        {/* Épica */}
+                        <td className="py-3 px-3 whitespace-nowrap">
+                          {story.parent_key ? (
+                            <a
+                              href={`${JIRA_BASE}/${story.parent_key}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="font-mono font-semibold text-blue-600 hover:text-blue-800 hover:underline text-[12px]"
+                            >
+                              {story.parent_key}
+                            </a>
+                          ) : (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                              ⚠️ Sin Épica
+                            </span>
+                          )}
                         </td>
 
                         {/* Categoría */}

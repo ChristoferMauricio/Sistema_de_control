@@ -1,16 +1,12 @@
 /**
- * @file revision-detalle/page.js - Página de Revisión de Detalle de Historias
+ * @file revision-hus/page.js - Página de Revisión de Historias de Usuario (HUs)
  * @description Módulo que analiza la calidad de la descripción (detalle) de cada
- *              Historia de usuario en Jira. Clasifica las Historias en 4 categorías:
- *                1. Sin detalle: descripción vacía o nula
- *                2. Detalle insuficiente: texto < 10 palabras o < 50 caracteres
- *                3. Solo adjunto: solo tiene imágenes/archivos, sin texto
- *                4. Detalle adecuado: texto descriptivo suficiente
+ *              Historia de usuario en Jira y detecta cuáles no tienen una Épica vinculada.
  *
  *              El reporte se muestra en pantalla con KPIs, gráfico de dona y tabla
  *              detallada. También se puede exportar a Excel con tabla dinámica.
  *
- * @route /dashboard/revision-detalle
+ * @route /dashboard/revision-hus
  * @requires supabase - Cliente de Supabase para consultar tickets
  * @requires DetailReviewTable - Componente que renderiza el reporte completo
  */
@@ -22,11 +18,11 @@ import { supabase } from "@/lib/supabase";
 import DetailReviewTable from "@/components/DetailReviewTable";
 
 /**
- * Componente de página de revisión de detalle de Historias.
+ * Componente de página de revisión de Historias de Usuario.
  *
  * @returns {JSX.Element} Página con header, botón de sincronización y tabla de revisión
  */
-export default function RevisionDetallePage() {
+export default function RevisionHUsPage() {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -34,7 +30,7 @@ export default function RevisionDetallePage() {
   const router = useRouter();
 
   /**
-   * Obtiene todos los tickets de Jira incluyendo el campo description.
+   * Obtiene todos los tickets de Jira incluyendo el campo description y parent_key.
    * Pagina de a 1000 registros para superar el límite de Supabase.
    */
   const fetchData = useCallback(async () => {
@@ -140,10 +136,10 @@ export default function RevisionDetallePage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold font-[family-name:var(--font-heading)] text-gray-900">
-            Revisión de Detalle
+            Revisión de HUs
           </h1>
           <p className="text-gray-500 mt-1">
-            Análisis de la calidad de la descripción de las Historias de usuario
+            Análisis de calidad de las Historias de usuario y detección de HUs sin Épica
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -227,7 +223,7 @@ export default function RevisionDetallePage() {
         </div>
       )}
 
-      {/* Componente de revisión de detalle */}
+      {/* Componente de revisión de HUs */}
       <DetailReviewTable tickets={tickets} />
     </div>
   );
