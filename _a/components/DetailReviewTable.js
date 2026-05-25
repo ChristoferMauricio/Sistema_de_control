@@ -79,6 +79,7 @@ export default function DetailReviewTable({ tickets = [] }) {
   const [currentPage, setCurrentPage] = useState(1);
   const [exporting, setExporting] = useState(false);
   const [showOnlyWithoutEpic, setShowOnlyWithoutEpic] = useState(false);
+  const [hideNoReportar, setHideNoReportar] = useState(false);
 
   // Datos auxiliares para resolución de nombres
   const [persons, setPersons] = useState([]);
@@ -212,6 +213,10 @@ export default function DetailReviewTable({ tickets = [] }) {
       result = result.filter((s) => !s.parent_key);
     }
 
+    if (hideNoReportar) {
+      result = result.filter((s) => !s.labels || !s.labels.includes("No_Reportar"));
+    }
+
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       result = result.filter(
@@ -234,7 +239,7 @@ export default function DetailReviewTable({ tickets = [] }) {
   }, [filteredStories, currentPage]);
 
   // Reset de página cuando cambian los filtros
-  useEffect(() => { setCurrentPage(1); }, [categoryFilter, searchQuery, selectedSprint, showOnlyWithoutEpic]);
+  useEffect(() => { setCurrentPage(1); }, [categoryFilter, searchQuery, selectedSprint, showOnlyWithoutEpic, hideNoReportar]);
 
   // ── Porcentaje para KPI cards ──────────────────────────────────────────
   const total = classifiedStories.length;
@@ -520,6 +525,19 @@ export default function DetailReviewTable({ tickets = [] }) {
               />
               <span className="flex items-center gap-1">
                 Mostrar solo sin Épica {storiesWithoutEpic.length > 0 && <span className="text-[11px]">⚠️</span>}
+              </span>
+            </label>
+
+            {/* Filtro No_Reportar */}
+            <label className="inline-flex items-center gap-2 cursor-pointer text-sm font-medium text-gray-600 hover:text-orange-500 transition-colors">
+              <input
+                type="checkbox"
+                checked={hideNoReportar}
+                onChange={(e) => setHideNoReportar(e.target.checked)}
+                className="w-4 h-4 rounded text-orange-500 border-gray-300 focus:ring-orange-500 focus:ring-2 focus:ring-offset-0 accent-orange-500 cursor-pointer"
+              />
+              <span className="flex items-center gap-1">
+                Ocultar "No_Reportar" 🚫
               </span>
             </label>
 
