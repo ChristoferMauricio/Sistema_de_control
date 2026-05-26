@@ -10,18 +10,18 @@
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
 /**
- * Genera un vector (embedding) de 1536 dimensiones para un bloque de texto
- * utilizando el modelo text-embedding-004 de Google.
+ * Genera un vector (embedding) de 768 dimensiones para un bloque de texto
+ * utilizando el modelo gemini-embedding-2 de Google con outputDimensionality de 768.
  *
  * @param {string} text - El texto a vectorizar
- * @returns {Promise<number[]>} Vector de 1536 float4 values
+ * @returns {Promise<number[]>} Vector de 768 float4 values
  */
 export async function getEmbedding(text) {
   if (!GEMINI_API_KEY) {
     throw new Error("Falta la variable de entorno GEMINI_API_KEY en el servidor.");
   }
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${GEMINI_API_KEY}`;
+  const url = `https://generativelanguage.googleapis.com/v1/models/gemini-embedding-2:embedContent?key=${GEMINI_API_KEY}`;
   
   const response = await fetch(url, {
     method: "POST",
@@ -29,10 +29,11 @@ export async function getEmbedding(text) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "models/text-embedding-004",
+      model: "models/gemini-embedding-2",
       content: {
         parts: [{ text }],
       },
+      outputDimensionality: 768,
     }),
   });
 
@@ -52,7 +53,8 @@ export async function getEmbedding(text) {
 }
 
 /**
- * Genera embeddings en lote (batch) para un conjunto de bloques de texto.
+ * Genera embeddings en lote (batch) para un conjunto de bloques de texto
+ * utilizando el modelo gemini-embedding-2 de Google con outputDimensionality de 768.
  *
  * @param {string[]} texts - Array de textos a vectorizar
  * @returns {Promise<number[][]>} Array de vectores
@@ -64,13 +66,14 @@ export async function getEmbeddingsBatch(texts) {
 
   if (!texts || texts.length === 0) return [];
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:batchEmbedContents?key=${GEMINI_API_KEY}`;
+  const url = `https://generativelanguage.googleapis.com/v1/models/gemini-embedding-2:batchEmbedContents?key=${GEMINI_API_KEY}`;
   
   const requests = texts.map(text => ({
-    model: "models/text-embedding-004",
+    model: "models/gemini-embedding-2",
     content: {
       parts: [{ text }],
     },
+    outputDimensionality: 768,
   }));
 
   const response = await fetch(url, {

@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS public.documentos_embeddings (
   source_key VARCHAR(100) NOT NULL,          -- Clave (ej: 'PF3-1799' o nombre del archivo)
   content TEXT NOT NULL,                     -- Fragmento de texto enriquecido con metadatos
   metadata JSONB NOT NULL DEFAULT '{}'::jsonb, -- Metadatos (sprint, asignado, tipo, tags, etc.)
-  embedding public.vector(1536),             -- Vector de 1536 dimensiones (text-embedding-004 de Gemini)
+  embedding public.vector(768),              -- Vector de 768 dimensiones (text-embedding-004 de Gemini v1)
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 
@@ -37,7 +37,7 @@ CREATE INDEX IF NOT EXISTS idx_documentos_embeddings_metadata_epic
 -- 5. Función de búsqueda vectorial híbrida por similitud (RPC para Supabase)
 --    Calcula la distancia de coseno (operator <=>) y filtra opcionalmente por Épica relacional.
 CREATE OR REPLACE FUNCTION public.match_documentos (
-  query_embedding public.vector(1536),
+  query_embedding public.vector(768),
   match_threshold float,
   match_count int,
   filter_epic_key text DEFAULT NULL
