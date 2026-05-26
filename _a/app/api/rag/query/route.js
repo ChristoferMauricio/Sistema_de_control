@@ -111,9 +111,40 @@ export async function POST(req) {
       }
     }
 
+    // D. Detectar si el usuario consulta por un Sprint específico (ej: "sprint 14" o "sprint 2")
+    const sprintRegex = /sprint\s*(\d+)/i;
+    const sprintMatch = query.match(sprintRegex);
+    if (sprintMatch) {
+      const sprintNum = sprintMatch[1];
+      console.log(`[RAG Query] Consulta por Sprint detectada: ${sprintNum}`);
+      
+      const { data: sprintTickets } = await supabase
+        .from("jira_tickets")
+        .select("jira_key, summary, status, assignee_email, priority, issue_type, parent_key, sprint, description")
+        .ilike("sprint", `%${sprintNum}%`)
+        .is("deleted_at", null)
+        .order("updated_at", { ascending: false })
+        .limit(30);
+
+      if (sprintTickets && sprintTickets.length > 0) {
+        jiraContextText += `\n=== TICKETS DEL SPRINT/ITERACIÓN QUE CONTIENE "${sprintNum}" (${sprintTickets.length} tickets) ===\n`;
+        sprintTickets.forEach(t => {
+          jiraContextText += `- [${t.jira_key}] "${t.summary}" (${t.issue_type}) | Estado: ${t.status} | Asignado: ${t.assignee_email || "Sin asignar"} | Sprint: ${t.sprint || "Ninguno"}\n`;
+          if (t.description) jiraContextText += `  Descripción del ticket: ${t.description.substring(0, 300)}${t.description.length > 300 ? '...' : ''}\n`;
+        });
+        
+        references.push({
+          key: `Tickets del Sprint ${sprintNum} (Jira DB)`,
+          sourceKey: `Sprint ${sprintNum}`,
+          sourceType: "jira_ticket",
+          similarity: 0.98
+        });
+      }
+    }
+
     // C. Si la consulta es "Global" (sin epicKey seleccionada) y no se mencionan claves específicas,
     //    inyectamos un resumen del estado actual de los tickets más recientes para dar contexto general.
-    if (!epicKey && keysToQuery.length === 0) {
+    if (!epicKey && keysToQuery.length === 0 && !sprintMatch) {
       console.log(`[RAG Query] Consulta global, inyectando resumen relacional de tickets activos.`);
       const { data: recentTickets } = await supabase
         .from("jira_tickets")
