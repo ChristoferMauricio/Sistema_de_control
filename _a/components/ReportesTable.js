@@ -514,26 +514,26 @@ function TicketListModal({ title, assigneeName, items, onClose }) {
 
                                                     {/* Cajas de fechas responsivas (derecha) */}
                                                     <div className="flex items-center gap-2 flex-wrap text-[10px] font-medium leading-none">
-                                                        {/* Cuadro naranja: Fecha de creación */}
+                                                        {/* Fecha de creación: color Slate neutro muy profesional */}
                                                         {ticket.created_at && (
                                                             <div 
-                                                                className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-orange-50 text-orange-700 border border-orange-200" 
+                                                                className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100 text-slate-600 border border-slate-200" 
                                                                 title={`Fecha de creación: ${formatDate(ticket.created_at)}`}
                                                             >
-                                                                <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-orange-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                                <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-slate-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                                                     <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                                                 </svg>
                                                                 <span>Creado: {formatDateShort(ticket.created_at)}</span>
                                                             </div>
                                                         )}
 
-                                                        {/* Cuadro rojo: Fecha de cambio */}
+                                                        {/* Fecha de cambio: color Indigo elegante representativo de cambios/flujos */}
                                                         {rawChangeDate && (
                                                             <div 
-                                                                className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-red-50 text-red-700 border border-red-200" 
+                                                                className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-200" 
                                                                 title={`Último cambio de estado: ${formatDate(rawChangeDate)}`}
                                                             >
-                                                                <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-red-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                                <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-indigo-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                                                     <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                                                                 </svg>
                                                                 <span>Cambiado: {formatDateShort(rawChangeDate)}</span>
