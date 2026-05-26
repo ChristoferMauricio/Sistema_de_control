@@ -121,12 +121,12 @@ export default function DashboardLayout({ children }) {
   return (
     <ThemeProvider>
       <RoleProvider role={role}>
-        <div className="min-h-screen flex bg-gray-50">
+        <div className="min-h-[100dvh] flex bg-gray-50">
           {/* Barra de navegación lateral (sidebar) */}
           <DashboardNav user={user} role={role} />
 
           {/* Contenido principal: se desplaza a la derecha del sidebar en pantallas grandes */}
-          <main className="flex-1 lg:ml-72 min-h-screen">
+          <main className="flex-1 lg:ml-72 min-h-[100dvh]">
             <div className="p-4 md:p-6 lg:p-8 max-w-7xl mx-auto">
               {children}
             </div>

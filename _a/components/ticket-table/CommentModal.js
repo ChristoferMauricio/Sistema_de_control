@@ -47,7 +47,7 @@ export default function CommentModal({ editingComment, onClose, onChange, onSave
               </span>
             )}
           </h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
+          <button onClick={onClose} className="p-2 -mr-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-all" aria-label="Cerrar modal">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -70,18 +70,18 @@ export default function CommentModal({ editingComment, onClose, onChange, onSave
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex justify-end gap-3">
+        <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex justify-end items-center gap-3">
           <button
             onClick={onClose}
             disabled={savingComment}
-            className="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-200 transition-colors"
+            className="px-5 py-2.5 sm:py-2 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-200 transition-colors shrink-0"
           >
             Cancelar
           </button>
           <button
             onClick={onSave}
             disabled={savingComment}
-            className="px-5 py-2 rounded-lg text-sm font-medium text-white bg-orange-500 hover:bg-orange-600 focus:ring-4 focus:ring-orange-500/20 transition-all shadow-sm shadow-orange-500/20 disabled:opacity-50 flex items-center gap-2"
+            className="px-5 py-2.5 sm:py-2 rounded-xl text-sm font-medium text-white bg-orange-500 hover:bg-orange-600 focus:ring-4 focus:ring-orange-500/20 transition-all shadow-sm shadow-orange-500/20 disabled:opacity-50 flex items-center gap-2 justify-center shrink-0"
           >
             {savingComment ? (
               <>

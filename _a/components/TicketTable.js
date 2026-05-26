@@ -323,7 +323,7 @@ export default function TicketTable({
       <div
         ref={topScrollRef}
         onScroll={handleTopScroll}
-        className="overflow-x-auto border-b border-gray-100"
+        className="hidden md:block overflow-x-auto border-b border-gray-100"
         style={{ height: "12px" }}
       >
         <div style={{ width: scrollWidth, height: "1px" }} />

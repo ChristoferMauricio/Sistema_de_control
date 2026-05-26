@@ -311,7 +311,9 @@ export default function DetailReviewTable({ tickets = [] }) {
 
             {isOpen && (
               <div
-                className="absolute left-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-200 py-3 z-50 animate-fade-in text-left text-sm text-gray-700"
+                className={`absolute mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-200 py-3 z-50 animate-fade-in text-left text-sm text-gray-700 ${
+                  ["labels", "category", "parent_key", "status"].includes(columnKey) ? "right-0" : "left-0"
+                }`}
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="px-3 pb-2 border-b border-gray-100 flex items-center justify-between text-[11px] text-gray-500">
@@ -504,13 +506,13 @@ export default function DetailReviewTable({ tickets = [] }) {
       </div>
 
       {/* ── Tabs de Reporte ────────────────────────────────────────────── */}
-      <div className="flex border-b border-gray-200">
+      <div className="flex border-b border-gray-200 overflow-x-auto whitespace-nowrap scrollbar-none scroll-smooth shrink-0">
         <button
           onClick={() => {
             setActiveTab("detalle");
             setCategoryFilter(null);
           }}
-          className={`px-5 py-3 border-b-2 text-sm font-semibold transition-all ${
+          className={`px-5 py-3 border-b-2 text-sm font-semibold transition-all shrink-0 ${
             activeTab === "detalle"
               ? "border-orange-500 text-orange-600"
               : "border-transparent text-gray-500 hover:text-gray-900"
@@ -523,7 +525,7 @@ export default function DetailReviewTable({ tickets = [] }) {
             setActiveTab("epicas");
             setCategoryFilter(null);
           }}
-          className={`px-5 py-3 border-b-2 text-sm font-semibold transition-all ${
+          className={`px-5 py-3 border-b-2 text-sm font-semibold transition-all shrink-0 ${
             activeTab === "epicas"
               ? "border-orange-500 text-orange-600"
               : "border-transparent text-gray-500 hover:text-gray-900"
