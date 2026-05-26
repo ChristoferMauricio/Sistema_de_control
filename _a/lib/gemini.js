@@ -100,7 +100,7 @@ export async function getEmbeddingsBatch(texts) {
 }
 
 /**
- * Llama al modelo de lenguaje gemini-1.5-flash para responder una consulta
+ * Llama al modelo de lenguaje gemini-2.5-flash para responder una consulta
  * utilizando fragmentos de contexto inyectados (RAG).
  *
  * @param {string} prompt - El prompt estructurado (Contexto + Pregunta)
@@ -111,7 +111,7 @@ export async function generateRAGResponse(prompt) {
     throw new Error("Falta la variable de entorno GEMINI_API_KEY en el servidor.");
   }
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+  const url = `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
   const response = await fetch(url, {
     method: "POST",

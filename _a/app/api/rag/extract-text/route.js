@@ -4,7 +4,7 @@ import { PDFParse } from "pdf-parse";
 
 /**
  * Helper to call Gemini Vision API for transcribing/describing images.
- * Leverages gemini-1.5-flash which is multimodal and extremely fast.
+ * Leverages gemini-2.5-flash which is multimodal and extremely fast.
  */
 async function extractTextFromImage(buffer, mimeType) {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -13,7 +13,7 @@ async function extractTextFromImage(buffer, mimeType) {
   }
 
   const base64Data = buffer.toString("base64");
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
   const response = await fetch(url, {
     method: "POST",
