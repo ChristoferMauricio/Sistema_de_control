@@ -410,6 +410,35 @@ function SubtasksModal({ assigneeName, subtasks, onClose }) {
 const JIRA_BASE = "https://supervisorservicio2020.atlassian.net/browse";
 
 function TicketListModal({ title, assigneeName, items, onClose }) {
+    const [changeDates, setChangeDates] = useState({});
+
+    useEffect(() => {
+        const keys = items.map(t => t.jira_key).filter(Boolean);
+        if (keys.length === 0) return;
+
+        // Consultar el historial de estados de estos tickets para obtener la última transición real
+        supabase
+            .from("jira_ticket_status_history")
+            .select("jira_key, changed_at")
+            .in("jira_key", keys)
+            .order("changed_at", { ascending: true })
+            .then(({ data, error }) => {
+                if (error) {
+                    console.error("Error cargando historial de estados en modal:", error);
+                    return;
+                }
+                const datesMap = {};
+                if (data) {
+                    data.forEach((h) => {
+                        // El orden es ascendente cronológicamente por changed_at, 
+                        // por lo que el último registro para una clave sobreescribirá y representará el cambio más reciente.
+                        datesMap[h.jira_key] = h.changed_at;
+                    });
+                }
+                setChangeDates(datesMap);
+            });
+    }, [items]);
+
     return (
         <div className="fixed inset-0 z-50 overflow-y-auto">
             <div className="min-h-full flex items-start justify-center p-4 py-8">
@@ -443,6 +472,9 @@ function TicketListModal({ title, assigneeName, items, onClose }) {
                                 const isCompleted = statusLower.includes("finalizada") || statusLower.includes("terminada") || statusLower.includes("done") || statusLower.includes("listo");
                                 const isSubtask = ticket.issue_type === "Sub-tarea" || ticket.issue_type === "Subtarea";
 
+                                // La fecha de cambio es el último cambio de estado obtenido del historial o en su defecto updated_at / created_at.
+                                const rawChangeDate = changeDates[ticket.jira_key] || ticket.updated_at || ticket.created_at;
+
                                 return (
                                     <div key={ticket.jira_key} className="p-4 bg-gray-50 rounded-xl border-2 border-gray-300">
                                         <div className="flex items-start gap-3">
@@ -456,24 +488,58 @@ function TicketListModal({ title, assigneeName, items, onClose }) {
                                             </a>
                                             <div className="flex-1 min-w-0">
                                                 <div className="text-sm text-gray-800 leading-snug">{ticket.summary}</div>
-                                                <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${isSubtask
-                                                        ? "bg-indigo-50 text-indigo-600 border border-indigo-200"
-                                                        : "bg-sky-50 text-sky-600 border border-sky-200"
-                                                        }`}>
-                                                        {ticket.issue_type}
-                                                    </span>
-                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium ${isCompleted
-                                                        ? "bg-green-50 text-green-600 border border-green-200"
-                                                        : "bg-amber-50 text-amber-600 border border-amber-200"
-                                                        }`}>
-                                                        {ticket.status}
-                                                    </span>
-                                                    {ticket.story_points != null && (
-                                                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-50 text-purple-600 border border-purple-200">
-                                                            {ticket.story_points} SP
+                                                
+                                                {/* Contenedor flex para alinear etiquetas a la izquierda y fechas a la derecha */}
+                                                <div className="flex items-center justify-between flex-wrap gap-2 mt-1.5 w-full">
+                                                    {/* Etiquetas de ticket (izquierda) */}
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${isSubtask
+                                                            ? "bg-indigo-50 text-indigo-600 border border-indigo-200"
+                                                            : "bg-sky-50 text-sky-600 border border-sky-200"
+                                                            }`}>
+                                                            {ticket.issue_type}
                                                         </span>
-                                                    )}
+                                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium ${isCompleted
+                                                            ? "bg-green-50 text-green-600 border border-green-200"
+                                                            : "bg-amber-50 text-amber-600 border border-amber-200"
+                                                            }`}>
+                                                            {ticket.status}
+                                                        </span>
+                                                        {ticket.story_points != null && (
+                                                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-50 text-purple-600 border border-purple-200">
+                                                                {ticket.story_points} SP
+                                                            </span>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Cajas de fechas responsivas (derecha) */}
+                                                    <div className="flex items-center gap-2 flex-wrap text-[10px] font-medium leading-none">
+                                                        {/* Cuadro naranja: Fecha de creación */}
+                                                        {ticket.created_at && (
+                                                            <div 
+                                                                className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-orange-50 text-orange-700 border border-orange-200" 
+                                                                title={`Fecha de creación: ${formatDate(ticket.created_at)}`}
+                                                            >
+                                                                <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-orange-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                                </svg>
+                                                                <span>Creado: {formatDateShort(ticket.created_at)}</span>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Cuadro rojo: Fecha de cambio */}
+                                                        {rawChangeDate && (
+                                                            <div 
+                                                                className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-red-50 text-red-700 border border-red-200" 
+                                                                title={`Último cambio de estado: ${formatDate(rawChangeDate)}`}
+                                                            >
+                                                                <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-red-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                                                </svg>
+                                                                <span>Cambiado: {formatDateShort(rawChangeDate)}</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
