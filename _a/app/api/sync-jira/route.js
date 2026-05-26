@@ -85,7 +85,7 @@ export const maxDuration = 60;
  */
 async function getEpicLinkFieldId() {
   try {
-    const res = await fetch(`${JIRA_BASE_URL}/rest/api/2/field`, {
+    const res = await fetch(`${JIRA_BASE_URL}/rest/api/3/field`, {
       method: "GET",
       headers: jiraHeaders,
     });
@@ -109,7 +109,7 @@ async function getEpicLinkFieldId() {
 /**
  * Busca tickets en Jira usando JQL (Jira Query Language) con paginacion por cursor.
  *
- * Utiliza el endpoint /rest/api/2/search/jql que soporta paginacion basada en
+ * Utiliza el endpoint /rest/api/3/search/jql que soporta paginacion basada en
  * `nextPageToken` (mas eficiente que offset para conjuntos grandes de datos).
  * Solicita hasta 100 tickets por pagina y continua hasta agotar los resultados.
  *
@@ -137,7 +137,7 @@ async function searchJira(jql, epicLinkFieldId) {
     const params = new URLSearchParams({ jql, maxResults: "100", fields });
     if (nextPageToken) params.set("nextPageToken", nextPageToken);
 
-    const res = await fetch(`${JIRA_BASE_URL}/rest/api/2/search/jql?${params}`, {
+    const res = await fetch(`${JIRA_BASE_URL}/rest/api/3/search/jql?${params}`, {
       method: "GET",
       headers: jiraHeaders,
     });
