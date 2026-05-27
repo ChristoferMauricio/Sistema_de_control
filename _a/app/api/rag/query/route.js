@@ -127,7 +127,7 @@ export async function POST(req) {
         .ilike("sprint", `%${sprintNum}%`)
         .is("deleted_at", null)
         .order("updated_at", { ascending: false })
-        .limit(30);
+        .limit(500);
 
       if (sprintTickets && sprintTickets.length > 0) {
         jiraContextText += `\n=== TICKETS DEL SPRINT/ITERACIÓN QUE CONTIENE "${sprintNum}" (${sprintTickets.length} tickets) ===\n`;
@@ -154,7 +154,7 @@ export async function POST(req) {
         .select("jira_key, summary, status, assignee_email, priority, issue_type, parent_key")
         .is("deleted_at", null)
         .order("updated_at", { ascending: false })
-        .limit(15);
+        .limit(150);
 
       if (recentTickets && recentTickets.length > 0) {
         jiraContextText += `\n=== RESUMEN DE TICKETS ACTIVOS Y RECIENTES EN EL TRABAJO ===\n`;
