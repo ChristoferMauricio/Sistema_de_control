@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { createServiceClient } from "@/lib/supabase";
 import { getEmbedding, generateRAGResponse } from "@/lib/gemini";
 
 /**
@@ -8,7 +8,7 @@ import { getEmbedding, generateRAGResponse } from "@/lib/gemini";
  *              ejecuta la búsqueda semántica e inyecta el contexto obtenido a Gemini.
  *              Además, de manera híbrida e inteligente, consulta en tiempo real las tablas
  *              relacionales de Jira (jira_tickets) para proveer datos exactos de tickets y épicas
- *              sin necesidad de subir documentos previos.
+ *              sin necesidad de subir documentos previos, utilizando createServiceClient para omitir RLS.
  */
 export async function POST(req) {
   try {
@@ -27,8 +27,11 @@ export async function POST(req) {
     let contextText = "";
     const references = [];
 
+    // 1. Crear el cliente de servicio para omitir RLS en el servidor
+    const supabaseAdmin = createServiceClient();
+
     // ──────────────────────────────────────────────────────────────────────────
-    // 1. RECUPERACIÓN DIRECTA DE DATOS DE JIRA DESDE SUPABASE (HÍBRIDO RELACIONAL)
+    // 2. RECUPERACIÓN DIRECTA DE DATOS DE JIRA DESDE SUPABASE (HÍBRIDO RELACIONAL)
     // ──────────────────────────────────────────────────────────────────────────
     let jiraContextText = "";
 
@@ -37,14 +40,14 @@ export async function POST(req) {
       console.log(`[RAG Query] Obteniendo contexto directo para la Épica: ${epicKey}`);
       
       // Consultar el ticket de la Épica en sí
-      const { data: epicTicket } = await supabase
+      const { data: epicTicket } = await supabaseAdmin
         .from("jira_tickets")
         .select("*")
         .eq("jira_key", epicKey)
         .maybeSingle();
 
       // Consultar todos los tickets asociados a esta Épica (parent_key = epicKey)
-      const { data: childTickets } = await supabase
+      const { data: childTickets } = await supabaseAdmin
         .from("jira_tickets")
         .select("*")
         .eq("parent_key", epicKey)
@@ -85,7 +88,7 @@ export async function POST(req) {
 
     if (keysToQuery.length > 0) {
       console.log(`[RAG Query] Claves de tickets detectadas en la consulta: ${keysToQuery.join(", ")}`);
-      const { data: directTickets } = await supabase
+      const { data: directTickets } = await supabaseAdmin
         .from("jira_tickets")
         .select("*")
         .in("jira_key", keysToQuery)
@@ -118,7 +121,7 @@ export async function POST(req) {
       const sprintNum = sprintMatch[1];
       console.log(`[RAG Query] Consulta por Sprint detectada: ${sprintNum}`);
       
-      const { data: sprintTickets } = await supabase
+      const { data: sprintTickets } = await supabaseAdmin
         .from("jira_tickets")
         .select("jira_key, summary, status, assignee_email, priority, issue_type, parent_key, sprint, description")
         .ilike("sprint", `%${sprintNum}%`)
@@ -146,7 +149,7 @@ export async function POST(req) {
     //    inyectamos un resumen del estado actual de los tickets más recientes para dar contexto general.
     if (!epicKey && keysToQuery.length === 0 && !sprintMatch) {
       console.log(`[RAG Query] Consulta global, inyectando resumen relacional de tickets activos.`);
-      const { data: recentTickets } = await supabase
+      const { data: recentTickets } = await supabaseAdmin
         .from("jira_tickets")
         .select("jira_key, summary, status, assignee_email, priority, issue_type, parent_key")
         .is("deleted_at", null)
@@ -162,7 +165,7 @@ export async function POST(req) {
     }
 
     // ──────────────────────────────────────────────────────────────────────────
-    // 2. BÚSQUEDA SEMÁNTICA VECTORIAL (RAG SOBRE DOCUMENTOS SUBIDOS)
+    // 3. BÚSQUEDA SEMÁNTICA VECTORIAL (RAG SOBRE DOCUMENTOS SUBIDOS)
     // ──────────────────────────────────────────────────────────────────────────
     let vectorContextText = "";
     
@@ -171,7 +174,7 @@ export async function POST(req) {
       const queryVector = await getEmbedding(query);
 
       // Ejecutar la búsqueda semántica llamando a la función RPC 'match_documentos' en Supabase
-      const { data: matches, error: rpcError } = await supabase.rpc("match_documentos", {
+      const { data: matches, error: rpcError } = await supabaseAdmin.rpc("match_documentos", {
         query_embedding: queryVector,
         match_threshold: 0.35, // Umbral mínimo de similitud
         match_count: 8,        // Traer los 8 fragmentos más relevantes
@@ -199,7 +202,7 @@ export async function POST(req) {
     }
 
     // ──────────────────────────────────────────────────────────────────────────
-    // 3. INTEGRAR AMBOS CONTEXTOS (RELACIONAL + VECTORIAL)
+    // 4. INTEGRAR AMBOS CONTEXTOS (RELACIONAL + VECTORIAL)
     // ──────────────────────────────────────────────────────────────────────────
     contextText = "";
     if (jiraContextText) {
