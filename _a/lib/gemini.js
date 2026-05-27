@@ -8,6 +8,7 @@
  */
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const GROQ_API_KEY = process.env.GROQ_API_KEY;
 
 /**
  * Genera un vector (embedding) de 768 dimensiones para un bloque de texto
@@ -100,47 +101,48 @@ export async function getEmbeddingsBatch(texts) {
 }
 
 /**
- * Llama al modelo de lenguaje gemini-2.5-flash para responder una consulta
- * utilizando fragmentos de contexto inyectados (RAG).
+ * Llama al modelo de lenguaje llama-3.3-70b-versatile de Groq para responder una consulta
+ * utilizando fragmentos de contexto inyectados (RAG) a ultra-alta velocidad.
  *
  * @param {string} prompt - El prompt estructurado (Contexto + Pregunta)
  * @returns {Promise<string>} La respuesta en formato Markdown
  */
 export async function generateRAGResponse(prompt) {
-  if (!GEMINI_API_KEY) {
-    throw new Error("Falta la variable de entorno GEMINI_API_KEY en el servidor.");
+  if (!GROQ_API_KEY) {
+    throw new Error("Falta la variable de entorno GROQ_API_KEY en el servidor.");
   }
 
-  const url = `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+  const url = "https://api.groq.com/openai/v1/chat/completions";
 
   const response = await fetch(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      "Authorization": `Bearer ${GROQ_API_KEY}`,
     },
     body: JSON.stringify({
-      contents: [
+      model: "llama-3.3-70b-versatile",
+      messages: [
         {
-          parts: [{ text: prompt }],
+          role: "user",
+          content: prompt,
         },
       ],
-      generationConfig: {
-        temperature: 0.15, // Temperatura baja para respuestas factuales sin alucinaciones
-        maxOutputTokens: 2048,
-      },
+      temperature: 0.15,
+      max_tokens: 2048,
     }),
   });
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`Error en Gemini Text Generation API: ${response.status} - ${errorText}`);
+    throw new Error(`Error en Groq Chat Completions API: ${response.status} - ${errorText}`);
   }
 
   const data = await response.json();
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  const text = data.choices?.[0]?.message?.content;
 
   if (!text) {
-    throw new Error("La API de Gemini no retornó una respuesta de texto válida.");
+    throw new Error("La API de Groq no retornó una respuesta de texto válida.");
   }
 
   return text;
