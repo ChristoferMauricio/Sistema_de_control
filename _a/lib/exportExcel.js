@@ -304,7 +304,7 @@ function buildOsiCacheAndPivots(rowsOsi, latestSprint) {
   const tipoFieldItems = makeFieldItems(si.tipo, tipoHidden, true);
   const sprintFieldItems = makeFieldItems(si.sprint, sprintHidden, true);
   const asignadoFieldItems = makeFieldItems(si.asignado, new Set(), true);
-  const epicaFieldItems = makeFieldItems(si.epica, new Set(), true);
+  const epicaFieldItems = makeFieldItems(si.epica, new Set(), false);
   const etiquetasFieldItems = makeFieldItems(si.etiquetas, etiquetasHidden, false);
 
   const ptAttrs =
@@ -346,7 +346,7 @@ function buildOsiCacheAndPivots(rowsOsi, latestSprint) {
 
   let pt1 = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
   pt1 += `<pivotTableDefinition xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" name="TablaDinámica2" cacheId="0"${ptAttrs}>`;
-  pt1 += '<location ref="A5:F15" firstHeaderRow="1" firstDataRow="2" firstDataCol="1" rowPageCount="3" colPageCount="1"/>';
+  pt1 += '<location ref="A4:F14" firstHeaderRow="1" firstDataRow="2" firstDataCol="1" rowPageCount="2" colPageCount="2"/>';
   pt1 += '<pivotFields count="15">';
   pt1 += pf(' axis="axisPage" multipleItemSelectionAllowed="1"', tipoFieldItems);  // 0
   pt1 += '<pivotField dataField="1" showAll="0"/>';                                 // 1
@@ -379,7 +379,7 @@ function buildOsiCacheAndPivots(rowsOsi, latestSprint) {
 
   let pt2 = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
   pt2 += `<pivotTableDefinition xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" name="TablaDinámica3" cacheId="0"${ptAttrs}>`;
-  pt2 += '<location ref="I5:N15" firstHeaderRow="1" firstDataRow="2" firstDataCol="1" rowPageCount="3" colPageCount="1"/>';
+  pt2 += '<location ref="I4:N14" firstHeaderRow="1" firstDataRow="2" firstDataCol="1" rowPageCount="2" colPageCount="2"/>';
   pt2 += '<pivotFields count="15">';
   pt2 += pf(' axis="axisPage" multipleItemSelectionAllowed="1"', tipoFieldItems);
   pt2 += pfSimple;  // 1
@@ -413,7 +413,7 @@ function buildOsiCacheAndPivots(rowsOsi, latestSprint) {
 
   let pt3 = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
   pt3 += `<pivotTableDefinition xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" name="TablaEpica" cacheId="0"${ptAttrs}>`;
-  pt3 += '<location ref="A5:C51" firstHeaderRow="1" firstDataRow="2" firstDataCol="1" rowPageCount="3" colPageCount="1"/>';
+  pt3 += '<location ref="A4:C50" firstHeaderRow="1" firstDataRow="2" firstDataCol="1" rowPageCount="2" colPageCount="2"/>';
   pt3 += '<pivotFields count="15">';
   pt3 += pf(' axis="axisPage" multipleItemSelectionAllowed="1"', tipoFieldItems);
   pt3 += pfSimple;  // 1
