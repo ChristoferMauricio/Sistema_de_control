@@ -166,8 +166,15 @@ function buildSheetXml(headers, rows, colWidths, sst, headerStyle = "6") {
 
 function buildOsiCacheAndPivots(rowsOsi, latestSprint) {
   // 1. Collect unique values for indexed fields
-  const sets = { tipo: new Set(), sprint: new Set(), asignado: new Set(), estado: new Set(), epica: new Set() };
-  const blanks = { tipo: false, sprint: false, asignado: false, estado: false, epica: false };
+  const sets = {
+    tipo: new Set(),
+    sprint: new Set(),
+    asignado: new Set(),
+    estado: new Set(),
+    epica: new Set(),
+    etiquetas: new Set(),
+  };
+  const blanks = { tipo: false, sprint: false, asignado: false, estado: false, epica: false, etiquetas: false };
 
   rowsOsi.forEach((r) => {
     if (r.Tipo) sets.tipo.add(r.Tipo); else blanks.tipo = true;
@@ -177,6 +184,7 @@ function buildOsiCacheAndPivots(rowsOsi, latestSprint) {
     if (r.Estado) sets.estado.add(r.Estado); else blanks.estado = true;
     const ep = r["Épica"];
     if (ep) sets.epica.add(ep); else blanks.epica = true;
+    if (r.Etiquetas) sets.etiquetas.add(r.Etiquetas); else blanks.etiquetas = true;
   });
 
   const tipoItems = [...sets.tipo].sort();
@@ -189,6 +197,7 @@ function buildOsiCacheAndPivots(rowsOsi, latestSprint) {
     return (iA === -1 ? 999 : iA) - (iB === -1 ? 999 : iB);
   });
   const epicaItems = [...sets.epica].sort();
+  const etiquetasItems = [...sets.etiquetas].sort();
 
   // 2. SharedItems helper
   function makeSI(items, hasBlank, extra = "") {
@@ -206,6 +215,7 @@ function buildOsiCacheAndPivots(rowsOsi, latestSprint) {
     asignado: makeSI(asignadoItems, blanks.asignado),
     estado: makeSI(estadoItems, blanks.estado),
     epica: makeSI(epicaItems, blanks.epica),
+    etiquetas: makeSI(etiquetasItems, blanks.etiquetas),
   };
 
   // 3. Pivot cache definition — 15 fields matching Osi columns
@@ -231,7 +241,7 @@ function buildOsiCacheAndPivots(rowsOsi, latestSprint) {
   defXml += `<cacheField name="Estado" numFmtId="0">${si.estado.xml}</cacheField>`;                // 11
   defXml += '<cacheField name="Informador" numFmtId="0"><sharedItems containsBlank="1"/></cacheField>'; // 12
   defXml += '<cacheField name="Creada" numFmtId="0"><sharedItems containsBlank="1"/></cacheField>'; // 13
-  defXml += '<cacheField name="Etiquetas" numFmtId="0"><sharedItems containsBlank="1"/></cacheField>'; // 14
+  defXml += `<cacheField name="Etiquetas" numFmtId="0">${si.etiquetas.xml}</cacheField>`;                // 14
   defXml += '</cacheFields></pivotCacheDefinition>';
 
   // 4. Pivot cache records
@@ -265,7 +275,7 @@ function buildOsiCacheAndPivots(rowsOsi, latestSprint) {
     recXml += `<x v="${getIdx(si.estado, r.Estado, !r.Estado)}"/>`;    // 11 Estado
     recXml += `<s v="${escXml(r.Informador)}"/>`;                      // 12 Informador
     recXml += `<s v="${escXml(r.Creada)}"/>`;                          // 13 Creada
-    recXml += `<s v="${escXml(r.Etiquetas || "")}"/>`;                 // 14 Etiquetas
+    recXml += `<x v="${getIdx(si.etiquetas, r.Etiquetas, !r.Etiquetas)}"/>`;   // 14 Etiquetas
     recXml += "</r>";
   });
   recXml += "</pivotCacheRecords>";
@@ -287,12 +297,15 @@ function buildOsiCacheAndPivots(rowsOsi, latestSprint) {
   const tipoHidden = new Set(tipoItems.filter((v) => v !== "Historia"));
   // Sprint = solo el seleccionado
   const sprintHidden = new Set(sprintItems.filter((v) => v !== latestSprint));
+  // Etiquetas = desmarcar cualquier valor que contenga "No_Reportar"
+  const etiquetasHidden = new Set(etiquetasItems.filter((v) => v.includes("No_Reportar")));
   // Estado: ocultar blank
   const estadoFieldItems = makeFieldItems(si.estado, new Set(), true);
   const tipoFieldItems = makeFieldItems(si.tipo, tipoHidden, true);
   const sprintFieldItems = makeFieldItems(si.sprint, sprintHidden, true);
   const asignadoFieldItems = makeFieldItems(si.asignado, new Set(), true);
   const epicaFieldItems = makeFieldItems(si.epica, new Set(), true);
+  const etiquetasFieldItems = makeFieldItems(si.etiquetas, etiquetasHidden, false);
 
   const ptAttrs =
     ' applyNumberFormats="0" applyBorderFormats="0" applyFontFormats="0"' +
@@ -327,13 +340,13 @@ function buildOsiCacheAndPivots(rowsOsi, latestSprint) {
   const pfSimple = '<pivotField showAll="0"/>';
 
   // --- PT1: TablaDinámica2 — Reporte Sprint (HU count) ---
-  // Page: Tipo(0), Sprint(8)  Row: Asignado(9)  Col: Estado(11)  Data: count of Clave(1)
-  const pageFields1 = '<pageFields count="2"><pageField fld="0" hier="-1"/><pageField fld="8" hier="-1"/></pageFields>';
+  // Page: Tipo(0), Sprint(8), Etiquetas(14)  Row: Asignado(9)  Col: Estado(11)  Data: count of Clave(1)
+  const pageFields1 = '<pageFields count="3"><pageField fld="0" hier="-1"/><pageField fld="8" hier="-1"/><pageField fld="14" hier="-1"/></pageFields>';
   const dataFields1 = '<dataFields count="1"><dataField name="Cuenta de Clave" fld="1" subtotal="count" baseField="0" baseItem="0"/></dataFields>';
 
   let pt1 = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
   pt1 += `<pivotTableDefinition xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" name="TablaDinámica2" cacheId="0"${ptAttrs}>`;
-  pt1 += '<location ref="A4:F14" firstHeaderRow="1" firstDataRow="2" firstDataCol="1" rowPageCount="2" colPageCount="1"/>';
+  pt1 += '<location ref="A5:F15" firstHeaderRow="1" firstDataRow="2" firstDataCol="1" rowPageCount="3" colPageCount="1"/>';
   pt1 += '<pivotFields count="15">';
   pt1 += pf(' axis="axisPage" multipleItemSelectionAllowed="1"', tipoFieldItems);  // 0
   pt1 += '<pivotField dataField="1" showAll="0"/>';                                 // 1
@@ -349,7 +362,7 @@ function buildOsiCacheAndPivots(rowsOsi, latestSprint) {
   pt1 += pf(' axis="axisCol"', estadoFieldItems);                                   // 11
   pt1 += pfSimple;  // 12
   pt1 += pfSimple;  // 13
-  pt1 += pfSimple;  // 14
+  pt1 += pf(' axis="axisPage" multipleItemSelectionAllowed="1"', etiquetasFieldItems); // 14
   pt1 += '</pivotFields>';
   pt1 += '<rowFields count="1"><field x="9"/></rowFields>';
   pt1 += rowItemsAsignado;
@@ -366,7 +379,7 @@ function buildOsiCacheAndPivots(rowsOsi, latestSprint) {
 
   let pt2 = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
   pt2 += `<pivotTableDefinition xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" name="TablaDinámica3" cacheId="0"${ptAttrs}>`;
-  pt2 += '<location ref="I4:N14" firstHeaderRow="1" firstDataRow="2" firstDataCol="1" rowPageCount="2" colPageCount="1"/>';
+  pt2 += '<location ref="I5:N15" firstHeaderRow="1" firstDataRow="2" firstDataCol="1" rowPageCount="3" colPageCount="1"/>';
   pt2 += '<pivotFields count="15">';
   pt2 += pf(' axis="axisPage" multipleItemSelectionAllowed="1"', tipoFieldItems);
   pt2 += pfSimple;  // 1
@@ -382,7 +395,7 @@ function buildOsiCacheAndPivots(rowsOsi, latestSprint) {
   pt2 += pf(' axis="axisCol"', estadoFieldItems);
   pt2 += pfSimple;  // 12
   pt2 += pfSimple;  // 13
-  pt2 += pfSimple;  // 14
+  pt2 += pf(' axis="axisPage" multipleItemSelectionAllowed="1"', etiquetasFieldItems); // 14
   pt2 += '</pivotFields>';
   pt2 += '<rowFields count="1"><field x="9"/></rowFields>';
   pt2 += rowItemsAsignado;
@@ -394,13 +407,13 @@ function buildOsiCacheAndPivots(rowsOsi, latestSprint) {
   pt2 += '</pivotTableDefinition>';
 
   // --- PT3: TablaEpica — Reporte por Épica (HU count + SP sum) ---
-  // Page: Tipo(0), Sprint(8)  Row: Épica(5)  Data: count(11), sum(10)
-  const pageFields3 = '<pageFields count="2"><pageField fld="0" hier="-1"/><pageField fld="8" hier="-1"/></pageFields>';
+  // Page: Tipo(0), Sprint(8), Etiquetas(14)  Row: Épica(5)  Data: count(11), sum(10)
+  const pageFields3 = '<pageFields count="3"><pageField fld="0" hier="-1"/><pageField fld="8" hier="-1"/><pageField fld="14" hier="-1"/></pageFields>';
   const dataFields3 = '<dataFields count="2"><dataField name="HU" fld="11" subtotal="count"/><dataField name="Puntos" fld="10" subtotal="sum"/></dataFields>';
 
   let pt3 = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
   pt3 += `<pivotTableDefinition xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" name="TablaEpica" cacheId="0"${ptAttrs}>`;
-  pt3 += '<location ref="A4:C50" firstHeaderRow="1" firstDataRow="2" firstDataCol="1" rowPageCount="2" colPageCount="1"/>';
+  pt3 += '<location ref="A5:C51" firstHeaderRow="1" firstDataRow="2" firstDataCol="1" rowPageCount="3" colPageCount="1"/>';
   pt3 += '<pivotFields count="15">';
   pt3 += pf(' axis="axisPage" multipleItemSelectionAllowed="1"', tipoFieldItems);
   pt3 += pfSimple;  // 1
@@ -416,7 +429,7 @@ function buildOsiCacheAndPivots(rowsOsi, latestSprint) {
   pt3 += '<pivotField dataField="1" showAll="0"/>';  // 11 Estado (count)
   pt3 += pfSimple;  // 12
   pt3 += pfSimple;  // 13
-  pt3 += pfSimple;  // 14
+  pt3 += pf(' axis="axisPage" multipleItemSelectionAllowed="1"', etiquetasFieldItems); // 14
   pt3 += '</pivotFields>';
   pt3 += '<rowFields count="1"><field x="5"/></rowFields>';
   pt3 += rowItemsEpica;
