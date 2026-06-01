@@ -639,12 +639,12 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
         return tickets.filter((t) => t.issue_type === "Historia");
     }, [tickets]);
 
-    // Sprints disponibles (de las historias)
+    // Sprints disponibles (de todos los tickets)
     const sprints = useMemo(() => {
         const s = new Set();
-        historias.forEach((t) => { if (t.sprint) s.add(t.sprint); });
+        tickets.forEach((t) => { if (t.sprint) s.add(t.sprint); });
         return sortSprints([...s]);
-    }, [historias]);
+    }, [tickets]);
 
     // Detectar si el sprint seleccionado pertenece al tablero PF3QA
     // (los sprints del tablero QA tienen formato "Tablero Sprint N")
