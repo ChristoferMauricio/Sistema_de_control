@@ -117,7 +117,49 @@ const FILE_EXTENSIONS = /\.(pdf|docx?|xlsx?|pptx?|json|csv|zip|rar|7z|png|jpg|jp
 // ─── Funciones de Limpieza ──────────────────────────────────────────────────
 
 /**
- * Limpia el markup wiki de Jira para obtener solo el texto plano.
+ * Recorre recursivamente un nodo de Atlassian Document Format (ADF) para
+ * extraer todo su contenido de texto plano.
+ *
+ * @param {Object} node - Nodo de la estructura ADF
+ * @returns {string} Texto plano extraído
+ */
+function extractTextFromNode(node) {
+  if (!node) return "";
+  if (node.type === "text" && typeof node.text === "string") {
+    return node.text;
+  }
+  if (Array.isArray(node.content)) {
+    return node.content.map(extractTextFromNode).join(" ");
+  }
+  return "";
+}
+
+/**
+ * Intenta parsear la descripción como un documento JSON en formato ADF.
+ * Si es un JSON válido que representa un documento de Jira Cloud,
+ * extrae y retorna su contenido en texto plano.
+ *
+ * @param {string} description - Texto que podría ser un JSON de tipo ADF
+ * @returns {string|null} Texto plano si es un ADF válido, de lo contrario null
+ */
+function extractTextFromAdf(description) {
+  if (!description) return null;
+  const trimmed = description.trim();
+  if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+    try {
+      const doc = JSON.parse(trimmed);
+      if (doc && doc.type === "doc") {
+        return extractTextFromNode(doc);
+      }
+    } catch (e) {
+      // Ignorar error de parseo y continuar con flujo normal
+    }
+  }
+  return null;
+}
+
+/**
+ * Limpia el markup wiki de Jira o parsea la estructura ADF en JSON para obtener solo el texto plano.
  * Elimina:
  *   - Headings: h1. h2. h3. etc.
  *   - Formato: *bold*, _italic_, +underline+, -strikethrough-, {{monospace}}
@@ -129,11 +171,17 @@ const FILE_EXTENSIONS = /\.(pdf|docx?|xlsx?|pptx?|json|csv|zip|rar|7z|png|jpg|jp
  *   - Imágenes y adjuntos (se analizan por separado)
  *   - Caracteres de control y espacios múltiples
  *
- * @param {string} text - Texto con markup wiki de Jira
+ * @param {string} text - Texto con markup wiki de Jira o JSON en formato ADF
  * @returns {string} Texto plano limpio
  */
 function stripJiraMarkup(text) {
   if (!text) return "";
+
+  // Intentar extraer texto si es un documento ADF en formato JSON
+  const adfText = extractTextFromAdf(text);
+  if (adfText !== null) {
+    return adfText.replace(/\s+/g, " ").trim();
+  }
 
   let clean = text;
 
@@ -182,14 +230,38 @@ function stripJiraMarkup(text) {
 
 /**
  * Detecta si la descripción contiene referencias a adjuntos (imágenes o archivos).
+ * Soporta tanto markup tradicional como nodos media/mediaSingle de ADF.
  *
- * @param {string} description - Texto de la descripción con markup de Jira
+ * @param {string} description - Texto de la descripción con markup o JSON
  * @returns {boolean} true si se detectan adjuntos
  */
 function hasAttachments(description) {
   if (!description) return false;
 
-  // Verificar cada patrón de adjunto
+  // Si es un documento ADF en formato JSON, buscar nodos de tipo media
+  const trimmed = description.trim();
+  if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+    try {
+      const doc = JSON.parse(trimmed);
+      let found = false;
+      function walk(node) {
+        if (!node || found) return;
+        if (node.type === "media" || node.type === "mediaSingle" || node.type === "inlineCard" || node.type === "blockCard") {
+          found = true;
+          return;
+        }
+        if (Array.isArray(node.content)) {
+          node.content.forEach(walk);
+        }
+      }
+      walk(doc);
+      if (found) return true;
+    } catch (e) {
+      // Ignorar error de parseo y continuar con expresiones regulares
+    }
+  }
+
+  // Verificar cada patrón de adjunto tradicional
   for (const pattern of ATTACHMENT_PATTERNS) {
     pattern.lastIndex = 0; // Resetear regex stateful
     if (pattern.test(description)) return true;
