@@ -169,35 +169,109 @@ export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
     return s.includes("done") || s.includes("listo") || s.includes("completado") || s.includes("cancelado") || s.includes("cerrado") || s.includes("rechazado");
   };
 
+  const extractTextFromNode = (node) => {
+    if (!node) return "";
+    if (node.type === "text" && typeof node.text === "string") {
+      return node.text;
+    }
+    if (Array.isArray(node.content)) {
+      return node.content.map(extractTextFromNode).join(" ");
+    }
+    return "";
+  };
+
+  const extractTextFromAdf = (description) => {
+    if (!description) return null;
+    const trimmed = description.trim();
+    if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+      try {
+        const doc = JSON.parse(trimmed);
+        if (doc && doc.type === "doc") {
+          return extractTextFromNode(doc);
+        }
+      } catch (e) {
+        // Ignorar
+      }
+    }
+    return null;
+  };
+
   /**
    * Extrae el nombre del reportante desde el campo "description" del ticket Jira.
+   * Soporta sintaxis Wiki tradicional y formato JSON ADF.
    * Busca patrones como "Usuario reportante: Nombre" o "Usuario solicitante: Nombre"
-   * usando expresiones regulares que toleran formato Markdown (asteriscos, etc.).
+   * y remueve campos continuos unidos (como fecha o correo).
    * @param {string} description - Campo description del ticket Jira
    * @returns {string|null} Nombre del reportante o null si no se encuentra
    */
   const parseReporter = (description) => {
     if (!description) return null;
     
+    // Si es un documento ADF en formato JSON, extraer el texto plano primero
+    const adfText = extractTextFromAdf(description);
+    const textToSearch = adfText !== null ? adfText : description;
+
     // Primero buscar reportante (sin importar asteriscos o formato Markdown)
-    let match = description.match(/Usuario reportante:\s*([^\n\r\*]+)/i) || 
-                description.match(/Usuario\s*reportante:\s*([^\n\r\*]+)/i) ||
-                description.match(/Reportante:\s*([^\n\r\*]+)/i);
+    let match = textToSearch.match(/Usuario reportante:\s*([^\n\r\*]+)/i) || 
+                textToSearch.match(/Usuario\s*reportante:\s*([^\n\r\*]+)/i) ||
+                textToSearch.match(/Reportante:\s*([^\n\r\*]+)/i);
                 
     if (match && match[1]) {
-      return match[1].trim();
+      let name = match[1].trim();
+      const nextFieldMatch = name.match(/^(.*?)\s*(fecha:|correo:|usuario asignado:|usuario solicitante:|solicitante:|cargo:|modalidad:|nota:)/i);
+      if (nextFieldMatch) name = nextFieldMatch[1].trim();
+      return name.replace(/"$/, "").trim();
     }
     
     // Luego buscar solicitante si no hay reportante
-    let solicitanteMatch = description.match(/Usuario solicitante:\s*([^\n\r\*]+)/i) || 
-                           description.match(/Usuario\s*solicitante:\s*([^\n\r\*]+)/i) ||
-                           description.match(/Solicitante:\s*([^\n\r\*]+)/i);
+    let solicitanteMatch = textToSearch.match(/Usuario solicitante:\s*([^\n\r\*]+)/i) || 
+                           textToSearch.match(/Usuario\s*solicitante:\s*([^\n\r\*]+)/i) ||
+                           textToSearch.match(/Solicitante:\s*([^\n\r\*]+)/i);
                            
     if (solicitanteMatch && solicitanteMatch[1]) {
-      return solicitanteMatch[1].trim();
+      let name = solicitanteMatch[1].trim();
+      const nextFieldMatch = name.match(/^(.*?)\s*(fecha:|correo:|usuario asignado:|usuario reportante:|reportante:|cargo:|modalidad:|nota:)/i);
+      if (nextFieldMatch) name = nextFieldMatch[1].trim();
+      return name.replace(/"$/, "").trim();
     }
     
     return null;
+  };
+
+  const normalizeStr = (str) => {
+    if (!str) return "";
+    return str
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim();
+  };
+
+  const NAME_ALIASES = {
+    "rolando berner ardiles velasco": "rolando bernes ardiles velasco",
+    "rolando berner": "rolando bernes ardiles velasco"
+  };
+
+  const matchNames = (n1, n2) => {
+    const clean1 = normalizeStr(n1);
+    const clean2 = normalizeStr(n2);
+    
+    if (clean1 === clean2) return true;
+    
+    const mapped1 = NAME_ALIASES[clean1] || clean1;
+    const mapped2 = NAME_ALIASES[clean2] || clean2;
+    if (mapped1 === mapped2) return true;
+    
+    // Ignorar palabras cortas como "de", "del", "la", "y" en la comparación
+    const words1 = mapped1.split(/\s+/).filter(w => w.length > 2);
+    const words2 = mapped2.split(/\s+/).filter(w => w.length > 2);
+    
+    if (words1.length === 0 || words2.length === 0) return false;
+    
+    const subset1 = words1.every(w => words2.includes(w));
+    const subset2 = words2.every(w => words1.includes(w));
+    
+    return subset1 || subset2;
   };
 
   /**
@@ -207,14 +281,8 @@ export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
    */
   const handleProfileClick = (name) => {
     if (!name) return;
-    const lowerName = name.toLowerCase();
     
-    // Exact or partial match inside the GSM array
-    const profile = gsmData.find(g => 
-      g.nombre.toLowerCase() === lowerName || 
-      g.nombre.toLowerCase().includes(lowerName) ||
-      lowerName.includes(g.nombre.toLowerCase())
-    );
+    const profile = gsmData.find(g => matchNames(name, g.nombre));
 
     if (profile) {
       setSelectedProfile(profile);

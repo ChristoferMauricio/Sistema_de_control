@@ -23,6 +23,7 @@
 "use client";
 
 import { useEffect, useState, useMemo, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { sortSprints } from "@/lib/utils";
 import { Download } from "lucide-react";
@@ -448,66 +449,91 @@ export default function ErroresEstadisticasPage() {
 
   /* ─── Estado del modal de detalle ─── */
   const [modal, setModal] = useState(null); // { title, personName, items }
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState(null);
+  const router = useRouter();
+
+  const fetchData = useCallback(async () => {
+    // Consultas en paralelo para optimizar tiempo de carga
+    const [ticketsRes, linksRes, equipoRes, personsRes] = await Promise.all([
+      supabase
+        .from("jira_tickets")
+        .select("jira_key, summary, issue_type, status, sprint, assignee_email, reporter_email, parent_key")
+        .is("deleted_at", null)
+        .like("jira_key", "PF3QA-%"),
+      supabase
+        .from("jira_ticket_links")
+        .select("source_key, target_key, link_type")
+        .like("source_key", "PF3QA-%"),
+      supabase.from("equipo_desarrollo").select("correo_pgim, correo_gcorp, nombre_clave, nombre"),
+      supabase.from("jira_persons").select("email, display_name"),
+    ]);
+
+    const tix = ticketsRes.data || [];
+    const lnk = linksRes.data || [];
+    setTickets(tix);
+    setLinks(lnk);
+    setEquipo(equipoRes.data || []);
+    setPersons(personsRes.data || []);
+
+    // Obtener resúmenes de tickets vinculados externos (PF3-XXXX que no están en PF3QA)
+    // Necesarios para mostrar info en el modal de detalle
+    const pf3qaKeys = new Set(tix.map((t) => t.jira_key));
+    const externalKeys = [...new Set(lnk.map((l) => l.target_key).filter((k) => !pf3qaKeys.has(k)))];
+    if (externalKeys.length > 0) {
+      const { data: extTickets } = await supabase
+        .from("jira_tickets")
+        .select("jira_key, summary")
+        .is("deleted_at", null)
+        .in("jira_key", externalKeys);
+      setLinkedTickets(extTickets || []);
+    }
+
+    // Obtener sprints de tickets vinculados (para clasificar Desarrollo/Certificación por fallback)
+    const allTargetKeys = [...new Set(lnk.map((l) => l.target_key).filter((k) => !pf3qaKeys.has(k)))];
+    if (allTargetKeys.length > 0) {
+      const { data: linkedSprintData } = await supabase
+        .from("jira_tickets")
+        .select("jira_key, sprint")
+        .is("deleted_at", null)
+        .in("jira_key", allTargetKeys);
+      const sprintMap = {};
+      (linkedSprintData || []).forEach((t) => { sprintMap[t.jira_key] = t.sprint || ""; });
+      setLinkedSprintMap(sprintMap);
+    }
+
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
-    /**
-     * Carga inicial de datos desde múltiples tablas en paralelo.
-     * Obtiene: tickets PF3QA, vínculos, equipo de desarrollo y personas de Jira.
-     * Luego busca los resúmenes de tickets externos vinculados.
-     */
-    async function fetchData() {
-      // Consultas en paralelo para optimizar tiempo de carga
-      const [ticketsRes, linksRes, equipoRes, personsRes] = await Promise.all([
-        supabase
-          .from("jira_tickets")
-          .select("jira_key, summary, issue_type, status, sprint, assignee_email, reporter_email, parent_key")
-          .is("deleted_at", null)
-          .like("jira_key", "PF3QA-%"),
-        supabase
-          .from("jira_ticket_links")
-          .select("source_key, target_key, link_type")
-          .like("source_key", "PF3QA-%"),
-        supabase.from("equipo_desarrollo").select("correo_pgim, correo_gcorp, nombre_clave, nombre"),
-        supabase.from("jira_persons").select("email, display_name"),
-      ]);
-
-      const tix = ticketsRes.data || [];
-      const lnk = linksRes.data || [];
-      setTickets(tix);
-      setLinks(lnk);
-      setEquipo(equipoRes.data || []);
-      setPersons(personsRes.data || []);
-
-      // Obtener resúmenes de tickets vinculados externos (PF3-XXXX que no están en PF3QA)
-      // Necesarios para mostrar info en el modal de detalle
-      const pf3qaKeys = new Set(tix.map((t) => t.jira_key));
-      const externalKeys = [...new Set(lnk.map((l) => l.target_key).filter((k) => !pf3qaKeys.has(k)))];
-      if (externalKeys.length > 0) {
-        const { data: extTickets } = await supabase
-          .from("jira_tickets")
-          .select("jira_key, summary")
-          .is("deleted_at", null)
-          .in("jira_key", externalKeys);
-        setLinkedTickets(extTickets || []);
-      }
-
-      // Obtener sprints de tickets vinculados (para clasificar Desarrollo/Certificación por fallback)
-      const allTargetKeys = [...new Set(lnk.map((l) => l.target_key).filter((k) => !pf3qaKeys.has(k)))];
-      if (allTargetKeys.length > 0) {
-        const { data: linkedSprintData } = await supabase
-          .from("jira_tickets")
-          .select("jira_key, sprint")
-          .is("deleted_at", null)
-          .in("jira_key", allTargetKeys);
-        const sprintMap = {};
-        (linkedSprintData || []).forEach((t) => { sprintMap[t.jira_key] = t.sprint || ""; });
-        setLinkedSprintMap(sprintMap);
-      }
-
-      setLoading(false);
-    }
     fetchData();
-  }, []);
+  }, [fetchData]);
+
+  async function handleSync() {
+    setSyncing(true);
+    setSyncResult(null);
+
+    try {
+      const response = await fetch("/api/sync-jira", { method: "POST" });
+      const data = await response.json();
+
+      if (!response.ok) {
+        setSyncResult({ type: "error", message: data.error || "Error al sincronizar" });
+      } else {
+        setSyncResult({
+          type: "success",
+          message: `${data.synced} tickets sincronizados, ${data.statusChanges} cambio(s) de estado${data.deleted ? `, ${data.deleted} eliminado(s)` : ""}`,
+        });
+        await fetchData();
+        router.refresh();
+      }
+    } catch (err) {
+      setSyncResult({ type: "error", message: "Error de conexión con el servidor" });
+    }
+
+    setSyncing(false);
+    setTimeout(() => setSyncResult(null), 5000);
+  }
 
   /** Mapa de vínculos: source_key → [{target_key, link_type}] para acceso O(1) */
   const linksMap = useMemo(() => {
@@ -796,21 +822,75 @@ export default function ErroresEstadisticasPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="animate-fade-in">
-        <div className="flex items-center gap-3 mb-1">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 animate-fade-in">
+        <div className="flex items-center gap-3">
           <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-900/40">
             <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-indigo-600 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
             </svg>
           </div>
-          <h1 className="text-2xl md:text-3xl font-bold font-[family-name:var(--font-heading)] text-gray-900 dark:text-gray-100">
-            Estadísticas de Errores
-          </h1>
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold font-[family-name:var(--font-heading)] text-gray-900 dark:text-gray-100">
+              Estadísticas de Errores
+            </h1>
+            <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5">
+              Distribución de historias y errores por integrante del tablero PF3QA
+            </p>
+          </div>
         </div>
-        <p className="text-gray-500 dark:text-gray-400 mt-2">
-          Distribución de historias y errores por integrante del tablero PF3QA
-        </p>
+
+        <button
+          id="sync-jira-btn"
+          onClick={handleSync}
+          disabled={syncing}
+          className={`
+            inline-flex items-center justify-center gap-2.5 px-5 py-2.5 rounded-xl
+            font-medium text-sm transition-all duration-300 w-full sm:w-auto
+            ${syncing
+              ? "bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-wait"
+              : "bg-orange-500 hover:bg-orange-600 text-white shadow-md shadow-orange-500/15 hover:shadow-lg hover:shadow-orange-500/25 hover:scale-[1.02] active:scale-[0.98]"
+            }
+          `}
+        >
+          {syncing ? (
+            <>
+              <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+              Sincronizando...
+            </>
+          ) : (
+            <>
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Actualizar desde Jira
+            </>
+          )}
+        </button>
       </div>
+
+      {/* Sync result toast */}
+      {syncResult && (
+        <div
+          className={`
+            flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium animate-slide-up
+            ${syncResult.type === "success"
+              ? "bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900/50"
+              : "bg-red-50 text-red-700 border border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-900/50"
+            }
+          `}
+        >
+          {syncResult.type === "success" ? (
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          ) : (
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          )}
+          {syncResult.message}
+        </div>
+      )}
 
       {/* Sprint filter + Export */}
       <div className="flex items-center gap-3 animate-fade-in">
