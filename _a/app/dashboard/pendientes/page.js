@@ -59,14 +59,11 @@ export default function PendientesPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      // 1. Obtener todos los pendientes
-      const { data: pData, error: pError } = await supabase
-        .from("pendientes")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (pError) throw pError;
-      setPendientes(pData || []);
+      // 1. Obtener todos los pendientes via API (usa service client, bypasses RLS)
+      const pRes = await fetch("/api/pendientes");
+      const pJson = await pRes.json();
+      if (!pRes.ok) throw new Error(pJson.error || "Error al obtener pendientes");
+      setPendientes(pJson.data || []);
 
       // 2. Obtener miembros del equipo para seleccionar responsables
       const { data: tData, error: tError } = await supabase
@@ -171,13 +168,12 @@ export default function PendientesPage() {
     setSaving(true);
     try {
       if (selectedPendiente) {
-        // MODO EDICIÓN
-        const isSubjectChanged = formData.asunto.trim() !== selectedPendiente.asunto;
-
-        // 1. Actualizar el pendiente
-        const { error: updateError } = await supabase
-          .from("pendientes")
-          .update({
+        // MODO EDICIÓN via API
+        const res = await fetch("/api/pendientes", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: selectedPendiente.id,
             asunto: formData.asunto.trim(),
             seguimiento: formData.seguimiento,
             responsables: formData.responsables,
@@ -186,31 +182,17 @@ export default function PendientesPage() {
             fecha_primer_correo: formData.fecha_primer_correo || null,
             fecha_atencion: formData.fecha_atencion || null,
             drive_link: formData.drive_link,
-            updated_at: new Date().toISOString()
-          })
-          .eq("id", selectedPendiente.id);
-
-        if (updateError) throw updateError;
-
-        // 2. Si el asunto cambió, insertar en el historial
-        if (isSubjectChanged) {
-          const { error: histError } = await supabase
-            .from("pendiente_asunto_history")
-            .insert({
-              pendiente_id: selectedPendiente.id,
-              asunto_anterior: selectedPendiente.asunto,
-              asunto_nuevo: formData.asunto.trim()
-            });
-
-          if (histError) throw histError;
-        }
+          }),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || "Error al actualizar");
 
       } else {
-        // MODO CREACIÓN
-        // 1. Insertar nuevo pendiente
-        const { data: newData, error: insertError } = await supabase
-          .from("pendientes")
-          .insert({
+        // MODO CREACIÓN via API
+        const res = await fetch("/api/pendientes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
             asunto: formData.asunto.trim(),
             seguimiento: formData.seguimiento,
             responsables: formData.responsables,
@@ -218,25 +200,11 @@ export default function PendientesPage() {
             historias: formData.historias,
             fecha_primer_correo: formData.fecha_primer_correo || null,
             fecha_atencion: formData.fecha_atencion || null,
-            drive_link: formData.drive_link
-          })
-          .select()
-          .single();
-
-        if (insertError) throw insertError;
-
-        // 2. Insertar entrada inicial en el historial
-        if (newData) {
-          const { error: histError } = await supabase
-            .from("pendiente_asunto_history")
-            .insert({
-              pendiente_id: newData.id,
-              asunto_anterior: null,
-              asunto_nuevo: formData.asunto.trim()
-            });
-
-          if (histError) throw histError;
-        }
+            drive_link: formData.drive_link,
+          }),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || "Error al crear");
       }
 
       setIsFormOpen(false);
@@ -253,12 +221,9 @@ export default function PendientesPage() {
     if (!confirm("¿Está seguro de que desea eliminar este pendiente?")) return;
 
     try {
-      const { error } = await supabase
-        .from("pendientes")
-        .delete()
-        .eq("id", id);
-
-      if (error) throw error;
+      const res = await fetch(`/api/pendientes?id=${id}`, { method: "DELETE" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Error al eliminar");
       fetchData();
     } catch (err) {
       console.error("Error al eliminar:", err.message);
@@ -274,14 +239,10 @@ export default function PendientesPage() {
     setSubjectHistory([]);
 
     try {
-      const { data, error } = await supabase
-        .from("pendiente_asunto_history")
-        .select("*")
-        .eq("pendiente_id", pendiente.id)
-        .order("changed_at", { ascending: true });
-
-      if (error) throw error;
-      setSubjectHistory(data || []);
+      const res = await fetch(`/api/pendientes/history?pendiente_id=${pendiente.id}`);
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Error al cargar historial");
+      setSubjectHistory(json.data || []);
     } catch (err) {
       console.error("Error al cargar historial:", err.message);
     } finally {
