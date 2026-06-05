@@ -19,10 +19,18 @@ import {
   Calendar, User, Link2, AlertCircle, Check, ArrowRight, ChevronDown
 } from "lucide-react";
 
+/** Extrae la clave de Jira de un link (ej: https://.../browse/PF3QA-93 → PF3QA-93) */
+const extractJiraKey = (link) => {
+  if (!link) return "";
+  const match = link.match(/\/browse\/([A-Za-z0-9]+-[0-9]+)/);
+  return match ? match[1] : link;
+};
+
 export default function PendientesPage() {
   /* ─── Estados de datos ─── */
   const [pendientes, setPendientes] = useState([]);
   const [teamMembers, setTeamMembers] = useState([]);
+  const [ticketStatuses, setTicketStatuses] = useState({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -69,7 +77,37 @@ export default function PendientesPage() {
       const pRes = await fetch("/api/pendientes");
       const pJson = await pRes.json();
       if (!pRes.ok) throw new Error(pJson.error || "Error al obtener pendientes");
-      setPendientes(pJson.data || []);
+      const fetchedPendientes = pJson.data || [];
+      setPendientes(fetchedPendientes);
+
+      // Obtener los estados de los tickets de Jira en lote
+      const allKeys = [];
+      fetchedPendientes.forEach(item => {
+        if (item.historias && Array.isArray(item.historias)) {
+          item.historias.forEach(link => {
+            const key = extractJiraKey(link);
+            if (key && key.includes("-")) {
+              allKeys.push(key);
+            }
+          });
+        }
+      });
+      const uniqueKeys = Array.from(new Set(allKeys));
+      if (uniqueKeys.length > 0) {
+        try {
+          const statusRes = await fetch("/api/pendientes/ticket-statuses", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ keys: uniqueKeys })
+          });
+          const statusJson = await statusRes.json();
+          if (statusRes.ok) {
+            setTicketStatuses(statusJson.data || {});
+          }
+        } catch (statusErr) {
+          console.error("Error al obtener estados de los tickets:", statusErr);
+        }
+      }
 
       // 2. Obtener miembros del equipo para seleccionar responsables
       const { data: tData, error: tError } = await supabase
@@ -183,7 +221,7 @@ export default function PendientesPage() {
   }, [ticketSearch]);
 
   /** Agrega un ticket seleccionado del dropdown a la lista de historias */
-  const addTicketToHistorias = (jiraKey) => {
+  const addTicketToHistorias = (jiraKey, status) => {
     const fullUrl = `${JIRA_BASE}/${jiraKey}`;
     // Evitar duplicados
     if (formData.historias.includes(fullUrl)) return;
@@ -191,6 +229,12 @@ export default function PendientesPage() {
       ...prev,
       historias: [...prev.historias, fullUrl]
     }));
+    if (status) {
+      setTicketStatuses(prev => ({
+        ...prev,
+        [jiraKey]: status
+      }));
+    }
     setTicketSearch("");
     setTicketResults([]);
     setShowTicketDropdown(false);
@@ -201,12 +245,6 @@ export default function PendientesPage() {
       ...prev,
       historias: prev.historias.filter((_, i) => i !== index)
     }));
-  };
-
-  /** Extrae la clave de Jira de un link (ej: https://.../browse/PF3QA-93 → PF3QA-93) */
-  const extractJiraKey = (link) => {
-    const match = link.match(/\/browse\/([A-Za-z0-9]+-[0-9]+)/);
-    return match ? match[1] : link;
   };
 
   const handleSave = async (e) => {
@@ -329,6 +367,28 @@ export default function PendientesPage() {
       default:
         return "bg-gray-50 text-gray-600 border-gray-200";
     }
+  };
+
+  /* ─── Estilos de Insignias de Estado de Jira ─── */
+  const getJiraStatusBadgeClass = (status) => {
+    if (!status) return "bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800/40 dark:text-gray-400 dark:border-gray-700/50";
+    const s = status.toLowerCase();
+    if (s.includes("done") || s.includes("finalizado") || s.includes("resuelto") || s.includes("resolved") || s.includes("completado")) {
+      return "bg-green-50 text-green-700 border-green-200 dark:bg-green-950/20 dark:text-green-400 dark:border-green-900/30";
+    }
+    if (s.includes("progress") || s.includes("proceso") || s.includes("desarrollo") || s.includes("working")) {
+      return "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/20 dark:text-blue-400 dark:border-blue-900/30";
+    }
+    if (s.includes("qa") || s.includes("testing") || s.includes("pruebas")) {
+      return "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/20 dark:text-purple-400 dark:border-purple-900/30";
+    }
+    if (s.includes("review") || s.includes("revisión") || s.includes("revision")) {
+      return "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/20 dark:text-orange-400 dark:border-orange-900/30";
+    }
+    if (s.includes("todo") || s.includes("to do") || s.includes("por hacer")) {
+      return "bg-gray-50 text-gray-600 border-gray-200 dark:bg-gray-800/40 dark:text-gray-400 dark:border-gray-700/50";
+    }
+    return "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900/30";
   };
 
   const formatDate = (dateStr) => {
@@ -507,23 +567,30 @@ export default function PendientesPage() {
 
                     {/* Historias */}
                     <td className="py-4 px-5">
-                      <div className="flex flex-col gap-1 max-w-[180px]">
+                      <div className="flex flex-col gap-1.5 max-w-[200px]">
                         {item.historias && item.historias.length > 0 ? (
                           item.historias.map((link, idx) => {
                             const label = extractJiraKey(link);
+                            const ticketStatus = ticketStatuses[label];
                             
                             return (
-                              <a
-                                key={idx}
-                                href={link}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 text-xs text-orange-500 hover:text-orange-600 font-medium truncate"
-                                title={link}
-                              >
-                                <Link2 className="w-3 h-3 shrink-0" />
-                                <span className="truncate">{label}</span>
-                              </a>
+                              <div key={idx} className="flex items-center gap-1.5 flex-wrap">
+                                <a
+                                  href={link}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-xs text-orange-500 hover:text-orange-600 font-medium hover:underline shrink-0"
+                                  title={link}
+                                >
+                                  <Link2 className="w-3 h-3 shrink-0" />
+                                  <span>{label}</span>
+                                </a>
+                                {ticketStatus && (
+                                  <span className={`inline-flex items-center px-1.5 py-0.25 rounded text-[10px] font-bold border shrink-0 ${getJiraStatusBadgeClass(ticketStatus)}`}>
+                                    {ticketStatus}
+                                  </span>
+                                )}
+                              </div>
                             );
                           })
                         ) : (
@@ -779,7 +846,7 @@ export default function PendientesPage() {
                             key={ticket.jira_key}
                             type="button"
                             disabled={alreadyAdded}
-                            onClick={() => addTicketToHistorias(ticket.jira_key)}
+                            onClick={() => addTicketToHistorias(ticket.jira_key, ticket.status)}
                             className={`w-full text-left px-4 py-2.5 flex items-center gap-3 transition-colors ${
                               alreadyAdded
                                 ? "opacity-40 cursor-not-allowed bg-gray-50 dark:bg-gray-800/30"
@@ -789,6 +856,11 @@ export default function PendientesPage() {
                             <span className="font-mono font-bold text-xs text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/30 px-2 py-0.5 rounded-lg border border-orange-100 dark:border-orange-900/40 shrink-0">
                               {ticket.jira_key}
                             </span>
+                            {ticket.status && (
+                              <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold border shrink-0 ${getJiraStatusBadgeClass(ticket.status)}`}>
+                                {ticket.status}
+                              </span>
+                            )}
                             <span className="text-sm text-gray-700 dark:text-gray-300 truncate">
                               {ticket.summary || "Sin resumen"}
                             </span>
@@ -821,6 +893,7 @@ export default function PendientesPage() {
                   ) : (
                     formData.historias.map((link, index) => {
                       const key = extractJiraKey(link);
+                      const status = ticketStatuses[key];
                       return (
                         <div
                           key={index}
@@ -836,6 +909,11 @@ export default function PendientesPage() {
                           >
                             {key}
                           </a>
+                          {status && (
+                            <span className={`inline-flex items-center px-1.5 py-0.25 rounded text-[10px] font-bold border ${getJiraStatusBadgeClass(status)}`}>
+                              {status}
+                            </span>
+                          )}
                           <button
                             type="button"
                             onClick={() => removeHistoria(index)}

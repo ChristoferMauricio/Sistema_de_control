@@ -26,7 +26,7 @@ export async function GET(request) {
     // Búsqueda por coincidencia parcial (case-insensitive) en jira_key
     const { data, error } = await supabase
       .from("jira_tickets")
-      .select("jira_key, summary")
+      .select("jira_key, summary, status")
       .ilike("jira_key", `%${query}%`)
       .is("deleted_at", null)
       .order("jira_key", { ascending: true })
