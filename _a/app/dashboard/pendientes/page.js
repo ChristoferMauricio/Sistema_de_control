@@ -12,6 +12,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { supabase } from "@/lib/supabase";
 import { 
   Plus, Edit2, Trash2, ExternalLink, Clock, X, Search, Filter, 
@@ -580,9 +581,9 @@ export default function PendientesPage() {
       )}
 
       {/* ─── MODAL DE FORMULARIO (Crear/Editar) ─── */}
-      {isFormOpen && (
-        <div className="fixed inset-0 z-[100] overflow-y-auto bg-black/60 backdrop-blur-sm">
-          <div className="flex min-h-full items-center justify-center p-4 py-10">
+      {isFormOpen && createPortal(
+        <div className="fixed inset-0 z-[9999] overflow-y-auto" style={{ background: 'rgba(0,0,0,0.6)' }}>
+          <div className="flex min-h-full items-start justify-center px-4 py-12">
           <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-xl w-full max-w-3xl flex flex-col animate-fade-in">
             
             {/* Cabecera */}
@@ -813,13 +814,13 @@ export default function PendientesPage() {
 
           </div>
           </div>
-        </div>
-      )}
+        </div>,
+      document.body)}
 
       {/* ─── MODAL DE LÍNEA DE TIEMPO (Historial de Asunto) ─── */}
-      {isHistoryOpen && (
-        <div className="fixed inset-0 z-[100] overflow-y-auto bg-black/60 backdrop-blur-sm">
-          <div className="flex min-h-full items-center justify-center p-4 py-10">
+      {isHistoryOpen && createPortal(
+        <div className="fixed inset-0 z-[9999] overflow-y-auto" style={{ background: 'rgba(0,0,0,0.6)' }}>
+          <div className="flex min-h-full items-start justify-center px-4 py-12">
           <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-xl w-full max-w-2xl flex flex-col animate-fade-in">
             
             {/* Cabecera */}
@@ -920,8 +921,8 @@ export default function PendientesPage() {
 
           </div>
           </div>
-        </div>
-      )}
+        </div>,
+      document.body)}
 
     </div>
   );
