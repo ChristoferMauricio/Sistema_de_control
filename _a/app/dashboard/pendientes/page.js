@@ -581,8 +581,9 @@ export default function PendientesPage() {
 
       {/* ─── MODAL DE FORMULARIO (Crear/Editar) ─── */}
       {isFormOpen && (
-        <div className="fixed inset-0 z-[100] overflow-y-auto bg-black/60 backdrop-blur-sm p-4">
-          <div className="mx-auto my-12 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-xl w-full max-w-3xl flex flex-col animate-fade-in">
+        <div className="fixed inset-0 z-[100] overflow-y-auto bg-black/60 backdrop-blur-sm">
+          <div className="flex min-h-full items-center justify-center p-4 py-10">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-xl w-full max-w-3xl flex flex-col animate-fade-in">
             
             {/* Cabecera */}
             <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between bg-gray-50/50 dark:bg-gray-800/20">
@@ -811,13 +812,15 @@ export default function PendientesPage() {
             </div>
 
           </div>
+          </div>
         </div>
       )}
 
       {/* ─── MODAL DE LÍNEA DE TIEMPO (Historial de Asunto) ─── */}
       {isHistoryOpen && (
-        <div className="fixed inset-0 z-[100] overflow-y-auto bg-black/60 backdrop-blur-sm p-4">
-          <div className="mx-auto my-12 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-xl w-full max-w-2xl flex flex-col animate-fade-in">
+        <div className="fixed inset-0 z-[100] overflow-y-auto bg-black/60 backdrop-blur-sm">
+          <div className="flex min-h-full items-center justify-center p-4 py-10">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-xl w-full max-w-2xl flex flex-col animate-fade-in">
             
             {/* Cabecera */}
             <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between bg-gray-50/50 dark:bg-gray-800/20">
@@ -915,6 +918,7 @@ export default function PendientesPage() {
               </button>
             </div>
 
+          </div>
           </div>
         </div>
       )}
