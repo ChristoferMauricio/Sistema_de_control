@@ -106,7 +106,9 @@ export default function PendientesPage() {
       fecha_atencion: "",
       drive_link: ""
     });
-    setTempHistoria("");
+    setTicketSearch("");
+    setTicketResults([]);
+    setShowTicketDropdown(false);
     setIsFormOpen(true);
   };
 
@@ -122,7 +124,9 @@ export default function PendientesPage() {
       fecha_atencion: pendiente.fecha_atencion || "",
       drive_link: pendiente.drive_link || ""
     });
-    setTempHistoria("");
+    setTicketSearch("");
+    setTicketResults([]);
+    setShowTicketDropdown(false);
     setIsFormOpen(true);
   };
 
