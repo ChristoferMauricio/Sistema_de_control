@@ -16,8 +16,10 @@ import { createPortal } from "react-dom";
 import { supabase } from "@/lib/supabase";
 import { 
   Plus, Edit2, Trash2, ExternalLink, Clock, X, Search, Filter, 
-  Calendar, User, Link2, AlertCircle, Check, ArrowRight, ChevronDown
+  Calendar, User, Link2, AlertCircle, Check, ArrowRight, ChevronDown,
+  FileSpreadsheet
 } from "lucide-react";
+import XLSX from "xlsx-js-style";
 
 /** Extrae la clave de Jira de un link (ej: https://.../browse/PF3QA-93 → PF3QA-93) */
 const extractJiraKey = (link) => {
@@ -397,6 +399,211 @@ export default function PendientesPage() {
     return `${day}/${month}/${year}`;
   };
 
+  const exportToExcel = () => {
+    // Preparar los datos filtrados en pantalla para exportar
+    const dataToExport = filteredPendientes;
+
+    if (dataToExport.length === 0) {
+      alert("No hay datos para exportar.");
+      return;
+    }
+
+    const rows = [];
+
+    // Fila 1: Título principal
+    rows.push([
+      {
+        v: "REPORTE DE REQUERIMIENTOS PENDIENTES DE CORREO",
+        t: "s",
+        s: {
+          font: { name: "Arial", size: 16, bold: true, color: { rgb: "FFFFFF" } },
+          fill: { fgColor: { rgb: "1E3A8A" } }, // Azul marino
+          alignment: { horizontal: "center", vertical: "center" }
+        }
+      }
+    ]);
+
+    // Fila 2: Vacía
+    rows.push([]);
+
+    // Fila 3: Metadatos
+    const todayStr = new Date().toLocaleDateString("es-ES", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+
+    rows.push([
+      { v: "Fecha de Generación:", t: "s", s: { font: { bold: true, name: "Arial", size: 10 } } },
+      { v: todayStr, t: "s", s: { font: { name: "Arial", size: 10 } } },
+      { v: "", t: "s" },
+      { v: "Total Requerimientos:", t: "s", s: { font: { bold: true, name: "Arial", size: 10 } } },
+      { v: dataToExport.length, t: "n", s: { font: { name: "Arial", size: 10 }, alignment: { horizontal: "left" } } }
+    ]);
+
+    // Fila 4: Vacía
+    rows.push([]);
+
+    // Fila 5: Encabezados de la tabla
+    const headers = [
+      "ID",
+      "Asunto (Correo)",
+      "Seguimiento / Comentarios",
+      "Responsables",
+      "Estado",
+      "Tickets Jira (Historias)",
+      "Fecha Primer Correo",
+      "Fecha Atención",
+      "Enlace Drive"
+    ];
+
+    const headerRow = headers.map(header => ({
+      v: header,
+      t: "s",
+      s: {
+        font: { name: "Arial", size: 11, bold: true, color: { rgb: "FFFFFF" } },
+        fill: { fgColor: { rgb: "2563EB" } }, // Azul corporativo
+        alignment: { horizontal: "center", vertical: "center", wrapText: true },
+        border: {
+          top: { style: "thin", color: { rgb: "94A3B8" } },
+          bottom: { style: "medium", color: { rgb: "1E3A8A" } },
+          left: { style: "thin", color: { rgb: "94A3B8" } },
+          right: { style: "thin", color: { rgb: "94A3B8" } }
+        }
+      }
+    }));
+    rows.push(headerRow);
+
+    // Fila 6 en adelante: Datos
+    dataToExport.forEach((item, index) => {
+      const isEven = index % 2 === 0;
+      const rowBg = isEven ? "F8FAFC" : "FFFFFF"; // Zebra striping
+
+      const commonStyle = {
+        font: { name: "Arial", size: 10 },
+        fill: { fgColor: { rgb: rowBg } },
+        alignment: { vertical: "center", wrapText: true },
+        border: {
+          top: { style: "thin", color: { rgb: "E2E8F0" } },
+          bottom: { style: "thin", color: { rgb: "E2E8F0" } },
+          left: { style: "thin", color: { rgb: "E2E8F0" } },
+          right: { style: "thin", color: { rgb: "E2E8F0" } }
+        }
+      };
+
+      // Formatear Responsables
+      const responsablesStr = (item.responsables || []).join(", ") || "No asignado";
+
+      // Formatear Historias (Tickets Jira) con sus estados
+      const historiasList = (item.historias || []).map(link => {
+        const key = extractJiraKey(link);
+        const status = ticketStatuses[key];
+        return status ? `${key} (${status})` : key;
+      });
+      const historiasStr = historiasList.join("\n") || "Sin historias";
+
+      // Formatear Estado con colores condicionales
+      let statusColor = "374151"; // Gris oscuro por defecto
+      let statusBg = "F3F4F6";    // Gris claro por defecto
+      if (item.estado === "Finalizado") {
+        statusColor = "15803D"; // Verde oscuro
+        statusBg = "DCFCE7";    // Verde claro
+      } else if (item.estado === "En proceso") {
+        statusColor = "1D4ED8"; // Azul oscuro
+        statusBg = "DBEAFE";    // Azul claro
+      } else if (item.estado === "Esperando respuesta") {
+        statusColor = "B45309"; // Ámbar oscuro
+        statusBg = "FEF3C7";    // Ámbar claro
+      } else if (item.estado === "Derivado") {
+        statusColor = "6D28D9"; // Púrpura oscuro
+        statusBg = "F3E8FF";    // Púrpura claro
+      }
+
+      const statusStyle = {
+        ...commonStyle,
+        font: { ...commonStyle.font, bold: true, color: { rgb: statusColor } },
+        fill: { fgColor: { rgb: statusBg } },
+        alignment: { horizontal: "center", vertical: "center" }
+      };
+
+      // Crear celdas de la fila
+      const row = [
+        // ID
+        { v: `#${item.id}`, t: "s", s: { ...commonStyle, alignment: { horizontal: "center", vertical: "center" } } },
+        // Asunto
+        { v: item.asunto || "Sin asunto", t: "s", s: commonStyle },
+        // Seguimiento
+        { v: item.seguimiento || "Sin comentarios", t: "s", s: commonStyle },
+        // Responsables
+        { v: responsablesStr, t: "s", s: commonStyle },
+        // Estado
+        { v: item.estado || "Sin atender", t: "s", s: statusStyle },
+        // Historias (Tickets Jira)
+        { v: historiasStr, t: "s", s: commonStyle },
+        // Fecha Primer Correo
+        { v: formatDate(item.fecha_primer_correo), t: "s", s: { ...commonStyle, alignment: { horizontal: "center", vertical: "center" } } },
+        // Fecha Atención
+        { v: formatDate(item.fecha_atencion), t: "s", s: { ...commonStyle, alignment: { horizontal: "center", vertical: "center" } } },
+        // Enlace Drive (como hipervínculo si existe)
+        item.drive_link 
+          ? { 
+              v: "Abrir Captura", 
+              t: "s", 
+              l: { Target: item.drive_link, Tooltip: "Ir a Drive" },
+              s: { 
+                ...commonStyle, 
+                font: { ...commonStyle.font, color: { rgb: "2563EB" }, underline: true }, 
+                alignment: { horizontal: "center", vertical: "center" } 
+              } 
+            }
+          : { v: "—", t: "s", s: { ...commonStyle, alignment: { horizontal: "center", vertical: "center" } } }
+      ];
+
+      rows.push(row);
+    });
+
+    // Crear el libro y la hoja
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+
+    // Configurar combinación de celdas para el título
+    ws["!merges"] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: 8 } }
+    ];
+
+    // Configurar alto de fila
+    ws["!rows"] = [
+      { hpt: 40 }, // Título
+      { hpt: 15 }, // Vacía
+      { hpt: 20 }, // Metadatos
+      { hpt: 15 }, // Vacía
+      { hpt: 28 }  // Cabecera
+    ];
+    for (let i = 5; i < rows.length; i++) {
+      ws["!rows"].push({ hpt: 35 });
+    }
+
+    // Configurar anchos de columna automáticos con mínimos óptimos
+    const colWidths = [
+      { wch: 10 }, // ID
+      { wch: 35 }, // Asunto (Correo)
+      { wch: 45 }, // Seguimiento / Comentarios
+      { wch: 25 }, // Responsables
+      { wch: 18 }, // Estado
+      { wch: 22 }, // Tickets Jira
+      { wch: 16 }, // Fecha Primer Correo
+      { wch: 16 }, // Fecha Atención
+      { wch: 18 }  // Enlace Drive
+    ];
+    ws["!cols"] = colWidths;
+
+    // Añadir la hoja al libro de trabajo y descargar
+    XLSX.utils.book_append_sheet(wb, ws, "Pendientes");
+    XLSX.writeFile(wb, `Reporte_Pendientes_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Encabezado */}
@@ -410,13 +617,23 @@ export default function PendientesPage() {
           </p>
         </div>
 
-        <button
-          onClick={openCreateModal}
-          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-medium text-sm text-white bg-orange-500 hover:bg-orange-600 shadow-md shadow-orange-500/15 hover:shadow-lg hover:shadow-orange-500/25 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
-        >
-          <Plus className="w-4.5 h-4.5" />
-          Registrar Pendiente
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={exportToExcel}
+            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-medium text-sm text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/80 border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+          >
+            <FileSpreadsheet className="w-4.5 h-4.5 text-green-600 dark:text-green-500" />
+            Exportar Excel
+          </button>
+
+          <button
+            onClick={openCreateModal}
+            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-medium text-sm text-white bg-orange-500 hover:bg-orange-600 shadow-md shadow-orange-500/15 hover:shadow-lg hover:shadow-orange-500/25 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+          >
+            <Plus className="w-4.5 h-4.5" />
+            Registrar Pendiente
+          </button>
+        </div>
       </div>
 
       {/* Buscador e Filtros */}
