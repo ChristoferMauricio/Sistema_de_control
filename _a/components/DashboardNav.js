@@ -59,11 +59,21 @@ const navItems = [
     roles: ["admin", "developer", "qa", "viewer"],
   },
   {
-    label: "Mis Pendientes",
+    label: "Mis Tickets Jira",
     href: "/dashboard/mis-pendientes",
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+      </svg>
+    ),
+    roles: ["admin", "developer", "qa", "viewer"],
+  },
+  {
+    label: "Pendientes",
+    href: "/dashboard/pendientes",
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
       </svg>
     ),
     roles: ["admin", "developer", "qa", "viewer"],
@@ -388,7 +398,7 @@ export default function DashboardNav({ user, role }) {
             if (item.label === "Errores Certificación") badgeCount = counts.certificacion;
             if (item.label === "Errores Desarrollo") badgeCount = counts.desarrollo;
             if (item.label === "Observ. del Supervisor") badgeCount = counts.observaciones;
-            if (item.label === "Mis Pendientes") badgeCount = counts.misChanges;
+            if (item.label === "Mis Tickets Jira") badgeCount = counts.misChanges;
 
             // Render Subitem Parent Toggle Structure
             if (hasSubmenu) {
@@ -543,7 +553,7 @@ export default function DashboardNav({ user, role }) {
                 
                 {badgeCount !== null && badgeCount > 0 && (
                   <span className={`px-2 py-0.5 text-xs font-bold rounded-full border ${
-                    item.label === "Mis Pendientes"
+                    item.label === "Mis Tickets Jira"
                       ? "bg-orange-100 text-orange-700 border-orange-200"
                       : isActive
                         ? "bg-orange-100 text-orange-700 border-orange-200"
