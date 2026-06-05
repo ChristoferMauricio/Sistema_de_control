@@ -579,10 +579,10 @@ export default function PendientesPage() {
         </div>
       )}
 
-      {/* ─── MODAL DE FORMULARIO (Crear/Editar) (z-[100] y bg-black/60) ─── */}
+      {/* ─── MODAL DE FORMULARIO (Crear/Editar) ─── */}
       {isFormOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="fixed inset-0 z-[100] overflow-y-auto bg-black/60 backdrop-blur-sm p-4 flex justify-center items-start pt-16 pb-16">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-xl w-full max-w-3xl flex flex-col animate-fade-in">
             
             {/* Cabecera */}
             <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between bg-gray-50/50 dark:bg-gray-800/20">
@@ -598,7 +598,7 @@ export default function PendientesPage() {
             </div>
 
             {/* Formulario */}
-            <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-6 space-y-6">
+            <form onSubmit={handleSave} className="p-6 space-y-6">
               
               {/* Asunto */}
               <div className="space-y-1.5">
@@ -814,10 +814,10 @@ export default function PendientesPage() {
         </div>
       )}
 
-      {/* ─── MODAL DE LÍNEA DE TIEMPO (Historial de Asunto) (z-[100] y bg-black/60) ─── */}
+      {/* ─── MODAL DE LÍNEA DE TIEMPO (Historial de Asunto) ─── */}
       {isHistoryOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+        <div className="fixed inset-0 z-[100] overflow-y-auto bg-black/60 backdrop-blur-sm p-4 flex justify-center items-start pt-16 pb-16">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-xl w-full max-w-2xl flex flex-col animate-fade-in">
             
             {/* Cabecera */}
             <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between bg-gray-50/50 dark:bg-gray-800/20">
@@ -839,7 +839,7 @@ export default function PendientesPage() {
             </div>
 
             {/* Contenido (Timeline) */}
-            <div className="flex-1 overflow-y-auto p-6">
+            <div className="p-6">
               {historyLoading ? (
                 <div className="space-y-4 py-8">
                   <div className="skeleton h-10 w-full" />
