@@ -15,7 +15,7 @@ import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { 
   Plus, Edit2, Trash2, ExternalLink, Clock, X, Search, Filter, 
-  Calendar, User, Link2, AlertCircle, Check, ArrowRight
+  Calendar, User, Link2, AlertCircle, Check, ArrowRight, ChevronDown
 } from "lucide-react";
 
 export default function PendientesPage() {
@@ -362,7 +362,7 @@ export default function PendientesPage() {
               placeholder="Buscar en asunto o seguimiento..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 outline-none"
+              className="w-full pl-10 pr-4 py-2.5 rounded-xl text-sm border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-850 text-gray-900 dark:text-gray-100 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 outline-none transition-all"
             />
           </div>
 
@@ -374,7 +374,7 @@ export default function PendientesPage() {
             <select
               value={filterEstado}
               onChange={(e) => setFilterEstado(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 outline-none appearance-none"
+              className="w-full pl-10 pr-10 py-2.5 rounded-xl text-sm border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-850 text-gray-900 dark:text-gray-100 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 outline-none appearance-none transition-all"
             >
               <option value="">Todos los Estados</option>
               <option value="Sin atender">Sin atender</option>
@@ -383,6 +383,9 @@ export default function PendientesPage() {
               <option value="Derivado">Derivado</option>
               <option value="Esperando respuesta">Esperando respuesta</option>
             </select>
+            <span className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-gray-400">
+              <ChevronDown className="h-4 w-4" />
+            </span>
           </div>
 
           {/* Filtro Responsable */}
@@ -393,13 +396,16 @@ export default function PendientesPage() {
             <select
               value={filterResponsable}
               onChange={(e) => setFilterResponsable(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 outline-none appearance-none"
+              className="w-full pl-10 pr-10 py-2.5 rounded-xl text-sm border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-850 text-gray-900 dark:text-gray-100 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 outline-none appearance-none transition-all"
             >
               <option value="">Todos los Responsables</option>
               {teamMembers.map((name) => (
                 <option key={name} value={name}>{name}</option>
               ))}
             </select>
+            <span className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-gray-400">
+              <ChevronDown className="h-4 w-4" />
+            </span>
           </div>
         </div>
       </div>
@@ -460,7 +466,7 @@ export default function PendientesPage() {
                     {/* Seguimiento */}
                     <td className="py-4 px-5 text-gray-500 dark:text-gray-400">
                       <p className="whitespace-pre-line line-clamp-3">
-                        {item.seguimiento || <span className="text-gray-300 dark:text-gray-700 italic">Sin comentarios</span>}
+                        {item.seguimiento || <span className="text-gray-350 dark:text-gray-700 italic">Sin comentarios</span>}
                       </p>
                     </td>
 
@@ -471,7 +477,7 @@ export default function PendientesPage() {
                           item.responsables.map((name) => (
                             <span
                               key={name}
-                              className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-gray-100 text-gray-800 border border-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700"
+                              className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-gray-105 text-gray-800 border border-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700"
                             >
                               {name}
                             </span>
@@ -573,9 +579,9 @@ export default function PendientesPage() {
         </div>
       )}
 
-      {/* ─── MODAL DE FORMULARIO (Crear/Editar) ─── */}
+      {/* ─── MODAL DE FORMULARIO (Crear/Editar) (z-[100] y bg-black/60) ─── */}
       {isFormOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
             
             {/* Cabecera */}
@@ -606,7 +612,7 @@ export default function PendientesPage() {
                   onChange={handleInputChange}
                   required
                   placeholder="Ingrese el asunto del correo..."
-                  className="w-full px-4 py-2.5 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 outline-none"
+                  className="w-full px-4 py-2.5 rounded-xl text-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50 text-gray-900 dark:text-gray-100 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 outline-none transition-all"
                 />
                 {selectedPendiente && (
                   <p className="text-xs text-amber-600 dark:text-amber-500 font-medium">
@@ -626,7 +632,7 @@ export default function PendientesPage() {
                   onChange={handleInputChange}
                   rows={4}
                   placeholder="Escriba comentarios sobre las acciones que se están realizando..."
-                  className="w-full px-4 py-2.5 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 outline-none resize-none"
+                  className="w-full px-4 py-2.5 rounded-xl text-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50 text-gray-900 dark:text-gray-100 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 outline-none resize-none transition-all"
                 />
               </div>
 
@@ -635,7 +641,7 @@ export default function PendientesPage() {
                 <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider block">
                   Responsables (Personas encargadas)
                 </label>
-                <div className="bg-gray-50 dark:bg-gray-800/40 rounded-xl border border-gray-200 dark:border-gray-800 p-4 max-h-[160px] overflow-y-auto">
+                <div className="bg-gray-55 dark:bg-gray-800/40 rounded-xl border border-gray-200 dark:border-gray-800 p-4 max-h-[160px] overflow-y-auto">
                   {teamMembers.length === 0 ? (
                     <p className="text-sm text-gray-400 italic">No hay miembros cargados en el equipo de desarrollo.</p>
                   ) : (
@@ -665,18 +671,23 @@ export default function PendientesPage() {
                   <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider block">
                     Estado
                   </label>
-                  <select
-                    name="estado"
-                    value={formData.estado}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2.5 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 outline-none appearance-none"
-                  >
-                    <option value="Sin atender">Sin atender</option>
-                    <option value="En proceso">En proceso</option>
-                    <option value="Finalizado">Finalizado</option>
-                    <option value="Derivado">Derivado</option>
-                    <option value="Esperando respuesta">Esperando respuesta</option>
-                  </select>
+                  <div className="relative">
+                    <select
+                      name="estado"
+                      value={formData.estado}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-2.5 rounded-xl text-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50 text-gray-900 dark:text-gray-100 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 outline-none appearance-none transition-all pr-10"
+                    >
+                      <option value="Sin atender">Sin atender</option>
+                      <option value="En proceso">En proceso</option>
+                      <option value="Finalizado">Finalizado</option>
+                      <option value="Derivado">Derivado</option>
+                      <option value="Esperando respuesta">Esperando respuesta</option>
+                    </select>
+                    <span className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-gray-400">
+                      <ChevronDown className="h-4 w-4" />
+                    </span>
+                  </div>
                 </div>
 
                 {/* Fecha primer correo */}
@@ -689,7 +700,7 @@ export default function PendientesPage() {
                     name="fecha_primer_correo"
                     value={formData.fecha_primer_correo}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-2.5 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 outline-none"
+                    className="w-full px-4 py-2.5 rounded-xl text-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50 text-gray-900 dark:text-gray-100 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 outline-none transition-all"
                   />
                 </div>
 
@@ -703,7 +714,7 @@ export default function PendientesPage() {
                     name="fecha_atencion"
                     value={formData.fecha_atencion}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-2.5 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 outline-none"
+                    className="w-full px-4 py-2.5 rounded-xl text-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50 text-gray-900 dark:text-gray-100 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 outline-none transition-all"
                   />
                 </div>
               </div>
@@ -713,16 +724,14 @@ export default function PendientesPage() {
                 <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">
                   Enlace de Drive (Captura o Imagen)
                 </label>
-                <div className="relative">
-                  <input
-                    type="url"
-                    name="drive_link"
-                    value={formData.drive_link}
-                    onChange={handleInputChange}
-                    placeholder="https://drive.google.com/..."
-                    className="w-full px-4 py-2.5 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 outline-none"
-                  />
-                </div>
+                <input
+                  type="url"
+                  name="drive_link"
+                  value={formData.drive_link}
+                  onChange={handleInputChange}
+                  placeholder="https://drive.google.com/..."
+                  className="w-full px-4 py-2.5 rounded-xl text-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50 text-gray-900 dark:text-gray-100 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 outline-none transition-all"
+                />
               </div>
 
               {/* Historias de Jira (Múltiples) */}
@@ -738,7 +747,7 @@ export default function PendientesPage() {
                     placeholder="https://supervisorservicio2020.atlassian.net/browse/PF3-xxxx"
                     value={tempHistoria}
                     onChange={(e) => setTempHistoria(e.target.value)}
-                    className="flex-1 px-4 py-2 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 outline-none border border-gray-200 dark:border-gray-800"
+                    className="flex-1 px-4 py-2 rounded-xl text-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50 text-gray-900 dark:text-gray-100 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 outline-none transition-all"
                   />
                   <button
                     type="button"
@@ -805,9 +814,9 @@ export default function PendientesPage() {
         </div>
       )}
 
-      {/* ─── MODAL DE LÍNEA DE TIEMPO (Historial de Asunto) ─── */}
+      {/* ─── MODAL DE LÍNEA DE TIEMPO (Historial de Asunto) (z-[100] y bg-black/60) ─── */}
       {isHistoryOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
             
             {/* Cabecera */}
@@ -843,7 +852,7 @@ export default function PendientesPage() {
                   <p className="text-gray-500 dark:text-gray-400 text-sm">No hay registros de evolución para este requerimiento.</p>
                 </div>
               ) : (
-                <div className="relative pl-6 border-l-2 border-orange-200 dark:border-orange-950/40 ml-4 py-2 space-y-8">
+                <div className="relative pl-6 border-l-2 border-orange-300 dark:border-orange-800 ml-4 py-2 space-y-8">
                   {subjectHistory.map((hist, index) => {
                     const dateObj = new Date(hist.changed_at);
                     const formattedDateTime = dateObj.toLocaleString("es-PE", {
@@ -859,12 +868,12 @@ export default function PendientesPage() {
 
                     return (
                       <div key={hist.id} className="relative">
-                        {/* Nodo de la línea de tiempo */}
-                        <span className="absolute -left-9 top-1.5 flex items-center justify-center w-5 h-5 rounded-full bg-white dark:bg-gray-900 border-2 border-orange-500">
+                        {/* Nodo de la línea de tiempo alineado perfectamente en el centro (-left-[7px] para w-4 y border-l-2) */}
+                        <span className="absolute -left-[7px] top-1.5 flex items-center justify-center w-4 h-4 rounded-full bg-white dark:bg-gray-900 border-2 border-orange-500">
                           {isFirst ? (
                             <span className="w-1.5 h-1.5 bg-orange-500 rounded-full" />
                           ) : (
-                            <Check className="w-3 h-3 text-orange-500 font-bold" />
+                            <Check className="w-2.5 h-2.5 text-orange-500 font-bold" />
                           )}
                         </span>
 
