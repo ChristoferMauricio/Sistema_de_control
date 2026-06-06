@@ -470,7 +470,7 @@ function TicketListModal({ title, assigneeName, items, onClose }) {
                             items.map((ticket) => {
                                 const statusLower = (ticket.status || "").toLowerCase();
                                 const isCompleted = statusLower.includes("finalizada") || statusLower.includes("terminada") || statusLower.includes("done") || statusLower.includes("listo");
-                                const isSubtask = ticket.issue_type === "Sub-tarea" || ticket.issue_type === "Subtarea";
+                                const isSubtask = (ticket.issue_type || "").toLowerCase().includes("subtare") || (ticket.issue_type || "").toLowerCase().includes("subtask") || (ticket.issue_type || "").toLowerCase().includes("sub-task");
 
                                 // La fecha de cambio es el último cambio de estado obtenido del historial o en su defecto updated_at / created_at.
                                 const rawChangeDate = changeDates[ticket.jira_key] || ticket.updated_at || ticket.created_at;
@@ -636,7 +636,7 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
 
     // Solo Historias
     const historias = useMemo(() => {
-        return tickets.filter((t) => t.issue_type === "Historia");
+        return tickets.filter((t) => isStory(t.issue_type));
     }, [tickets]);
 
     // Sprints disponibles (de todos los tickets)
@@ -664,7 +664,7 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
     // Filtra subtareas que pertenecen a historias de la epica PF3-1799 (estabilizacion)
     // y que coinciden con el sprint seleccionado
     const filteredSubtasks = useMemo(() => {
-        const subtareas = tickets.filter(t => t.issue_type === "Subtarea");
+        const subtareas = tickets.filter(t => isSubtask(t.issue_type));
 
         // Match sprint directly or use parent story sprint
         const storyKeysBySprint = new Set(filtered.map(s => s.jira_key));
@@ -673,7 +673,7 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
         // We identify them by checking if the epic is PF3-1799 or if their summary has "(Iteraci[oó]n"
         const validParentKeys = new Set(
             tickets
-                .filter(t => t.issue_type === "Historia" && (t.parent_key === "PF3-1799" || t.summary.match(/\(Iteraci[oó]n/i)))
+                .filter(t => isStory(t.issue_type) && (t.parent_key === "PF3-1799" || t.summary.match(/\(Iteraci[oó]n/i)))
                 .map(t => t.jira_key)
         );
 
