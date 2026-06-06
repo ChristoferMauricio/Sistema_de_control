@@ -634,9 +634,12 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
         return null;
     }, [ticketMap]);
 
-    // Solo Historias
+    // Solo Historias (e incluir tareas principales de soporte de iteraciones para consistencia)
     const historias = useMemo(() => {
-        return tickets.filter((t) => isStory(t.issue_type));
+        return tickets.filter((t) => 
+            isStory(t.issue_type) || 
+            (!isSubtask(t.issue_type) && (t.parent_key === "PF3-1799" || (t.summary && t.summary.match(/\(Iteraci[oó]n/i))))
+        );
     }, [tickets]);
 
     // Sprints disponibles (de todos los tickets)
