@@ -12,8 +12,8 @@
  */
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
-import { Search, Filter, AlertCircle, Calendar, Info, Download, Tag } from "lucide-react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
+import { Search, Filter, AlertCircle, Calendar, Info, Download, Tag, ChevronDown, ListChecks } from "lucide-react";
 import * as XLSX from "xlsx-js-style";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -40,6 +40,9 @@ export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
     return "Todas";
   });
   const [filterEtiqueta, setFilterEtiqueta] = useState("Todas");
+  const [filterEstados, setFilterEstados] = useState([]); // Multi-selección de estados; vacío = mostrar todos
+  const [estadoOpen, setEstadoOpen] = useState(false);     // Controla la apertura del dropdown de estados
+  const estadoRef = useRef(null);                          // Para detectar clic fuera del dropdown
   const [selectedProfile, setSelectedProfile] = useState(null);
   const [localFechas, setLocalFechas] = useState({});
 
@@ -82,6 +85,30 @@ export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
     const tags = [...new Set(incidencias.map((inc) => inc.etiqueta).filter(Boolean))].sort();
     return ["Todas", ...tags];
   }, [incidencias]);
+
+  // Extrae estados únicos de los datos, ordenados alfabéticamente (para el filtro multi-selección)
+  const estados = useMemo(() => {
+    return [...new Set(incidencias.map((inc) => inc.estado).filter(Boolean))].sort();
+  }, [incidencias]);
+
+  // Alterna la selección de un estado dentro del filtro multi-selección
+  const toggleEstado = useCallback((estado) => {
+    setFilterEstados((prev) =>
+      prev.includes(estado) ? prev.filter((e) => e !== estado) : [...prev, estado]
+    );
+  }, []);
+
+  // Cierra el dropdown de estados al hacer clic fuera de él
+  useEffect(() => {
+    if (!estadoOpen) return;
+    const handleClickOutside = (e) => {
+      if (estadoRef.current && !estadoRef.current.contains(e.target)) {
+        setEstadoOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [estadoOpen]);
 
   // Genera un color consistente para cada etiqueta basado en hash del texto
   const TAG_PALETTE = [
@@ -126,9 +153,12 @@ export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
       // 3. Etiqueta Filter
       const etiquetaMatch = filterEtiqueta === "Todas" || inc.etiqueta === filterEtiqueta;
 
-      return textMatch && iteracionMatch && etiquetaMatch;
+      // 4. Estado Filter (multi-selección). Vacío = no filtra (muestra todos los estados)
+      const estadoMatch = filterEstados.length === 0 || filterEstados.includes(inc.estado);
+
+      return textMatch && iteracionMatch && etiquetaMatch && estadoMatch;
     });
-  }, [incidencias, searchTerm, filterIteracion, filterEtiqueta]);
+  }, [incidencias, searchTerm, filterIteracion, filterEtiqueta, filterEstados]);
 
   // Format date
   const formatDate = (dateString) => {
@@ -467,7 +497,65 @@ export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
               </select>
             </div>
           )}
-          
+
+          {/* Estado Filter (multi-selección) */}
+          {estados.length > 0 && (
+            <div className="relative" ref={estadoRef}>
+              <button
+                type="button"
+                onClick={() => setEstadoOpen((o) => !o)}
+                className="flex items-center gap-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg py-1.5 pl-3 pr-2.5 bg-white dark:bg-gray-900 hover:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-colors"
+                title="Filtrar por estado"
+              >
+                <ListChecks className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                <span className="text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                  {filterEstados.length === 0
+                    ? "Estado: Todos"
+                    : `Estado: ${filterEstados.length} sel.`}
+                </span>
+                <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${estadoOpen ? "rotate-180" : ""}`} />
+              </button>
+
+              {estadoOpen && (
+                <div className="absolute z-20 mt-1 right-0 w-60 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg overflow-hidden">
+                  <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100 dark:border-gray-800">
+                    <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                      Estados
+                    </span>
+                    {filterEstados.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setFilterEstados([])}
+                        className="text-xs font-medium text-orange-600 dark:text-orange-400 hover:underline"
+                      >
+                        Limpiar
+                      </button>
+                    )}
+                  </div>
+                  <div className="max-h-64 overflow-y-auto py-1">
+                    {estados.map((est) => {
+                      const checked = filterEstados.includes(est);
+                      return (
+                        <label
+                          key={est}
+                          className="flex items-center gap-2.5 px-3 py-1.5 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleEstado(est)}
+                            className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-orange-600 focus:ring-orange-500/30 cursor-pointer"
+                          />
+                          <span className="text-sm text-gray-700 dark:text-gray-300">{est}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="text-sm text-gray-500 dark:text-gray-400 font-medium px-2">
             {filteredIncidencias.length} incidencias
           </div>
