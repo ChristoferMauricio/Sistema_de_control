@@ -234,9 +234,36 @@ export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
       if (nextFieldMatch) name = nextFieldMatch[1].trim();
       return name.replace(/"$/, "").trim();
     }
-    
+
     return null;
   };
+
+  /**
+   * Extrae el codigo de requerimiento de Confluence/Jira-Osinergmin (ej: "PGIM-445")
+   * desde el campo "description" de la subtarea. Busca el patron "Confluence: PGIM-XXX".
+   * Soporta tanto descripciones en formato JSON ADF como texto plano Wiki.
+   * @param {string} description - Campo description del ticket Jira
+   * @returns {string|null} Clave del requerimiento (ej: "PGIM-445") o null si no se encuentra
+   */
+  const parseConfluenceKey = (description) => {
+    if (!description) return null;
+
+    // Si es un documento ADF en formato JSON, extraer el texto plano primero
+    const adfText = extractTextFromAdf(description);
+    const textToSearch = adfText !== null ? adfText : description;
+
+    const match = textToSearch.match(/Confluence\s*:\s*(PGIM-\d+)/i);
+    return match ? match[1].toUpperCase() : null;
+  };
+
+  /**
+   * Construye el hipervinculo al requerimiento en el Jira de Osinergmin.
+   * Solo varia la clave del requerimiento (parametro "selectedIssue").
+   * @param {string} key - Clave del requerimiento (ej: "PGIM-445")
+   * @returns {string} URL completa al issue en Jira Osinergmin
+   */
+  const buildConfluenceUrl = (key) =>
+    `https://osinergmin.atlassian.net/jira/software/c/projects/PGIM/issues?jql=project%20%3D%20PGIM%20ORDER%20BY%20created%20DESC&selectedIssue=${key}`;
 
   const normalizeStr = (str) => {
     if (!str) return "";
@@ -489,20 +516,38 @@ export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
                   <tr key={inc.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors">
                     {/* Etiqueta Column */}
                     <td className="px-3 py-3">
-                      {inc.etiqueta ? (() => {
-                        const color = getTagColor(inc.etiqueta);
-                        return (
-                          <span
-                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border whitespace-nowrap max-w-[160px] truncate ${color.bg} ${color.text} ${color.border}`}
-                            title={inc.etiqueta}
-                          >
-                            <Tag className="w-3 h-3 shrink-0" />
-                            {inc.etiqueta}
-                          </span>
-                        );
-                      })() : (
-                        <span className="text-gray-300 dark:text-gray-600">—</span>
-                      )}
+                      <div className="flex flex-col gap-1">
+                        {inc.etiqueta ? (() => {
+                          const color = getTagColor(inc.etiqueta);
+                          return (
+                            <span
+                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border whitespace-nowrap max-w-[160px] truncate ${color.bg} ${color.text} ${color.border}`}
+                              title={inc.etiqueta}
+                            >
+                              <Tag className="w-3 h-3 shrink-0" />
+                              {inc.etiqueta}
+                            </span>
+                          );
+                        })() : (
+                          <span className="text-gray-300 dark:text-gray-600">—</span>
+                        )}
+                        {/* Hipervinculo al requerimiento de Confluence/Jira-Osinergmin */}
+                        {(() => {
+                          const confluenceKey = parseConfluenceKey(inc.description);
+                          if (!confluenceKey) return null;
+                          return (
+                            <a
+                              href={buildConfluenceUrl(confluenceKey)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline whitespace-nowrap"
+                              title={`Ver requerimiento ${confluenceKey} en Jira Osinergmin`}
+                            >
+                              Confluence: {confluenceKey}
+                            </a>
+                          );
+                        })()}
+                      </div>
                     </td>
                     <td className="px-3 py-3">
                       <div className="flex items-center gap-1.5">
