@@ -356,13 +356,15 @@ export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
   const handleExportExcel = useCallback(async () => {
     /* ─── Hoja 1: Datos detallados ─── */
     const columnNames = [
-      "Clave", "Etiqueta", "Resumen", "Reportante", "Iteración",
+      "Clave", "Confluence", "Etiqueta", "Resumen", "Reportante", "Iteración",
       "Asignado", "Estado", "Fecha Creación", "Fecha Inicio", "Fecha Solución", "Última Actualización",
     ];
     const rawRows = incidencias.map((inc) => {
       const reporter = parseReporter(inc.description);
+      const confluence = parseConfluenceKey(inc.description);
       return [
         inc.clave,
+        confluence || "-",
         inc.etiqueta || "-",
         inc.resumen,
         reporter || "-",
@@ -388,8 +390,24 @@ export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
       const cell = ws[XLSX.utils.encode_cell({ r: 0, c: col })];
       if (cell) cell.s = orangeHeader;
     }
+
+    // Convierte la columna "Confluence" (índice 1) en hipervínculos al Jira de Osinergmin
+    const confluenceLinkStyle = {
+      font: { color: { rgb: "2563EB" }, underline: true },
+      alignment: { horizontal: "center", vertical: "center" },
+    };
+    rawRows.forEach((row, i) => {
+      const key = row[1];
+      if (!key || key === "-") return; // ticket sin código → sin enlace
+      const cell = ws[XLSX.utils.encode_cell({ r: i + 1, c: 1 })]; // +1 por la fila de encabezado
+      if (cell) {
+        cell.l = { Target: buildConfluenceUrl(key), Tooltip: `Ver ${key} en Jira Osinergmin` };
+        cell.s = confluenceLinkStyle;
+      }
+    });
+
     ws["!cols"] = [
-      { wch: 12 }, { wch: 22 }, { wch: 50 }, { wch: 22 }, { wch: 14 },
+      { wch: 12 }, { wch: 14 }, { wch: 22 }, { wch: 50 }, { wch: 22 }, { wch: 14 },
       { wch: 22 }, { wch: 18 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 },
     ];
 
@@ -429,9 +447,9 @@ export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
       pvtSheetIndex: 2,
       columns: columnNames,
       dataRows: rawRows,
-      rowFieldIdx: 1,      // Etiqueta
+      rowFieldIdx: 2,      // Etiqueta
       dataFieldIdx: 0,     // Clave (count)
-      pageFieldIdx: 4,     // Iteración
+      pageFieldIdx: 5,     // Iteración
       summaryEntries: sortedEntries,
       total,
     });
