@@ -88,6 +88,7 @@ async function getEpicLinkFieldId() {
     const res = await fetch(`${JIRA_BASE_URL}/rest/api/3/field`, {
       method: "GET",
       headers: jiraHeaders,
+      signal: AbortSignal.timeout(10000), // 10s timeout
     });
     if (!res.ok) return null;
 
@@ -140,6 +141,7 @@ async function searchJira(jql, epicLinkFieldId) {
     const res = await fetch(`${JIRA_BASE_URL}/rest/api/3/search/jql?${params}`, {
       method: "GET",
       headers: jiraHeaders,
+      signal: AbortSignal.timeout(20000), // 20s timeout per page
     });
 
     if (!res.ok) throw new Error(`Jira API (${res.status}): ${await res.text()}`);
@@ -289,6 +291,35 @@ async function runSync() {
       return Response.json(
         { error: "Configuración de Jira incompleta en el servidor" },
         { status: 500 }
+      );
+    }
+
+    // Paso 0: Validar credenciales y conectividad con Jira para evitar falsos éxitos
+    try {
+      const authCheck = await fetch(`${JIRA_BASE_URL}/rest/api/3/myself`, {
+        method: "GET",
+        headers: jiraHeaders,
+        signal: AbortSignal.timeout(10000), // 10s timeout
+      });
+
+      if (authCheck.status === 401) {
+        return Response.json(
+          { error: "Error de autenticación con Jira (401). Por favor, verifica el correo y el API token en el archivo .env.local" },
+          { status: 401 }
+        );
+      }
+
+      if (!authCheck.ok) {
+        const authErrText = await authCheck.text();
+        return Response.json(
+          { error: `Error de conexión con Jira (${authCheck.status}): ${authErrText || authCheck.statusText}` },
+          { status: authCheck.status >= 400 && authCheck.status < 600 ? authCheck.status : 500 }
+        );
+      }
+    } catch (fetchErr) {
+      return Response.json(
+        { error: `Error de conexión o timeout al validar credenciales de Jira: ${fetchErr.message}` },
+        { status: 504 }
       );
     }
 
