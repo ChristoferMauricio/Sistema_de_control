@@ -34,17 +34,11 @@
  */
 
 import { createClient } from "@supabase/supabase-js";
+import fs from "fs";
+import path from "path";
 
 // ─── Configuracion de Variables de Entorno ──────────────────────────────────
 
-/** URL base de Jira, con barras finales eliminadas para evitar doble barra en endpoints */
-const JIRA_BASE_URL      = (process.env.JIRA_BASE_URL || "").replace(/\/+$/, "");
-/** Email del usuario para autenticacion basica en la API de Jira */
-const JIRA_USER_EMAIL    = process.env.JIRA_USER_EMAIL;
-/** Token de API de Jira (se combina con el email para autenticacion Basic) */
-const JIRA_API_TOKEN     = process.env.JIRA_API_TOKEN;
-/** Clave(s) del proyecto Jira a sincronizar (separadas por coma si son multiples) */
-const JIRA_PROJECT_KEY   = process.env.JIRA_PROJECT_KEY || "";
 /** URL del proyecto Supabase */
 const SUPABASE_URL       = process.env.NEXT_PUBLIC_SUPABASE_URL;
 /** Clave de servicio de Supabase (acceso completo sin RLS) */
@@ -54,14 +48,49 @@ const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
 /**
- * Headers HTTP para todas las peticiones a la API de Jira.
- * Usa autenticacion Basic con email:token codificado en Base64.
+ * Obtiene la configuración de Jira dinámicamente en cada petición,
+ * leyendo directamente del archivo .env.local para evitar problemas de caché
+ * en procesos de larga duración en desarrollo.
  */
-const jiraHeaders = {
-  Authorization: `Basic ${Buffer.from(`${JIRA_USER_EMAIL}:${JIRA_API_TOKEN}`).toString("base64")}`,
-  "Content-Type": "application/json",
-  Accept: "application/json",
-};
+function getJiraConfig() {
+  let email = process.env.JIRA_USER_EMAIL || "";
+  let token = process.env.JIRA_API_TOKEN || "";
+  let baseUrl = process.env.JIRA_BASE_URL || "";
+  let projectKey = process.env.JIRA_PROJECT_KEY || "";
+
+  try {
+    const envPath = path.resolve(process.cwd(), ".env.local");
+    if (fs.existsSync(envPath)) {
+      const envContent = fs.readFileSync(envPath, "utf-8");
+      envContent.split(/\r?\n/).forEach((line) => {
+        const trimmed = line.trim();
+        if (trimmed && !trimmed.startsWith("#")) {
+          const parts = trimmed.split("=");
+          if (parts.length >= 2) {
+            const key = parts[0].trim();
+            const value = parts.slice(1).join("=").trim().replace(/^['"]|['"]$/g, "");
+            if (key === "JIRA_USER_EMAIL") email = value;
+            if (key === "JIRA_API_TOKEN") token = value;
+            if (key === "JIRA_BASE_URL") baseUrl = value;
+            if (key === "JIRA_PROJECT_KEY") projectKey = value;
+          }
+        }
+      });
+    }
+  } catch (err) {
+    console.warn("No se pudo leer .env.local directamente:", err.message);
+  }
+
+  baseUrl = baseUrl.replace(/\/+$/, "");
+
+  const headers = {
+    Authorization: `Basic ${Buffer.from(`${email}:${token}`).toString("base64")}`,
+    "Content-Type": "application/json",
+    Accept: "application/json",
+  };
+
+  return { baseUrl, email, token, projectKey, headers };
+}
 
 /**
  * Tiempo maximo de ejecucion permitido para esta API route.
@@ -84,10 +113,11 @@ export const maxDuration = 60;
  * @returns {Promise<string|null>} El ID del campo Epic Link, o null si no se encuentra
  */
 async function getEpicLinkFieldId() {
+  const config = getJiraConfig();
   try {
-    const res = await fetch(`${JIRA_BASE_URL}/rest/api/3/field`, {
+    const res = await fetch(`${config.baseUrl}/rest/api/3/field`, {
       method: "GET",
-      headers: jiraHeaders,
+      headers: config.headers,
       signal: AbortSignal.timeout(10000), // 10s timeout
     });
     if (!res.ok) return null;
@@ -121,6 +151,7 @@ async function getEpicLinkFieldId() {
  * @throws {Error} Si la API de Jira responde con un codigo de error HTTP
  */
 async function searchJira(jql, epicLinkFieldId) {
+  const config = getJiraConfig();
   const allIssues = [];
 
   // Campos base a solicitar en cada peticion
@@ -138,9 +169,9 @@ async function searchJira(jql, epicLinkFieldId) {
     const params = new URLSearchParams({ jql, maxResults: "100", fields });
     if (nextPageToken) params.set("nextPageToken", nextPageToken);
 
-    const res = await fetch(`${JIRA_BASE_URL}/rest/api/3/search/jql?${params}`, {
+    const res = await fetch(`${config.baseUrl}/rest/api/3/search/jql?${params}`, {
       method: "GET",
-      headers: jiraHeaders,
+      headers: config.headers,
       signal: AbortSignal.timeout(20000), // 20s timeout per page
     });
 
@@ -286,8 +317,10 @@ function verifyCronSecret(request) {
  */
 async function runSync() {
   try {
+    const config = getJiraConfig();
+
     // Validar que la configuracion de Jira este completa
-    if (!JIRA_BASE_URL || !JIRA_USER_EMAIL || !JIRA_API_TOKEN) {
+    if (!config.baseUrl || !config.email || !config.token) {
       return Response.json(
         { error: "Configuración de Jira incompleta en el servidor" },
         { status: 500 }
@@ -296,9 +329,9 @@ async function runSync() {
 
     // Paso 0: Validar credenciales y conectividad con Jira para evitar falsos éxitos
     try {
-      const authCheck = await fetch(`${JIRA_BASE_URL}/rest/api/3/myself`, {
+      const authCheck = await fetch(`${config.baseUrl}/rest/api/3/myself`, {
         method: "GET",
-        headers: jiraHeaders,
+        headers: config.headers,
         signal: AbortSignal.timeout(10000), // 10s timeout
       });
 
@@ -325,9 +358,9 @@ async function runSync() {
 
     // Construir consulta JQL: si hay proyectos configurados, filtrar por ellos
     let jql = "ORDER BY updated DESC";
-    if (JIRA_PROJECT_KEY) {
+    if (config.projectKey) {
       // Soporta multiples proyectos separados por coma (ej: "PGIM,OTRO")
-      const projects = JIRA_PROJECT_KEY.split(",").map(p => `"${p.trim()}"`).join(", ");
+      const projects = config.projectKey.split(",").map(p => `"${p.trim()}"`).join(", ");
       jql = `project in (${projects}) ORDER BY updated DESC`;
     }
 
@@ -438,8 +471,8 @@ async function runSync() {
     let deletedCount = 0;
     let revivedCount = 0;
 
-    if (JIRA_PROJECT_KEY) {
-      const projectPrefixes = JIRA_PROJECT_KEY.split(",").map(p => `${p.trim()}-`);
+    if (config.projectKey) {
+      const projectPrefixes = config.projectKey.split(",").map(p => `${p.trim()}-`);
       let existingKeys = [];
 
       for (const prefix of projectPrefixes) {
