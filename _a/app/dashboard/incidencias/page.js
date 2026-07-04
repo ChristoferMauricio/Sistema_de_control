@@ -27,6 +27,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import IncidenciasTable from "@/components/IncidenciasTable";
+import { parseFechaInicio } from "@/lib/incidenciasFechas";
 import { useRole } from "../RoleContext";
 
 /**
@@ -41,6 +42,7 @@ export default function IncidenciasPage() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState(null);
+  const [migracionPendiente, setMigracionPendiente] = useState(false); // Columna resolution_date sin crear
   const router = useRouter();
 
   /**
@@ -73,13 +75,27 @@ export default function IncidenciasPage() {
       });
 
       /* ─── Paso 2: Obtener subtareas de las historias padre ─── */
-      const { data: subtasks, error: subtasksError } = await supabase
+      // Intenta incluir la columna nueva (resolution_date); si la migración aún no
+      // se ejecutó en Supabase, reintenta sin ella para no romper la vista.
+      const camposBase = "jira_key, summary, status, assignee_email, created_at, updated_at, parent_key, description, labels, fecha_inicio, fecha_solucion";
+      let { data: subtasks, error: subtasksError } = await supabase
         .from("jira_tickets")
-        .select("jira_key, summary, status, assignee_email, created_at, updated_at, parent_key, description, fecha_inicio, fecha_solucion")
+        .select(`${camposBase}, resolution_date`)
         .is("deleted_at", null)
         .eq("issue_type", "Subtarea")
         .in("parent_key", parentKeys)
         .order("created_at", { ascending: false });
+
+      if (subtasksError && /resolution_date/i.test(subtasksError.message || "")) {
+        setMigracionPendiente(true);
+        ({ data: subtasks, error: subtasksError } = await supabase
+          .from("jira_tickets")
+          .select(camposBase)
+          .is("deleted_at", null)
+          .eq("issue_type", "Subtarea")
+          .in("parent_key", parentKeys)
+          .order("created_at", { ascending: false }));
+      }
 
       // Cargar datos del GSM para matching de descripciones en la tabla
       const { data: gsm, error: gsmError } = await supabase
@@ -94,6 +110,28 @@ export default function IncidenciasPage() {
         console.error("Error fetching subtasks:", subtasksError);
         setLoading(false);
         return;
+      }
+
+      /* ─── Paso 2b: Fechas de finalización desde el historial de estados ─── */
+      // Respaldo para "Fecha Solución" cuando resolution_date (de Jira) aún no está
+      // sincronizado. Solo se consideran transiciones reales (old_status no nulo);
+      // las filas del backfill inicial del historial no reflejan la fecha real de cierre.
+      const finalizadaHistMap = {};
+      const subtaskKeys = (subtasks || []).map((t) => t.jira_key);
+      if (subtaskKeys.length > 0) {
+        const { data: histRows } = await supabase
+          .from("jira_ticket_status_history")
+          .select("jira_key, old_status, changed_at")
+          .in("jira_key", subtaskKeys)
+          .ilike("new_status", "%finaliz%")
+          .not("old_status", "is", null);
+
+        (histRows || []).forEach((h) => {
+          // Conservar la transición más reciente a Finalizada (caso de reaperturas)
+          if (!finalizadaHistMap[h.jira_key] || h.changed_at > finalizadaHistMap[h.jira_key]) {
+            finalizadaHistMap[h.jira_key] = h.changed_at;
+          }
+        });
       }
 
       /* ─── Paso 3: Cargar tablas de resolución de nombres ─── */
@@ -145,6 +183,26 @@ export default function IncidenciasPage() {
         const pipeIndex = t.summary ? t.summary.indexOf("|") : -1;
         const etiqueta = pipeIndex !== -1 ? t.summary.substring(0, pipeIndex).trim() : "";
 
+        // Fecha Inicio efectiva: valor editado manualmente > fecha extraída de la
+        // línea "Fecha:" de la descripción (soporta múltiples formatos)
+        const fechaInicioAuto = parseFechaInicio(t.description, t.created_at);
+
+        // Clasificación "Atendido por": es Externo si el título comienza con
+        // "Externo |" o si las etiquetas de Jira incluyen "No_Reportar"
+        const esExterno =
+          /^\s*externo\s*\|/i.test(t.summary || "") ||
+          (Array.isArray(t.labels) &&
+            t.labels.some((l) => String(l).trim().toLowerCase() === "no_reportar"));
+
+        // Fecha Solución efectiva: valor editado manualmente > resolutiondate de Jira
+        // (fecha real del pase a Finalizada) > transición registrada en el historial.
+        // El respaldo del historial solo aplica si el ticket sigue Finalizada (si fue
+        // reabierto, la transición antigua ya no representa una solución vigente).
+        const resolutionDate = t.resolution_date ? t.resolution_date.slice(0, 10) : null;
+        const historialDate = /finaliz/i.test(t.status || "") && finalizadaHistMap[t.jira_key]
+          ? finalizadaHistMap[t.jira_key].slice(0, 10)
+          : null;
+
         return {
           id: t.jira_key,
           clave: t.jira_key,
@@ -153,21 +211,14 @@ export default function IncidenciasPage() {
           estado: t.status,
           creado: t.created_at,
           actualizado: t.updated_at,
-          fecha_inicio: t.fecha_inicio,
-          fecha_solucion: t.fecha_solucion,
+          fecha_inicio: t.fecha_inicio || fechaInicioAuto,
+          fecha_solucion: t.fecha_solucion || resolutionDate || historialDate,
+          atendido_por: esExterno ? "Externo" : "Equipo Desarrollador PGIM",
           description: t.description,
           iteracion: iterationMap[t.parent_key] || "Iteración Desconocida",
           asignado: resolvedName,
           asignado_original: t.assignee_email // Se mantiene para depuración
         };
-      });
-
-      // Log de depuración para tickets específicos (desarrollo)
-      console.log("DEBUG: Raw descriptions from Supabase:");
-      formattedData.forEach(item => {
-        if (item.clave.includes("3177") || item.clave.includes("3176") || item.clave.includes("3175")) {
-          console.log(`${item.clave} - DESC:`, item.description);
-        }
       });
 
       setIncidencias(formattedData);
@@ -265,6 +316,16 @@ export default function IncidenciasPage() {
           )}
         </button>
       </div>
+
+      {/* Aviso: migración de BD pendiente para la fecha de resolución de Jira */}
+      {migracionPendiente && (
+        <div className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900/50">
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+          </svg>
+          Migración pendiente: ejecuta scripts/add-atendido-resolution-columns.sql en el SQL Editor de Supabase y luego sincroniza desde Jira para habilitar la captura automática de la Fecha Solución.
+        </div>
+      )}
 
       {/* Sync result toast */}
       {syncResult && (

@@ -9,11 +9,16 @@
  *   - Filtro por iteracion (se auto-selecciona la iteracion actual del cronograma)
  *   - Extraccion del nombre del reportante desde el campo "description" mediante regex
  *   - Modal de perfil GSM al hacer clic en el nombre del reportante
+ *   - Dos tablas seleccionables mediante lista desplegable segun quien atendio el caso:
+ *     "Equipo Desarrollador PGIM" o "Externo". La clasificacion es automatica: es
+ *     Externo si el titulo comienza con "Externo |" o si las etiquetas de Jira
+ *     incluyen "No_Reportar" (columna informativa "Atendido por")
+ *   - Edicion de Fecha Inicio / Fecha Solucion por fila (persisten en Supabase)
  */
 "use client";
 
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
-import { Search, Filter, AlertCircle, Calendar, Info, Download, Tag, ChevronDown, ListChecks } from "lucide-react";
+import { Search, Filter, AlertCircle, Calendar, Info, Download, Tag, ChevronDown, ListChecks, Users } from "lucide-react";
 import * as XLSX from "xlsx-js-style";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -45,6 +50,23 @@ export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
   const estadoRef = useRef(null);                          // Para detectar clic fuera del dropdown
   const [selectedProfile, setSelectedProfile] = useState(null);
   const [localFechas, setLocalFechas] = useState({});
+
+  // ─── Vista por "Atendido por" ──────────────────────────────────────────────
+  // Dos tablas seleccionables: incidencias atendidas por el Equipo Desarrollador
+  // PGIM (por defecto) y casos atendidos por agentes externos al equipo.
+  // La clasificación viene calculada desde la página: es "Externo" cuando el título
+  // comienza con "Externo |" o las etiquetas de Jira incluyen "No_Reportar".
+  const ATENDIDO_OPCIONES = ["Equipo Desarrollador PGIM", "Externo"];
+  const [vistaAtendido, setVistaAtendido] = useState("Equipo Desarrollador PGIM");
+
+  // Conteo por clasificación para mostrar en el selector de vista
+  const atendidoCounts = useMemo(() => {
+    const counts = { "Equipo Desarrollador PGIM": 0, "Externo": 0 };
+    incidencias.forEach((inc) => {
+      counts[inc.atendido_por] = (counts[inc.atendido_por] || 0) + 1;
+    });
+    return counts;
+  }, [incidencias]);
 
   const handleDateChange = (incId, field, value) => {
     setLocalFechas(prev => ({
@@ -156,9 +178,12 @@ export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
       // 4. Estado Filter (multi-selección). Vacío = no filtra (muestra todos los estados)
       const estadoMatch = filterEstados.length === 0 || filterEstados.includes(inc.estado);
 
-      return textMatch && iteracionMatch && etiquetaMatch && estadoMatch;
+      // 5. Vista por "Atendido por": tabla del Equipo Desarrollador PGIM o de Externos
+      const atendidoMatch = inc.atendido_por === vistaAtendido;
+
+      return textMatch && iteracionMatch && etiquetaMatch && estadoMatch && atendidoMatch;
     });
-  }, [incidencias, searchTerm, filterIteracion, filterEtiqueta, filterEstados]);
+  }, [incidencias, searchTerm, filterIteracion, filterEtiqueta, filterEstados, vistaAtendido]);
 
   // Format date
   const formatDate = (dateString) => {
@@ -357,7 +382,7 @@ export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
     /* ─── Hoja 1: Datos detallados ─── */
     const columnNames = [
       "Clave", "Confluence", "Etiqueta", "Resumen", "Reportante", "Iteración",
-      "Asignado", "Estado", "Fecha Creación", "Fecha Inicio", "Fecha Solución", "Última Actualización",
+      "Asignado", "Estado", "Atendido por", "Fecha Creación", "Fecha Inicio", "Fecha Solución", "Última Actualización",
     ];
     const rawRows = incidencias.map((inc) => {
       const reporter = parseReporter(inc.description);
@@ -371,6 +396,7 @@ export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
         inc.iteracion,
         inc.asignado,
         inc.estado,
+        inc.atendido_por,
         inc.creado ? formatDate(inc.creado) : "-",
         inc.fecha_inicio || "-",
         inc.fecha_solucion || "-",
@@ -408,7 +434,7 @@ export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
 
     ws["!cols"] = [
       { wch: 12 }, { wch: 14 }, { wch: 22 }, { wch: 50 }, { wch: 22 }, { wch: 14 },
-      { wch: 22 }, { wch: 18 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 },
+      { wch: 22 }, { wch: 18 }, { wch: 26 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 },
     ];
 
     /* ─── Hoja 2: Resumen (pre-populate para PivotTable + chart) ─── */
@@ -486,6 +512,23 @@ export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
 
         {/* Filters & Actions */}
         <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+          {/* Selector de tabla: Equipo Desarrollador PGIM / Externo */}
+          <div className="flex items-center gap-2">
+            <Users className="w-4 h-4 text-orange-500" />
+            <select
+              value={vistaAtendido}
+              onChange={(e) => setVistaAtendido(e.target.value)}
+              className="text-sm font-medium border-orange-200 dark:border-orange-900/50 rounded-lg py-1.5 pl-3 pr-8 bg-orange-50/50 dark:bg-orange-500/10 text-orange-800 dark:text-orange-300 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-colors"
+              title="Seleccionar tabla: incidencias atendidas por el Equipo Desarrollador PGIM o por agentes externos"
+            >
+              {ATENDIDO_OPCIONES.map((op) => (
+                <option key={op} value={op}>
+                  {op} ({atendidoCounts[op] || 0})
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Iteration Filter */}
           <div className="flex items-center gap-2">
             <Filter className="w-4 h-4 text-gray-500 dark:text-gray-400" />
@@ -592,6 +635,14 @@ export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
 
       {/* Table */}
       <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden transition-colors">
+        {/* Cabecera de la tabla seleccionada */}
+        <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30 transition-colors">
+          <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+            {vistaAtendido === "Externo"
+              ? "Casos atendidos por agentes externos al Equipo Desarrollador PGIM"
+              : "Incidencias: Listado de subtareas reportadas durante las iteraciones de estabilización, atendidas por el Equipo Desarrollador PGIM"}
+          </p>
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm whitespace-nowrap">
             <thead className="bg-gray-50/80 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-800 text-gray-500 dark:text-gray-400 font-medium transition-colors">
@@ -603,6 +654,7 @@ export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
                 <th className="px-3 py-3">Iteración</th>
                 <th className="px-3 py-3">Asignado</th>
                 <th className="px-3 py-3">Estado</th>
+                <th className="px-3 py-3">Atendido por</th>
                 <th className="px-3 py-3 text-right">Fecha Inicio</th>
                 <th className="px-3 py-3 text-right">Fecha Solución</th>
               </tr>
@@ -610,7 +662,7 @@ export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
             <tbody className="divide-y divide-gray-50 dark:divide-gray-800/60">
               {filteredIncidencias.length === 0 ? (
                 <tr>
-                  <td colSpan="9" className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                  <td colSpan="10" className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                     <div className="flex flex-col items-center justify-center">
                       <AlertCircle className="w-8 h-8 text-gray-300 dark:text-gray-600 mb-3" />
                       <p>No se encontraron incidencias con estos filtros.</p>
@@ -716,6 +768,23 @@ export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
                     </td>
                     <td className="px-3 py-3">
                       {getStatusBadge(inc.estado)}
+                    </td>
+                    <td className="px-3 py-3">
+                      {inc.atendido_por === "Externo" ? (
+                        <span
+                          className="px-2 py-0.5 rounded-full text-xs font-medium bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-950/30 dark:text-purple-300 dark:border-purple-900/50 whitespace-nowrap"
+                          title={'Clasificado como Externo: el título comienza con "Externo |" o tiene la etiqueta "No_Reportar" en Jira'}
+                        >
+                          Externo
+                        </span>
+                      ) : (
+                        <span
+                          className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 whitespace-nowrap"
+                          title="Atendido por el Equipo Desarrollador PGIM"
+                        >
+                          Equipo Desarrollador PGIM
+                        </span>
+                      )}
                     </td>
                     <td className="px-3 py-3 text-right whitespace-nowrap">
                       {(() => {

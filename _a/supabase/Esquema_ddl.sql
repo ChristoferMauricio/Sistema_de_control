@@ -55,6 +55,7 @@ CREATE TABLE public.jira_tickets (
   deleted_at timestamp with time zone,
   fecha_inicio date,
   fecha_solucion date,
+  resolution_date timestamp with time zone,
   CONSTRAINT jira_tickets_pkey PRIMARY KEY (id)
 );
 

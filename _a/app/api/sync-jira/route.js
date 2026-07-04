@@ -155,7 +155,7 @@ async function searchJira(jql, epicLinkFieldId) {
   const allIssues = [];
 
   // Campos base a solicitar en cada peticion
-  const baseFields = "key,summary,status,assignee,priority,issuetype,created,updated,reporter,parent,subtasks,customfield_10036,customfield_10020,customfield_10014,description,issuelinks,labels";
+  const baseFields = "key,summary,status,assignee,priority,issuetype,created,updated,resolutiondate,reporter,parent,subtasks,customfield_10036,customfield_10020,customfield_10014,description,issuelinks,labels";
 
   // Agregar el campo Epic Link descubierto si es diferente al incluido por defecto
   const fields = epicLinkFieldId && epicLinkFieldId !== "customfield_10014"
@@ -250,6 +250,8 @@ function transformIssue(issue, epicLinkFieldId) {
     parent_key:     f.parent?.key || f.customfield_10014 || epicLinkKey || null,
     created_at:     f.created       || null,
     updated_at:     f.updated       || null,
+    // Fecha real en la que el ticket fue resuelto (pasó a Finalizada) segun Jira
+    resolution_date: f.resolutiondate || null,
     synced_at:      now,
     labels:         Array.isArray(f.labels) && f.labels.length > 0 ? f.labels : null,
   };
@@ -426,6 +428,17 @@ async function runSync() {
     }
 
     // Paso 5: Upsert de tickets en lotes de 500 (limite practico para Supabase)
+    // Si la columna resolution_date aun no existe (migracion pendiente en Supabase),
+    // se omite el campo para no romper la sincronizacion.
+    const { error: resolutionColErr } = await supabaseAdmin
+      .from("jira_tickets")
+      .select("resolution_date")
+      .limit(1);
+    if (resolutionColErr) {
+      console.warn("Columna resolution_date no disponible (ejecutar scripts/add-atendido-resolution-columns.sql):", resolutionColErr.message);
+      tickets.forEach(t => { delete t.resolution_date; });
+    }
+
     const upsertBatch = 500;
     for (let i = 0; i < tickets.length; i += upsertBatch) {
       const { error } = await supabaseAdmin
