@@ -16,3 +16,14 @@ CREATE TABLE IF NOT EXISTS public.hu_reportadas (
 
 -- Index for searching stories
 CREATE INDEX IF NOT EXISTS idx_hu_reportadas_story_key ON public.hu_reportadas(story_key);
+
+-- Habilitar Row Level Security (RLS)
+ALTER TABLE public.hu_reportadas ENABLE ROW LEVEL SECURITY;
+
+-- Crear política de lectura para usuarios autenticados
+DROP POLICY IF EXISTS "Authenticated users can read hu_reportadas" ON public.hu_reportadas;
+CREATE POLICY "Authenticated users can read hu_reportadas"
+  ON public.hu_reportadas
+  FOR SELECT
+  TO authenticated
+  USING (true);

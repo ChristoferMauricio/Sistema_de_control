@@ -979,60 +979,65 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
         <>
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden animate-fade-in">
                 {/* Header */}
-                <div className="px-4 py-3 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <div>
-                        <h3 className="text-[15px] font-semibold font-[family-name:var(--font-heading)] text-gray-900">
-                            Historias por integrante
-                        </h3>
-                        <p className="text-xs text-gray-400 mt-0.5">
-                            {filtered.length} historia{filtered.length !== 1 ? "s" : ""} · {pivotData.length} integrante{pivotData.length !== 1 ? "s" : ""}
-                        </p>
-                    </div>
-
-                    {/* Actions & Filters */}
-                    <div className="flex items-center gap-4">
+                <div className="px-5 py-4 border-b border-gray-100 flex flex-col gap-4 bg-gray-50/50">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <div>
+                            <h3 className="text-base font-bold font-[family-name:var(--font-heading)] text-gray-900">
+                                Historias por integrante
+                            </h3>
+                            <p className="text-xs text-gray-400 mt-0.5">
+                                {filtered.length} historia{filtered.length !== 1 ? "s" : ""} · {pivotData.length} integrante{pivotData.length !== 1 ? "s" : ""}
+                            </p>
+                        </div>
                         <button
                             onClick={exportToExcel}
-                            className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg shadow-sm transition-colors"
+                            className="flex items-center justify-center gap-1.5 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-xl shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98] shrink-0"
                             title="Descargar datos actuales en formato Excel"
                         >
                             <Download className="w-4 h-4" />
-                            <span className="hidden sm:inline">Exportar Excel</span>
+                            <span>Exportar Excel</span>
                         </button>
+                    </div>
 
-                        <div className="flex items-center gap-2 border-l border-gray-200 pl-4">
-                            <label className="text-xs font-medium text-gray-500">Sprint:</label>
-                            <select
-                                value={selectedSprint}
-                                onChange={(e) => setSelectedSprint(e.target.value)}
-                                className="px-3 py-2 rounded-lg border border-gray-200 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[180px]"
-                            >
-                                <option value="">Todos los sprints</option>
-                                {sprints.map((s) => (
-                                    <option key={s} value={s}>{s}</option>
-                                ))}
-                            </select>
-                            {selectedSprint && (
-                                <button
-                                    onClick={() => setSelectedSprint("")}
-                                    className="text-xs text-orange-500 hover:text-orange-600 font-medium whitespace-nowrap"
+                    {/* Filters Bar */}
+                    <div className="flex flex-wrap items-center gap-x-6 gap-y-3 pt-3 border-t border-gray-100">
+                        {/* Sprint Filter */}
+                        <div className="flex items-center gap-2">
+                            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Sprint:</span>
+                            <div className="flex items-center gap-1.5">
+                                <select
+                                    value={selectedSprint}
+                                    onChange={(e) => setSelectedSprint(e.target.value)}
+                                    className="px-3 py-2 rounded-xl border border-gray-200 text-xs font-medium text-gray-700 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[180px]"
                                 >
-                                    Limpiar
-                                </button>
-                            )}
+                                    <option value="">Todos los sprints</option>
+                                    {sprints.map((s) => (
+                                        <option key={s} value={s}>{s}</option>
+                                    ))}
+                                </select>
+                                {selectedSprint && (
+                                    <button
+                                        onClick={() => setSelectedSprint("")}
+                                        className="text-xs text-orange-500 hover:text-orange-600 font-bold whitespace-nowrap"
+                                    >
+                                        Limpiar
+                                    </button>
+                                )}
+                            </div>
                         </div>
 
-                        <div className="flex items-center gap-2 border-l border-gray-200 pl-4">
-                            <label className="text-xs font-medium text-gray-500">Deuda Técnica:</label>
+                        {/* Deuda Técnica Filter */}
+                        <div className="flex items-center gap-2">
+                            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Deuda Técnica:</span>
                             <select
                                 value={deudaTecnicaFilter}
                                 onChange={(e) => setDeudaTecnicaFilter(e.target.value)}
                                 disabled={!selectedSprint}
                                 title={!selectedSprint ? "Selecciona un Sprint primero" : ""}
-                                className={`px-2.5 py-2 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[180px] ${!selectedSprint
+                                className={`px-3 py-2 rounded-xl border text-xs font-medium focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[180px] shadow-sm ${!selectedSprint
                                     ? "bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed"
                                     : deudaTecnicaFilter
-                                        ? "border-orange-300 bg-orange-50 text-orange-700 font-medium"
+                                        ? "border-orange-300 bg-orange-50 text-orange-700 font-bold"
                                         : "border-gray-200 bg-white text-gray-700"
                                     }`}
                             >
@@ -1043,13 +1048,14 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                             </select>
                         </div>
 
-                        <div className="flex items-center gap-2 border-l border-gray-200 pl-4">
-                            <label className="text-xs font-medium text-gray-500">Etiqueta:</label>
+                        {/* Etiqueta Filter */}
+                        <div className="flex items-center gap-2">
+                            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Etiqueta:</span>
                             <select
                                 value={labelFilter}
                                 onChange={(e) => setLabelFilter(e.target.value)}
-                                className={`px-2.5 py-2 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[120px] ${labelFilter !== "todo"
-                                    ? "border-orange-300 bg-orange-50 text-orange-700 font-medium"
+                                className={`px-3 py-2 rounded-xl border text-xs font-medium focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[120px] shadow-sm ${labelFilter !== "todo"
+                                    ? "border-orange-300 bg-orange-50 text-orange-700 font-bold"
                                     : "border-gray-200 bg-white text-gray-700"
                                     }`}
                             >
@@ -1059,18 +1065,19 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                             </select>
                         </div>
 
-                        <div className="flex items-center gap-2 border-l border-gray-200 pl-4">
-                            <label className="text-xs font-medium text-gray-500">Etiqueta:</label>
+                        {/* Carolina Filter */}
+                        <div className="flex items-center gap-2">
+                            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Ver Carolina:</span>
                             <select
-                                value={hideCarolina ? "reportar" : "todo"}
-                                onChange={(e) => setHideCarolina(e.target.value === "reportar")}
-                                className={`px-2.5 py-2 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[120px] ${hideCarolina
-                                    ? "border-orange-300 bg-orange-50 text-orange-700 font-medium"
+                                value={hideCarolina ? "ocultar" : "mostrar"}
+                                onChange={(e) => setHideCarolina(e.target.value === "ocultar")}
+                                className={`px-3 py-2 rounded-xl border text-xs font-medium focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[110px] shadow-sm ${hideCarolina
+                                    ? "border-orange-300 bg-orange-50 text-orange-700 font-bold"
                                     : "border-gray-200 bg-white text-gray-700"
                                     }`}
                             >
-                                <option value="todo">Todo</option>
-                                <option value="reportar">Reportar</option>
+                                <option value="mostrar">Mostrar</option>
+                                <option value="ocultar">Ocultar</option>
                             </select>
                         </div>
                     </div>
