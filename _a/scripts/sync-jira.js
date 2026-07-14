@@ -89,6 +89,7 @@ async function searchJira(jql) {
       jql,
       maxResults: String(maxResults),
       fields,
+      expand: "changelog",
     });
 
     // Agregar token de paginación si existe (segunda página en adelante)
@@ -139,11 +140,41 @@ function extractSprintName(sprintField) {
   return activeSprint?.name || null;
 }
 
-function extractFirstSprintName(sprintField) {
-  if (!sprintField || !Array.isArray(sprintField) || sprintField.length === 0) {
-    return null;
+function extractFirstSprintFromHistory(issue) {
+  const changelog = issue.changelog;
+  const sprintField = issue.fields?.customfield_10020;
+
+  if (changelog?.histories?.length) {
+    const sprintChanges = [];
+    for (const h of changelog.histories) {
+      for (const item of h.items) {
+        if (item.field === "Sprint") {
+          sprintChanges.push({
+            date: h.created,
+            fromString: item.fromString,
+            toString: item.toString,
+          });
+        }
+      }
+    }
+
+    if (sprintChanges.length > 0) {
+      for (let i = sprintChanges.length - 1; i >= 0; i--) {
+        const sc = sprintChanges[i];
+        if (!sc.fromString || sc.fromString === "") {
+          return sc.toString?.split(",")[0]?.trim() || null;
+        }
+      }
+      const oldest = sprintChanges[sprintChanges.length - 1];
+      return oldest.fromString?.split(",")[0]?.trim() || oldest.toString?.split(",")[0]?.trim() || null;
+    }
   }
-  return sprintField[0]?.name || null;
+
+  if (Array.isArray(sprintField) && sprintField.length > 0) {
+    return sprintField[0]?.name ?? null;
+  }
+
+  return null;
 }
 
 /**
@@ -169,7 +200,7 @@ function transformIssue(issue) {
     priority: fields.priority?.name || "",
     issue_type: fields.issuetype?.name || "",
     sprint: extractSprintName(fields.customfield_10020),
-    created_sprint: extractFirstSprintName(fields.customfield_10020),
+    created_sprint: extractFirstSprintFromHistory(issue),
     story_points: fields.customfield_10036 || null,
     reporter_email: fields.reporter?.emailAddress || "",
     parent_key: fields.parent?.key || null,

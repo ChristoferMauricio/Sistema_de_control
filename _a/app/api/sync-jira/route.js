@@ -166,7 +166,7 @@ async function searchJira(jql, epicLinkFieldId) {
 
   // Bucle de paginacion por cursor: continuar hasta que no haya mas paginas
   while (true) {
-    const params = new URLSearchParams({ jql, maxResults: "100", fields });
+    const params = new URLSearchParams({ jql, maxResults: "100", fields, expand: "changelog" });
     if (nextPageToken) params.set("nextPageToken", nextPageToken);
 
     const res = await fetch(`${config.baseUrl}/rest/api/3/search/jql?${params}`, {
@@ -205,14 +205,62 @@ function extractSprintName(sprintField) {
 }
 
 /**
- * Extrae el nombre del primer sprint al que fue asociada la historia de Jira.
+ * Extrae el primer sprint al que fue asignado un ticket, usando el changelog de Jira.
  *
- * @param {Array<Object>|null} sprintField - Campo customfield_10020 de Jira
- * @returns {string|null} Nombre del primer sprint del arreglo, o null si no hay sprints
+ * Estrategia:
+ *   1. Recorrer el changelog del ticket buscando cambios en el campo "Sprint".
+ *   2. Encontrar la entrada mas antigua donde Sprint fue asignado por primera vez
+ *      (fromString es null/vacio → toString contiene el primer sprint).
+ *   3. Si hay cambios pero ninguno tiene fromString vacio, tomar el fromString
+ *      de la entrada mas antigua (sprint previo al primer cambio registrado).
+ *   4. Si no hay cambios de Sprint en el changelog, el sprint fue asignado al
+ *      crear el ticket; usar customfield_10020[0] como fallback.
+ *
+ * @param {Object} issue - Issue completo de Jira (con .changelog y .fields)
+ * @returns {string|null} Nombre del primer sprint, o null si nunca tuvo sprint
  */
-function extractFirstSprintName(sprintField) {
-  if (!Array.isArray(sprintField) || sprintField.length === 0) return null;
-  return sprintField[0]?.name ?? null;
+function extractFirstSprintFromHistory(issue) {
+  const changelog = issue.changelog;
+  const sprintField = issue.fields?.customfield_10020;
+
+  if (changelog?.histories?.length) {
+    // Recolectar todos los cambios de Sprint
+    const sprintChanges = [];
+    for (const h of changelog.histories) {
+      for (const item of h.items) {
+        if (item.field === "Sprint") {
+          sprintChanges.push({
+            date: h.created,
+            fromString: item.fromString,
+            toString: item.toString,
+          });
+        }
+      }
+    }
+
+    if (sprintChanges.length > 0) {
+      // El changelog del endpoint search/jql viene en orden descendente (mas reciente primero).
+      // Buscar desde el final (mas antiguo) la primera asignacion de sprint.
+      for (let i = sprintChanges.length - 1; i >= 0; i--) {
+        const sc = sprintChanges[i];
+        if (!sc.fromString || sc.fromString === "") {
+          // Primera asignacion: fromString vacio → toString es el primer sprint
+          return sc.toString?.split(",")[0]?.trim() || null;
+        }
+      }
+      // Si ningun cambio tiene fromString vacio, el sprint original es
+      // el fromString del cambio mas antiguo (el sprint antes del primer cambio)
+      const oldest = sprintChanges[sprintChanges.length - 1];
+      return oldest.fromString?.split(",")[0]?.trim() || oldest.toString?.split(",")[0]?.trim() || null;
+    }
+  }
+
+  // Fallback: sin cambios de Sprint en changelog → sprint fue asignado al crear el ticket
+  if (Array.isArray(sprintField) && sprintField.length > 0) {
+    return sprintField[0]?.name ?? null;
+  }
+
+  return null;
 }
 
 /**
@@ -252,7 +300,7 @@ function transformIssue(issue, epicLinkFieldId) {
     priority:       f.priority?.name || "",
     issue_type:     f.issuetype?.name || "",
     sprint:         extractSprintName(f.customfield_10020),
-    created_sprint: extractFirstSprintName(f.customfield_10020),
+    created_sprint: extractFirstSprintFromHistory(issue),
     story_points:   f.customfield_10036 ?? null,
     reporter_email: reporterId,
     // Jerarquia del ticket: 3 posibles fuentes de relacion padre

@@ -59,7 +59,7 @@ async function searchJira(jql, epicLinkFieldId) {
 
   let nextPageToken = null;
   while (true) {
-    const params = new URLSearchParams({ jql, maxResults: "100", fields });
+    const params = new URLSearchParams({ jql, maxResults: "100", fields, expand: "changelog" });
     if (nextPageToken) params.set("nextPageToken", nextPageToken);
 
     const res = await fetch(`${JIRA_BASE_URL}/rest/api/3/search/jql?${params}`, {
@@ -86,9 +86,44 @@ function extractSprintName(sprintField) {
   return active?.name ?? null;
 }
 
-function extractFirstSprintName(sprintField) {
-  if (!Array.isArray(sprintField) || sprintField.length === 0) return null;
-  return sprintField[0]?.name ?? null;
+function extractFirstSprintFromHistory(issue) {
+  const changelog = issue.changelog;
+  const sprintField = issue.fields?.customfield_10020;
+
+  if (changelog?.histories?.length) {
+    const sprintChanges = [];
+    for (const h of changelog.histories) {
+      for (const item of h.items) {
+        if (item.field === "Sprint") {
+          sprintChanges.push({
+            date: h.created,
+            fromString: item.fromString,
+            toString: item.toString,
+          });
+        }
+      }
+    }
+
+    if (sprintChanges.length > 0) {
+      // Changelog from search/jql is in descending order (newest first).
+      // Search from the end (oldest) for the first sprint assignment.
+      for (let i = sprintChanges.length - 1; i >= 0; i--) {
+        const sc = sprintChanges[i];
+        if (!sc.fromString || sc.fromString === "") {
+          return sc.toString?.split(",")[0]?.trim() || null;
+        }
+      }
+      const oldest = sprintChanges[sprintChanges.length - 1];
+      return oldest.fromString?.split(",")[0]?.trim() || oldest.toString?.split(",")[0]?.trim() || null;
+    }
+  }
+
+  // Fallback: no changelog Sprint changes → sprint was set at creation
+  if (Array.isArray(sprintField) && sprintField.length > 0) {
+    return sprintField[0]?.name ?? null;
+  }
+
+  return null;
 }
 
 function transformIssue(issue, epicLinkFieldId) {
@@ -108,7 +143,7 @@ function transformIssue(issue, epicLinkFieldId) {
     priority:       f.priority?.name || "",
     issue_type:     f.issuetype?.name || "",
     sprint:         extractSprintName(f.customfield_10020),
-    created_sprint: extractFirstSprintName(f.customfield_10020),
+    created_sprint: extractFirstSprintFromHistory(issue),
     story_points:   f.customfield_10036 ?? null,
     reporter_email: reporterId,
     parent_key:     f.parent?.key || f.customfield_10014 || epicLinkKey || null,
