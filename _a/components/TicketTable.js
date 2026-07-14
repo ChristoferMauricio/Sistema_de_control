@@ -202,6 +202,7 @@ export default function TicketTable({
       "Principal":        t.parent_key || "",
       "Épica":            resolveEpic(t)?.summary || "",
       "Sprint":           t.sprint || "",
+      "Sprint Creado":    t.created_sprint || t.sprint || "",
       "Persona asignada": resolveName(t.assignee_email),
       "Story Points":     t.story_points ?? "",
       "Estado":           t.status || "",

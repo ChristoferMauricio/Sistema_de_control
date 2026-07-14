@@ -205,6 +205,17 @@ function extractSprintName(sprintField) {
 }
 
 /**
+ * Extrae el nombre del primer sprint al que fue asociada la historia de Jira.
+ *
+ * @param {Array<Object>|null} sprintField - Campo customfield_10020 de Jira
+ * @returns {string|null} Nombre del primer sprint del arreglo, o null si no hay sprints
+ */
+function extractFirstSprintName(sprintField) {
+  if (!Array.isArray(sprintField) || sprintField.length === 0) return null;
+  return sprintField[0]?.name ?? null;
+}
+
+/**
  * Transforma un issue crudo de la API de Jira en 4 objetos relacionales normalizados
  * listos para insertar en Supabase.
  *
@@ -241,6 +252,7 @@ function transformIssue(issue, epicLinkFieldId) {
     priority:       f.priority?.name || "",
     issue_type:     f.issuetype?.name || "",
     sprint:         extractSprintName(f.customfield_10020),
+    created_sprint: extractFirstSprintName(f.customfield_10020),
     story_points:   f.customfield_10036 ?? null,
     reporter_email: reporterId,
     // Jerarquia del ticket: 3 posibles fuentes de relacion padre

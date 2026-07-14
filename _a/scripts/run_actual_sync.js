@@ -86,6 +86,11 @@ function extractSprintName(sprintField) {
   return active?.name ?? null;
 }
 
+function extractFirstSprintName(sprintField) {
+  if (!Array.isArray(sprintField) || sprintField.length === 0) return null;
+  return sprintField[0]?.name ?? null;
+}
+
 function transformIssue(issue, epicLinkFieldId) {
   const f = issue.fields || {};
   const now = new Date().toISOString();
@@ -103,6 +108,7 @@ function transformIssue(issue, epicLinkFieldId) {
     priority:       f.priority?.name || "",
     issue_type:     f.issuetype?.name || "",
     sprint:         extractSprintName(f.customfield_10020),
+    created_sprint: extractFirstSprintName(f.customfield_10020),
     story_points:   f.customfield_10036 ?? null,
     reporter_email: reporterId,
     parent_key:     f.parent?.key || f.customfield_10014 || epicLinkKey || null,

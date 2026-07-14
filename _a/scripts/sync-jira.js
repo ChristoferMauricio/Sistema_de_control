@@ -139,6 +139,13 @@ function extractSprintName(sprintField) {
   return activeSprint?.name || null;
 }
 
+function extractFirstSprintName(sprintField) {
+  if (!sprintField || !Array.isArray(sprintField) || sprintField.length === 0) {
+    return null;
+  }
+  return sprintField[0]?.name || null;
+}
+
 /**
  * Transforma un issue de Jira al formato de nuestra tabla
  * @param {object} issue - Issue de Jira
@@ -146,14 +153,14 @@ function extractSprintName(sprintField) {
  */
 function transformIssue(issue) {
   const fields = issue.fields || {};
-
+ 
   // Extract linked issue keys from issuelinks
   const linkedKeys = (fields.issuelinks || []).reduce((acc, link) => {
     if (link.inwardIssue?.key) acc.push(link.inwardIssue.key);
     if (link.outwardIssue?.key) acc.push(link.outwardIssue.key);
     return acc;
   }, []);
-
+ 
   return {
     jira_key: issue.key,
     summary: fields.summary || "",
@@ -162,6 +169,7 @@ function transformIssue(issue) {
     priority: fields.priority?.name || "",
     issue_type: fields.issuetype?.name || "",
     sprint: extractSprintName(fields.customfield_10020),
+    created_sprint: extractFirstSprintName(fields.customfield_10020),
     story_points: fields.customfield_10036 || null,
     reporter_email: fields.reporter?.emailAddress || "",
     parent_key: fields.parent?.key || null,

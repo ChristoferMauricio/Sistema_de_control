@@ -45,6 +45,7 @@ CREATE TABLE public.jira_tickets (
   updated_at timestamp with time zone,
   synced_at timestamp with time zone DEFAULT now(),
   sprint text,
+  created_sprint text,
   story_points numeric,
   reporter_email text,
   parent_key text,

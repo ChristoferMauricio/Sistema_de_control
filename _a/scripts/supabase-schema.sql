@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS jira_tickets (
   priority        TEXT,                         -- Prioridad (Highest, High, Medium, Low, Lowest)
   issue_type      TEXT,                         -- Tipo (Bug, Story, Task, Sub-task, Epic)
   sprint          TEXT,                         -- Sprint activo (ej: "Sprint 5")
+  created_sprint  TEXT,                         -- Primer sprint al que fue asociada
   story_points    NUMERIC,                     -- Story points (solo aplica para Historias)
   reporter_name   TEXT,                         -- Nombre del informador
   reporter_email  TEXT,                         -- Email del informador
