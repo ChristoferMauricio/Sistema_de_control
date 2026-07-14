@@ -206,3 +206,16 @@ CREATE TABLE public.pendiente_asunto_history (
   CONSTRAINT pendiente_asunto_history_pkey PRIMARY KEY (id),
   CONSTRAINT fk_pendiente FOREIGN KEY (pendiente_id) REFERENCES public.pendientes(id) ON DELETE CASCADE
 );
+
+CREATE TABLE public.hu_reportadas (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  epic_key text,
+  epic_summary text,
+  story_key text NOT NULL UNIQUE,
+  story_summary text,
+  story_points numeric,
+  sprint text,
+  nota text,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT hu_reportadas_pkey PRIMARY KEY (id)
+);

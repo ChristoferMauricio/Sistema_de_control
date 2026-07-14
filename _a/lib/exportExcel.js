@@ -218,15 +218,15 @@ function buildOsiCacheAndPivots(rowsOsi, latestSprint) {
     etiquetas: makeSI(etiquetasItems, blanks.etiquetas),
   };
 
-  // 3. Pivot cache definition — 16 fields matching Osi columns
+  // 3. Pivot cache definition — 17 fields matching Osi columns
   let defXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
   defXml += '<pivotCacheDefinition refreshOnLoad="1" xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"';
   defXml += ' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
   defXml += ` r:id="rId1" refreshedBy="Sistema" refreshedDate="46098"`;
   defXml += ` createdVersion="8" refreshedVersion="8" minRefreshableVersion="3"`;
   defXml += ` recordCount="${rowsOsi.length}">`;
-  defXml += '<cacheSource type="worksheet"><worksheetSource ref="A1:P1048576" sheet="Osi"/></cacheSource>';
-  defXml += '<cacheFields count="16">';
+  defXml += '<cacheSource type="worksheet"><worksheetSource ref="A1:Q1048576" sheet="Osi"/></cacheSource>';
+  defXml += '<cacheFields count="17">';
   defXml += `<cacheField name="Tipo" numFmtId="0">${si.tipo.xml}</cacheField>`;                    // 0
   defXml += '<cacheField name="Clave" numFmtId="0"><sharedItems containsBlank="1"/></cacheField>';  // 1
   defXml += '<cacheField name="Resumen" numFmtId="0"><sharedItems containsBlank="1" longText="1"/></cacheField>'; // 2
@@ -243,6 +243,7 @@ function buildOsiCacheAndPivots(rowsOsi, latestSprint) {
   defXml += '<cacheField name="Creada" numFmtId="0"><sharedItems containsBlank="1"/></cacheField>'; // 13
   defXml += `<cacheField name="Etiquetas" numFmtId="0">${si.etiquetas.xml}</cacheField>`;                // 14
   defXml += '<cacheField name="Sprint Creado" numFmtId="0"><sharedItems containsBlank="1"/></cacheField>'; // 15
+  defXml += '<cacheField name="HU Reportada" numFmtId="0"><sharedItems containsBlank="1"/></cacheField>'; // 16
   defXml += '</cacheFields></pivotCacheDefinition>';
 
   // 4. Pivot cache records
@@ -278,6 +279,7 @@ function buildOsiCacheAndPivots(rowsOsi, latestSprint) {
     recXml += `<s v="${escXml(r.Creada)}"/>`;                          // 13 Creada
     recXml += `<x v="${getIdx(si.etiquetas, r.Etiquetas, !r.Etiquetas)}"/>`;   // 14 Etiquetas
     recXml += `<s v="${escXml(r["Sprint Creado"])}"/>`;                // 15 Sprint Creado
+    recXml += `<s v="${escXml(r["HU Reportada"])}"/>`;                 // 16 HU Reportada
     recXml += "</r>";
   });
   recXml += "</pivotCacheRecords>";
@@ -349,7 +351,7 @@ function buildOsiCacheAndPivots(rowsOsi, latestSprint) {
   let pt1 = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
   pt1 += `<pivotTableDefinition xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" name="TablaDinámica2" cacheId="0"${ptAttrs}>`;
   pt1 += '<location ref="A4:F14" firstHeaderRow="1" firstDataRow="2" firstDataCol="1" rowPageCount="2" colPageCount="2"/>';
-  pt1 += '<pivotFields count="16">';
+  pt1 += '<pivotFields count="17">';
   pt1 += pf(' axis="axisPage" multipleItemSelectionAllowed="1"', tipoFieldItems);  // 0
   pt1 += '<pivotField dataField="1" showAll="0"/>';                                 // 1
   pt1 += pfSimple;  // 2
@@ -366,6 +368,7 @@ function buildOsiCacheAndPivots(rowsOsi, latestSprint) {
   pt1 += pfSimple;  // 13
   pt1 += pf(' axis="axisPage" multipleItemSelectionAllowed="1"', etiquetasFieldItems); // 14
   pt1 += pfSimple;  // 15 Sprint Creado
+  pt1 += pfSimple;  // 16 HU Reportada
   pt1 += '</pivotFields>';
   pt1 += '<rowFields count="1"><field x="9"/></rowFields>';
   pt1 += rowItemsAsignado;
@@ -383,7 +386,7 @@ function buildOsiCacheAndPivots(rowsOsi, latestSprint) {
   let pt2 = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
   pt2 += `<pivotTableDefinition xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" name="TablaDinámica3" cacheId="0"${ptAttrs}>`;
   pt2 += '<location ref="I4:N14" firstHeaderRow="1" firstDataRow="2" firstDataCol="1" rowPageCount="2" colPageCount="2"/>';
-  pt2 += '<pivotFields count="16">';
+  pt2 += '<pivotFields count="17">';
   pt2 += pf(' axis="axisPage" multipleItemSelectionAllowed="1"', tipoFieldItems);
   pt2 += pfSimple;  // 1
   pt2 += pfSimple;  // 2
@@ -400,6 +403,7 @@ function buildOsiCacheAndPivots(rowsOsi, latestSprint) {
   pt2 += pfSimple;  // 13
   pt2 += pf(' axis="axisPage" multipleItemSelectionAllowed="1"', etiquetasFieldItems); // 14
   pt2 += pfSimple;  // 15 Sprint Creado
+  pt2 += pfSimple;  // 16 HU Reportada
   pt2 += '</pivotFields>';
   pt2 += '<rowFields count="1"><field x="9"/></rowFields>';
   pt2 += rowItemsAsignado;
@@ -418,7 +422,7 @@ function buildOsiCacheAndPivots(rowsOsi, latestSprint) {
   let pt3 = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
   pt3 += `<pivotTableDefinition xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" name="TablaEpica" cacheId="0"${ptAttrs}>`;
   pt3 += '<location ref="A4:C50" firstHeaderRow="1" firstDataRow="2" firstDataCol="1" rowPageCount="2" colPageCount="2"/>';
-  pt3 += '<pivotFields count="16">';
+  pt3 += '<pivotFields count="17">';
   pt3 += pf(' axis="axisPage" multipleItemSelectionAllowed="1"', tipoFieldItems);
   pt3 += pfSimple;  // 1
   pt3 += pfSimple;  // 2
@@ -435,6 +439,7 @@ function buildOsiCacheAndPivots(rowsOsi, latestSprint) {
   pt3 += pfSimple;  // 13
   pt3 += pf(' axis="axisPage" multipleItemSelectionAllowed="1"', etiquetasFieldItems); // 14
   pt3 += pfSimple;  // 15 Sprint Creado
+  pt3 += pfSimple;  // 16 HU Reportada
   pt3 += '</pivotFields>';
   pt3 += '<rowFields count="1"><field x="5"/></rowFields>';
   pt3 += rowItemsEpica;
@@ -736,13 +741,17 @@ export async function exportUnifiedExcel(selectedSprint) {
     /* ═══════════════════════════════════════════════════════════════
        1. OBTENER DATOS DE SUPABASE
        ═══════════════════════════════════════════════════════════════ */
-    const [equipoRes, personsRes] = await Promise.all([
+    const [equipoRes, personsRes, huReportadasRes] = await Promise.all([
       supabase.from("equipo_desarrollo").select("correo_pgim, correo_gcorp, nombre_clave, nombre"),
       supabase.from("jira_persons").select("email, display_name"),
+      supabase.from("hu_reportadas").select("story_key"),
     ]);
 
     if (equipoRes.error) console.error("[exportExcel] Error equipo:", equipoRes.error);
     if (personsRes.error) console.error("[exportExcel] Error persons:", personsRes.error);
+    if (huReportadasRes.error) console.error("[exportExcel] Error huReportadas:", huReportadasRes.error);
+
+    const reportedKeys = new Set((huReportadasRes.data || []).map((r) => r.story_key));
 
     let allTickets = [];
     const pageSize = 1000;
@@ -854,7 +863,7 @@ export async function exportUnifiedExcel(selectedSprint) {
     const headersOsi = [
       "Tipo", "Clave", "Resumen", "Subtareas", "Principal",
       "Épica", "Codigo HU", "Historia", "Sprint", "Persona asignada", "Story Points",
-      "Estado", "Informador", "Creada", "Etiquetas", "Sprint Creado",
+      "Estado", "Informador", "Creada", "Etiquetas", "Sprint Creado", "HU Reportada",
     ];
     const rowsOsi = allTickets.map((t) => ({
       Tipo: t.issue_type || "",
@@ -873,9 +882,10 @@ export async function exportUnifiedExcel(selectedSprint) {
       Creada: t.created_at ? formatDate(t.created_at) : "",
       Etiquetas: Array.isArray(t.labels) ? t.labels.join(", ") : "",
       "Sprint Creado": t.created_sprint || t.sprint || "",
+      "HU Reportada": reportedKeys.has(t.jira_key) ? "Sí" : "No",
     }));
     const osiXml = buildSheetXml(headersOsi, rowsOsi,
-      [16, 13, 52, 20, 13, 32, 13, 40, 22, 24, 13, 20, 24, 18, 20, 22], sst);
+      [16, 13, 52, 20, 13, 32, 13, 40, 22, 24, 13, 20, 24, 18, 20, 22, 15], sst);
     console.log(`[exportExcel] ✅ Hoja Osi: ${rowsOsi.length} filas`);
 
     // ─── Hoja "Datos QA" (sheet4) — TODOS los tickets PF3QA ────────

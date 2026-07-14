@@ -14,6 +14,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { formatDate } from "@/lib/utils";
 import * as XLSX from "xlsx";
+import { supabase } from "@/lib/supabase";
 
 import { useTicketData } from "./ticket-table/useTicketData";
 import TicketRow    from "./ticket-table/TicketRow";
@@ -99,6 +100,18 @@ export default function TicketTable({
 }) {
   // ── Estado de UI local ─────────────────────────────────────────────────────
   const [expandedRow,    setExpandedRow]    = useState(null);
+  const [reportedKeys,   setReportedKeys]   = useState(new Set());
+
+  useEffect(() => {
+    supabase
+      .from("hu_reportadas")
+      .select("story_key")
+      .then(({ data }) => {
+        if (data) {
+          setReportedKeys(new Set(data.map((r) => r.story_key)));
+        }
+      });
+  }, []);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [editingComment, setEditingComment] = useState(null);
   const [savingComment,  setSavingComment]  = useState(false);
@@ -203,6 +216,7 @@ export default function TicketTable({
       "Épica":            resolveEpic(t)?.summary || "",
       "Sprint":           t.sprint || "",
       "Sprint Creado":    t.created_sprint || t.sprint || "",
+      "HU Reportada":     reportedKeys.has(t.jira_key) ? "Sí" : "No",
       "Persona asignada": resolveName(t.assignee_email),
       "Story Points":     t.story_points ?? "",
       "Estado":           t.status || "",

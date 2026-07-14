@@ -564,10 +564,16 @@ function TicketListModal({ title, assigneeName, items, onClose }) {
  */
 export default function ReportesTable({ tickets = [], nombres = [] }) {
     const [selectedSprint, setSelectedSprint] = useState(() => getCurrentSprint(new Date())?.iteracion || "");
+    const [deudaTecnicaFilter, setDeudaTecnicaFilter] = useState("");
     const [labelFilter, setLabelFilter] = useState("reportar"); // "todo" | "reportar" | "no_reportar"
     const [hideCarolina, setHideCarolina] = useState(true);
     const [persons, setPersons] = useState([]);
     const [equipo, setEquipo] = useState([]);
+
+    // Reset Deuda Técnica when current sprint changes
+    useEffect(() => {
+        setDeudaTecnicaFilter("");
+    }, [selectedSprint]);
 
     // Cargar jira_persons + equipo_desarrollo para resolver nombres
     useEffect(() => {
@@ -654,14 +660,31 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
     // para ocultar la columna de soporte e incidencias
     const isPF3QA = /Tablero\s+Sprint/i.test(selectedSprint);
 
-    // Filtrar por sprint + etiqueta
+    // Opciones del filtro de Deuda Técnica dependiente
+    const deudaTecnicaOptions = useMemo(() => {
+        let ticketsForOptions = historias;
+        if (selectedSprint) {
+            ticketsForOptions = ticketsForOptions.filter((t) => t.sprint === selectedSprint);
+        }
+        const opts = new Set();
+        ticketsForOptions.forEach((t) => {
+            if (t.created_sprint) opts.add(t.created_sprint);
+            else if (t.sprint) opts.add(t.sprint);
+        });
+        return sortSprints([...opts]);
+    }, [historias, selectedSprint]);
+
+    // Filtrar por sprint + deuda técnica + etiqueta
     const filtered = useMemo(() => {
         let result = historias;
         if (selectedSprint) result = result.filter((t) => t.sprint === selectedSprint);
+        if (deudaTecnicaFilter) {
+            result = result.filter((t) => (t.created_sprint || t.sprint) === deudaTecnicaFilter);
+        }
         if (labelFilter === "reportar") result = result.filter((t) => !Array.isArray(t.labels) || !t.labels.includes("No_Reportar"));
         if (labelFilter === "no_reportar") result = result.filter((t) => Array.isArray(t.labels) && t.labels.includes("No_Reportar"));
         return result;
-    }, [historias, selectedSprint, labelFilter]);
+    }, [historias, selectedSprint, deudaTecnicaFilter, labelFilter]);
 
     // ── Subtareas de soporte e incidencias ────────────────────────────────────
     // Filtra subtareas que pertenecen a historias de la epica PF3-1799 (estabilizacion)
@@ -997,6 +1020,27 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                                     Limpiar
                                 </button>
                             )}
+                        </div>
+
+                        <div className="flex items-center gap-2 border-l border-gray-200 pl-4">
+                            <label className="text-xs font-medium text-gray-500">Deuda Técnica:</label>
+                            <select
+                                value={deudaTecnicaFilter}
+                                onChange={(e) => setDeudaTecnicaFilter(e.target.value)}
+                                disabled={!selectedSprint}
+                                title={!selectedSprint ? "Selecciona un Sprint primero" : ""}
+                                className={`px-2.5 py-2 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[180px] ${!selectedSprint
+                                    ? "bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed"
+                                    : deudaTecnicaFilter
+                                        ? "border-orange-300 bg-orange-50 text-orange-700 font-medium"
+                                        : "border-gray-200 bg-white text-gray-700"
+                                    }`}
+                            >
+                                <option value="">Todos (sin filtrar creador)</option>
+                                {deudaTecnicaOptions.map((s) => (
+                                    <option key={s} value={s}>{s}</option>
+                                ))}
+                            </select>
                         </div>
 
                         <div className="flex items-center gap-2 border-l border-gray-200 pl-4">

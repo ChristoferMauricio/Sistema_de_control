@@ -134,3 +134,28 @@ CREATE POLICY "Admins can read all roles"
   FOR SELECT
   TO authenticated
   USING (is_admin());
+
+-- ─── Tabla: hu_reportadas ──────────────────────────────────
+-- Almacena las historias reportadas importadas de Excel
+CREATE TABLE IF NOT EXISTS hu_reportadas (
+  id              BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  epic_key        TEXT,
+  epic_summary    TEXT,
+  story_key       TEXT UNIQUE NOT NULL,
+  story_summary   TEXT,
+  story_points    NUMERIC,
+  sprint          TEXT,
+  nota            TEXT,
+  created_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- RLS policies for hu_reportadas
+ALTER TABLE hu_reportadas ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Authenticated users can read hu_reportadas" ON hu_reportadas;
+CREATE POLICY "Authenticated users can read hu_reportadas"
+  ON hu_reportadas
+  FOR SELECT
+  TO authenticated
+  USING (true);
+
