@@ -58,26 +58,7 @@ const navItems = [
     ),
     roles: ["admin", "developer", "qa", "viewer"],
   },
-  {
-    label: "Mis Tickets Jira",
-    href: "/dashboard/mis-pendientes",
-    icon: (
-      <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-      </svg>
-    ),
-    roles: ["admin", "developer", "qa", "viewer"],
-  },
-  {
-    label: "Pendientes",
-    href: "/dashboard/pendientes",
-    icon: (
-      <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-      </svg>
-    ),
-    roles: ["admin", "developer", "qa", "viewer"],
-  },
+
   {
     label: "Errores",
     icon: (
@@ -165,16 +146,7 @@ const navItems = [
     ),
     roles: ["admin", "developer", "qa", "viewer"],
   },
-  {
-    label: "Correos pendientes",
-    href: "/dashboard/correos-pendientes",
-    icon: (
-      <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
-      </svg>
-    ),
-    roles: ["admin", "developer", "qa", "viewer"],
-  },
+
   {
     label: "Reportes",
     href: "/dashboard/reportes",
