@@ -569,20 +569,23 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
     const [hideCarolina, setHideCarolina] = useState(true);
     const [persons, setPersons] = useState([]);
     const [equipo, setEquipo] = useState([]);
+    const [deudaExclusions, setDeudaExclusions] = useState(new Set());
 
     // Reset Deuda Técnica when current sprint changes
     useEffect(() => {
         setDeudaTecnicaFilter("");
     }, [selectedSprint]);
 
-    // Cargar jira_persons + equipo_desarrollo para resolver nombres
+    // Cargar jira_persons + equipo_desarrollo + exclusiones de deuda técnica
     useEffect(() => {
         Promise.all([
             supabase.from("jira_persons").select("email, display_name"),
             supabase.from("equipo_desarrollo").select("nombre, nombre_clave, correo_pgim, correo_gcorp"),
-        ]).then(([personsRes, equipoRes]) => {
+            supabase.from("deuda_tecnica_exclusions").select("story_key"),
+        ]).then(([personsRes, equipoRes, exclusionsRes]) => {
             if (personsRes.data) setPersons(personsRes.data);
             if (equipoRes.data) setEquipo(equipoRes.data);
+            if (exclusionsRes.data) setDeudaExclusions(new Set(exclusionsRes.data.map(e => e.story_key)));
         });
     }, []);
     const [traceModal, setTraceModal] = useState(null); // { assigneeName, stories }
@@ -660,6 +663,12 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
     // para ocultar la columna de soporte e incidencias
     const isPF3QA = /Tablero\s+Sprint/i.test(selectedSprint);
 
+    // Resolver created_sprint efectivo: si la historia está excluida, usar su sprint actual
+    const getEffectiveCreatedSprint = useCallback((t) => {
+        if (deudaExclusions.has(t.jira_key)) return t.sprint;
+        return t.created_sprint || t.sprint;
+    }, [deudaExclusions]);
+
     // Opciones del filtro de Deuda Técnica dependiente
     const deudaTecnicaOptions = useMemo(() => {
         let ticketsForOptions = historias;
@@ -668,23 +677,22 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
         }
         const opts = new Set();
         ticketsForOptions.forEach((t) => {
-            if (t.created_sprint) opts.add(t.created_sprint);
-            else if (t.sprint) opts.add(t.sprint);
+            opts.add(getEffectiveCreatedSprint(t));
         });
         return sortSprints([...opts]);
-    }, [historias, selectedSprint]);
+    }, [historias, selectedSprint, getEffectiveCreatedSprint]);
 
     // Filtrar por sprint + deuda técnica + etiqueta
     const filtered = useMemo(() => {
         let result = historias;
         if (selectedSprint) result = result.filter((t) => t.sprint === selectedSprint);
         if (deudaTecnicaFilter) {
-            result = result.filter((t) => (t.created_sprint || t.sprint) === deudaTecnicaFilter);
+            result = result.filter((t) => getEffectiveCreatedSprint(t) === deudaTecnicaFilter);
         }
         if (labelFilter === "reportar") result = result.filter((t) => !Array.isArray(t.labels) || !t.labels.includes("No_Reportar"));
         if (labelFilter === "no_reportar") result = result.filter((t) => Array.isArray(t.labels) && t.labels.includes("No_Reportar"));
         return result;
-    }, [historias, selectedSprint, deudaTecnicaFilter, labelFilter]);
+    }, [historias, selectedSprint, deudaTecnicaFilter, labelFilter, getEffectiveCreatedSprint]);
 
     // ── Subtareas de soporte e incidencias ────────────────────────────────────
     // Filtra subtareas que pertenecen a historias de la epica PF3-1799 (estabilizacion)
