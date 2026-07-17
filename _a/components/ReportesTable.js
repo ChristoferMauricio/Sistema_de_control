@@ -17,7 +17,7 @@
  */
 "use client";
 
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { Download } from "lucide-react";
 import { getCurrentSprint } from "@/lib/cronogramaData";
@@ -564,17 +564,30 @@ function TicketListModal({ title, assigneeName, items, onClose }) {
  */
 export default function ReportesTable({ tickets = [], nombres = [] }) {
     const [selectedSprint, setSelectedSprint] = useState(() => getCurrentSprint(new Date())?.iteracion || "");
-    const [deudaTecnicaFilter, setDeudaTecnicaFilter] = useState("");
+    const [deudaTecnicaFilters, setDeudaTecnicaFilters] = useState([]);
+    const [deudaDropdownOpen, setDeudaDropdownOpen] = useState(false);
     const [labelFilter, setLabelFilter] = useState("reportar"); // "todo" | "reportar" | "no_reportar"
     const [hideCarolina, setHideCarolina] = useState(true);
     const [persons, setPersons] = useState([]);
     const [equipo, setEquipo] = useState([]);
     const [deudaExclusions, setDeudaExclusions] = useState(new Set());
+    const deudaDropdownRef = useRef(null);
 
     // Reset Deuda Técnica when current sprint changes
     useEffect(() => {
-        setDeudaTecnicaFilter("");
+        setDeudaTecnicaFilters([]);
     }, [selectedSprint]);
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        function handleClickOutside(e) {
+            if (deudaDropdownRef.current && !deudaDropdownRef.current.contains(e.target)) {
+                setDeudaDropdownOpen(false);
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
 
     // Cargar jira_persons + equipo_desarrollo + exclusiones de deuda técnica
     useEffect(() => {
@@ -682,17 +695,17 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
         return sortSprints([...opts]);
     }, [historias, selectedSprint, getEffectiveCreatedSprint]);
 
-    // Filtrar por sprint + deuda técnica + etiqueta
+    // Filtrar por sprint + deuda técnica (multi) + etiqueta
     const filtered = useMemo(() => {
         let result = historias;
         if (selectedSprint) result = result.filter((t) => t.sprint === selectedSprint);
-        if (deudaTecnicaFilter) {
-            result = result.filter((t) => getEffectiveCreatedSprint(t) === deudaTecnicaFilter);
+        if (deudaTecnicaFilters.length > 0) {
+            result = result.filter((t) => deudaTecnicaFilters.includes(getEffectiveCreatedSprint(t)));
         }
         if (labelFilter === "reportar") result = result.filter((t) => !Array.isArray(t.labels) || !t.labels.includes("No_Reportar"));
         if (labelFilter === "no_reportar") result = result.filter((t) => Array.isArray(t.labels) && t.labels.includes("No_Reportar"));
         return result;
-    }, [historias, selectedSprint, deudaTecnicaFilter, labelFilter, getEffectiveCreatedSprint]);
+    }, [historias, selectedSprint, deudaTecnicaFilters, labelFilter, getEffectiveCreatedSprint]);
 
     // ── Subtareas de soporte e incidencias ────────────────────────────────────
     // Filtra subtareas que pertenecen a historias de la epica PF3-1799 (estabilizacion)
@@ -715,19 +728,25 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
             // First, it MUST belong to one of the PF3-1799 iteration stories
             if (!validParentKeys.has(t.parent_key)) return false;
 
+            // Excluir subtareas externas (resumen empieza con "Externo | ")
+            if ((t.summary || "").startsWith("Externo | ")) return false;
+
+            // Excluir subtareas con etiqueta "No_Reportar"
+            if (Array.isArray(t.labels) && t.labels.includes("No_Reportar")) return false;
+
             // Second, it must pass the sprint filter if one is selected
             if (selectedSprint && !(t.sprint === selectedSprint || storyKeysBySprint.has(t.parent_key))) return false;
 
             // Si el filtro de Deuda Técnica está activo, la subtarea debe pertenecer a una historia que coincida con el filtro
-            if (deudaTecnicaFilter && !storyKeysBySprint.has(t.parent_key)) return false;
+            if (deudaTecnicaFilters.length > 0 && !storyKeysBySprint.has(t.parent_key)) return false;
 
-            // Third, apply label filter
+            // Apply label filter (reportar/no_reportar global toggle)
             if (labelFilter === "reportar" && Array.isArray(t.labels) && t.labels.includes("No_Reportar")) return false;
             if (labelFilter === "no_reportar" && (!Array.isArray(t.labels) || !t.labels.includes("No_Reportar"))) return false;
 
             return true;
         });
-    }, [tickets, selectedSprint, filtered, labelFilter, deudaTecnicaFilter]);
+    }, [tickets, selectedSprint, filtered, labelFilter, deudaTecnicaFilters]);
 
     // Crear mapa de Programador → Nombre (case-insensitive)
     // nameMap: jiraDisplayName.lower → alias personalizado (tabla Nombres)
@@ -1037,26 +1056,79 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                             </div>
                         </div>
 
-                        {/* Deuda Técnica Filter */}
-                        <div className="flex items-center gap-2">
+                        {/* Deuda Técnica Filter — Multi-select */}
+                        <div className="flex items-center gap-2" ref={deudaDropdownRef}>
                             <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Deuda Técnica:</span>
-                            <select
-                                value={deudaTecnicaFilter}
-                                onChange={(e) => setDeudaTecnicaFilter(e.target.value)}
-                                disabled={!selectedSprint}
-                                title={!selectedSprint ? "Selecciona un Sprint primero" : ""}
-                                className={`px-3 py-2 rounded-xl border text-xs font-medium focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[180px] shadow-sm ${!selectedSprint
-                                    ? "bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed"
-                                    : deudaTecnicaFilter
-                                        ? "border-orange-300 bg-orange-50 text-orange-700 font-bold"
-                                        : "border-gray-200 bg-white text-gray-700"
-                                    }`}
-                            >
-                                <option value="">Todos (sin filtrar creador)</option>
-                                {deudaTecnicaOptions.map((s) => (
-                                    <option key={s} value={s}>{s}</option>
-                                ))}
-                            </select>
+                            <div className="relative">
+                                <button
+                                    type="button"
+                                    onClick={() => selectedSprint && setDeudaDropdownOpen((o) => !o)}
+                                    disabled={!selectedSprint}
+                                    title={!selectedSprint ? "Selecciona un Sprint primero" : ""}
+                                    className={`flex items-center justify-between gap-2 px-3 py-2 rounded-xl border text-xs font-medium focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[200px] shadow-sm transition-colors ${!selectedSprint
+                                        ? "bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed"
+                                        : deudaTecnicaFilters.length > 0
+                                            ? "border-orange-300 bg-orange-50 text-orange-700 font-bold"
+                                            : "border-gray-200 bg-white text-gray-700 hover:border-gray-300"
+                                        }`}
+                                >
+                                    <span className="truncate">
+                                        {deudaTecnicaFilters.length === 0
+                                            ? "Todos (sin filtrar)"
+                                            : deudaTecnicaFilters.length === 1
+                                                ? deudaTecnicaFilters[0]
+                                                : `${deudaTecnicaFilters.length} sprints seleccionados`}
+                                    </span>
+                                    <svg className={`w-3.5 h-3.5 shrink-0 transition-transform ${deudaDropdownOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                                    </svg>
+                                </button>
+
+                                {deudaDropdownOpen && (
+                                    <div className="absolute z-50 mt-1 w-full min-w-[220px] bg-white border border-gray-200 rounded-xl shadow-lg py-1 max-h-60 overflow-y-auto animate-fade-in">
+                                        {/* Select All / Clear */}
+                                        <div className="flex items-center justify-between px-3 py-1.5 border-b border-gray-100">
+                                            <button
+                                                type="button"
+                                                onClick={() => setDeudaTecnicaFilters(deudaTecnicaOptions.length === deudaTecnicaFilters.length ? [] : [...deudaTecnicaOptions])}
+                                                className="text-[11px] font-semibold text-orange-500 hover:text-orange-600"
+                                            >
+                                                {deudaTecnicaOptions.length === deudaTecnicaFilters.length ? "Deseleccionar todo" : "Seleccionar todo"}
+                                            </button>
+                                            {deudaTecnicaFilters.length > 0 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setDeudaTecnicaFilters([])}
+                                                    className="text-[11px] font-semibold text-gray-400 hover:text-gray-600"
+                                                >
+                                                    Limpiar
+                                                </button>
+                                            )}
+                                        </div>
+                                        {deudaTecnicaOptions.map((s) => {
+                                            const checked = deudaTecnicaFilters.includes(s);
+                                            return (
+                                                <label
+                                                    key={s}
+                                                    className={`flex items-center gap-2.5 px-3 py-1.5 cursor-pointer hover:bg-orange-50/60 transition-colors ${checked ? "bg-orange-50/40" : ""}`}
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={checked}
+                                                        onChange={() => {
+                                                            setDeudaTecnicaFilters((prev) =>
+                                                                checked ? prev.filter((x) => x !== s) : [...prev, s]
+                                                            );
+                                                        }}
+                                                        className="w-3.5 h-3.5 rounded border-gray-300 text-orange-500 focus:ring-orange-500/40 accent-orange-500"
+                                                    />
+                                                    <span className={`text-xs ${checked ? "font-semibold text-orange-700" : "text-gray-600"}`}>{s}</span>
+                                                </label>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
                         {/* Etiqueta Filter */}
