@@ -362,7 +362,7 @@ function buildOsiCacheAndPivots(rowsOsi, latestSprint) {
   // --- PT1: TablaDinámica2 — Sprint Actual (HU count) ---
   let pt1 = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
   pt1 += `<pivotTableDefinition xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" name="TablaDinámica2" cacheId="0"${ptAttrs}>`;
-  pt1 += '<location ref="A6:F16" firstHeaderRow="1" firstDataRow="2" firstDataCol="1" rowPageCount="4" colPageCount="2"/>';
+  pt1 += '<location ref="A8:F18" firstHeaderRow="1" firstDataRow="2" firstDataCol="1" rowPageCount="4" colPageCount="2"/>';
   pt1 += '<pivotFields count="17">';
   pt1 += pf(' axis="axisPage" multipleItemSelectionAllowed="1"', tipoFieldItems);  // 0
   pt1 += '<pivotField dataField="1" showAll="0"/>';                                 // 1
@@ -394,7 +394,7 @@ function buildOsiCacheAndPivots(rowsOsi, latestSprint) {
   // --- PT2: TablaDinámica3 — Sprint Actual (SP sum) ---
   let pt2 = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
   pt2 += `<pivotTableDefinition xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" name="TablaDinámica3" cacheId="0"${ptAttrs}>`;
-  pt2 += '<location ref="I6:N16" firstHeaderRow="1" firstDataRow="2" firstDataCol="1" rowPageCount="4" colPageCount="2"/>';
+  pt2 += '<location ref="I8:N18" firstHeaderRow="1" firstDataRow="2" firstDataCol="1" rowPageCount="4" colPageCount="2"/>';
   pt2 += '<pivotFields count="17">';
   pt2 += pf(' axis="axisPage" multipleItemSelectionAllowed="1"', tipoFieldItems);
   pt2 += pfSimple;  // 1
@@ -426,7 +426,7 @@ function buildOsiCacheAndPivots(rowsOsi, latestSprint) {
   // --- PT6: TablaDinámica_Deuda_HU — Deuda Técnica (HU count) ---
   let pt6 = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
   pt6 += `<pivotTableDefinition xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" name="TablaDinámica_Deuda_HU" cacheId="0"${ptAttrs}>`;
-  pt6 += '<location ref="A30:F40" firstHeaderRow="1" firstDataRow="2" firstDataCol="1" rowPageCount="4" colPageCount="2"/>';
+  pt6 += '<location ref="A33:F43" firstHeaderRow="1" firstDataRow="2" firstDataCol="1" rowPageCount="4" colPageCount="2"/>';
   pt6 += '<pivotFields count="17">';
   pt6 += pf(' axis="axisPage" multipleItemSelectionAllowed="1"', tipoFieldItems);  // 0
   pt6 += '<pivotField dataField="1" showAll="0"/>';                                 // 1
@@ -458,7 +458,7 @@ function buildOsiCacheAndPivots(rowsOsi, latestSprint) {
   // --- PT7: TablaDinámica_Deuda_SP — Deuda Técnica (SP sum) ---
   let pt7 = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
   pt7 += `<pivotTableDefinition xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" name="TablaDinámica_Deuda_SP" cacheId="0"${ptAttrs}>`;
-  pt7 += '<location ref="I30:N40" firstHeaderRow="1" firstDataRow="2" firstDataCol="1" rowPageCount="4" colPageCount="2"/>';
+  pt7 += '<location ref="I33:N43" firstHeaderRow="1" firstDataRow="2" firstDataCol="1" rowPageCount="4" colPageCount="2"/>';
   pt7 += '<pivotFields count="17">';
   pt7 += pf(' axis="axisPage" multipleItemSelectionAllowed="1"', tipoFieldItems);
   pt7 += pfSimple;  // 1
@@ -1056,13 +1056,13 @@ export async function exportUnifiedExcel(selectedSprint) {
     const newSheetData =
       '<sheetData>' +
       `<row r="1" ht="28" customHeight="1" spans="1:14" x14ac:dyDescent="0.25"><c r="A1" s="7" t="inlineStr"><is><t>${sprintTitleText}</t></is></c></row>` +
-      `<row r="24" ht="28" customHeight="1" spans="1:14" x14ac:dyDescent="0.25"><c r="A24" s="8" t="inlineStr"><is><t>${deudaTitleText}</t></is></c></row>` +
-      `<row r="25" ht="20" customHeight="1" spans="1:14" x14ac:dyDescent="0.25"><c r="A25" s="9" t="inlineStr"><is><t>${deudaSubtitleText}</t></is></c></row>` +
+      `<row r="25" ht="28" customHeight="1" spans="1:14" x14ac:dyDescent="0.25"><c r="A25" s="8" t="inlineStr"><is><t>${deudaTitleText}</t></is></c></row>` +
+      `<row r="26" ht="20" customHeight="1" spans="1:14" x14ac:dyDescent="0.25"><c r="A26" s="9" t="inlineStr"><is><t>${deudaSubtitleText}</t></is></c></row>` +
       '</sheetData>' +
       '<mergeCells count="3">' +
       '<mergeCell ref="A1:N1"/>' +
-      '<mergeCell ref="A24:N24"/>' +
       '<mergeCell ref="A25:N25"/>' +
+      '<mergeCell ref="A26:N26"/>' +
       '</mergeCells>';
 
     sheet1Xml = sheet1Xml.replace(/<sheetData>[\s\S]*?<\/sheetData>/, newSheetData);
