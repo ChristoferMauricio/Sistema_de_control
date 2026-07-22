@@ -771,15 +771,23 @@ async function customizeTemplate(zip) {
   // ─── B) Mejorar estilo de encabezados ──────────────────────────────
   let sty = await zip.file("xl/styles.xml").async("string");
 
-  // fontId=3: blanca, negrita
-  sty = sty.replace('<fonts count="3"', '<fonts count="4"');
+  // fontId=3: blanca 11pt negrita
+  // fontId=4: blanca 13pt negrita (para banners de título)
+  // fontId=5: gris 11pt cursiva (para subtítulos)
+  sty = sty.replace('<fonts count="3"', '<fonts count="6"');
   sty = sty.replace("</fonts>",
-    '<font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/><family val="2"/><scheme val="minor"/></font></fonts>');
+    '<font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/><family val="2"/><scheme val="minor"/></font>' +
+    '<font><b/><sz val="13"/><color rgb="FFFFFFFF"/><name val="Calibri"/><family val="2"/><scheme val="minor"/></font>' +
+    '<font><i/><sz val="11"/><color rgb="FF595959"/><name val="Calibri"/><family val="2"/><scheme val="minor"/></font></fonts>'
+  );
 
-  // fillId=3: azul corporativo
-  sty = sty.replace('<fills count="3"', '<fills count="4"');
+  // fillId=3: azul corporativo (4472C4)
+  // fillId=4: naranja/ámbar (C65911)
+  sty = sty.replace('<fills count="3"', '<fills count="5"');
   sty = sty.replace("</fills>",
-    '<fill><patternFill patternType="solid"><fgColor rgb="FF4472C4"/><bgColor indexed="64"/></patternFill></fill></fills>');
+    '<fill><patternFill patternType="solid"><fgColor rgb="FF4472C4"/><bgColor indexed="64"/></patternFill></fill>' +
+    '<fill><patternFill patternType="solid"><fgColor rgb="FFC65911"/><bgColor indexed="64"/></patternFill></fill></fills>'
+  );
 
   // borderId=1: borde delgado
   sty = sty.replace('<borders count="1"', '<borders count="2"');
@@ -791,12 +799,25 @@ async function customizeTemplate(zip) {
     '<bottom style="thin"><color indexed="64"/></bottom>' +
     "<diagonal/></border></borders>");
 
-  // xfId=6: encabezado azul + blanco + centrado + borde
-  sty = sty.replace('<cellXfs count="6"', '<cellXfs count="7"');
+  // xfId=6: encabezado tabla (azul + blanco + centrado + borde)
+  // xfId=7: Banner Titulo Sprint Actual (fontId=4, fillId=3 - azul, alineado izq, centrado vert)
+  // xfId=8: Banner Titulo Deuda Técnica (fontId=4, fillId=4 - naranja, alineado izq, centrado vert)
+  // xfId=9: Subtitulo Deuda Técnica (fontId=5, fillId=0, alineado izq, centrado vert)
+  sty = sty.replace('<cellXfs count="6"', '<cellXfs count="10"');
   sty = sty.replace("</cellXfs>",
     '<xf numFmtId="0" fontId="3" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1">' +
     '<alignment horizontal="center" vertical="center" wrapText="1"/>' +
-    "</xf></cellXfs>");
+    '</xf>' +
+    '<xf numFmtId="0" fontId="4" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1">' +
+    '<alignment horizontal="left" vertical="center"/>' +
+    '</xf>' +
+    '<xf numFmtId="0" fontId="4" fillId="4" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1">' +
+    '<alignment horizontal="left" vertical="center"/>' +
+    '</xf>' +
+    '<xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1">' +
+    '<alignment horizontal="left" vertical="center"/>' +
+    '</xf></cellXfs>'
+  );
 
   zip.file("xl/styles.xml", sty);
   console.log("[exportExcel] ✅ Template personalizado");
@@ -1028,16 +1049,21 @@ export async function exportUnifiedExcel(selectedSprint) {
     );
 
     // Inyectar los encabezados de título y subtítulo en sheetData de sheet1.xml
-    const sprintTitleText = escXml(`Reporte - ${sprintParaPF3 || "Sprint Actual"}`);
-    const deudaTitleText = "Reporte - Deuda Técnica";
-    const deudaSubtitleText = escXml(`Sprints incluidos en Deuda Técnica: ${osiPivot.deudaSprintsText}`);
+    const sprintTitleText = escXml(`  REPORTE - SPRINT: ${sprintParaPF3 || "Sprint Actual"}`);
+    const deudaTitleText = "  REPORTE - DEUDA TÉCNICA";
+    const deudaSubtitleText = escXml(`  Sprints incluidos en Deuda Técnica: ${osiPivot.deudaSprintsText}`);
 
     const newSheetData =
       '<sheetData>' +
-      `<row r="1" spans="1:14" x14ac:dyDescent="0.25"><c r="A1" t="inlineStr"><is><t>${sprintTitleText}</t></is></c></row>` +
-      `<row r="24" spans="1:14" x14ac:dyDescent="0.25"><c r="A24" t="inlineStr"><is><t>${deudaTitleText}</t></is></c></row>` +
-      `<row r="25" spans="1:14" x14ac:dyDescent="0.25"><c r="A25" t="inlineStr"><is><t>${deudaSubtitleText}</t></is></c></row>` +
-      '</sheetData>';
+      `<row r="1" ht="28" customHeight="1" spans="1:14" x14ac:dyDescent="0.25"><c r="A1" s="7" t="inlineStr"><is><t>${sprintTitleText}</t></is></c></row>` +
+      `<row r="24" ht="28" customHeight="1" spans="1:14" x14ac:dyDescent="0.25"><c r="A24" s="8" t="inlineStr"><is><t>${deudaTitleText}</t></is></c></row>` +
+      `<row r="25" ht="20" customHeight="1" spans="1:14" x14ac:dyDescent="0.25"><c r="A25" s="9" t="inlineStr"><is><t>${deudaSubtitleText}</t></is></c></row>` +
+      '</sheetData>' +
+      '<mergeCells count="3">' +
+      '<mergeCell ref="A1:N1"/>' +
+      '<mergeCell ref="A24:N24"/>' +
+      '<mergeCell ref="A25:N25"/>' +
+      '</mergeCells>';
 
     sheet1Xml = sheet1Xml.replace(/<sheetData>[\s\S]*?<\/sheetData>/, newSheetData);
     zip.file("xl/worksheets/sheet1.xml", sheet1Xml);
