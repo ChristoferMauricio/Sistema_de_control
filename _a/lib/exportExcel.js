@@ -1053,6 +1053,18 @@ export async function exportUnifiedExcel(selectedSprint) {
       '</Relationships>';
     zip.file("xl/worksheets/_rels/sheet1.xml.rels", sheet1RelsXml);
 
+    // Actualizar [Content_Types].xml para registrar pivotTable6.xml y pivotTable7.xml
+    let ctXml = await zip.file("[Content_Types].xml").async("string");
+    if (!ctXml.includes("pivotTable6.xml")) {
+      ctXml = ctXml.replace(
+        "</Types>",
+        '<Override PartName="/xl/pivotTables/pivotTable6.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.pivotTable+xml"/>' +
+        '<Override PartName="/xl/pivotTables/pivotTable7.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.pivotTable+xml"/>' +
+        "</Types>"
+      );
+      zip.file("[Content_Types].xml", ctXml);
+    }
+
     // Pivot cache y tables QA (cache 2)
     zip.file("xl/pivotCache/pivotCacheDefinition2.xml", qaPivot.cacheDefXml);
     zip.file("xl/pivotCache/pivotCacheRecords2.xml", qaPivot.cacheRecXml);
