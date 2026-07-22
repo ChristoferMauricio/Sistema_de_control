@@ -164,7 +164,7 @@ function buildSheetXml(headers, rows, colWidths, sst, headerStyle = "6") {
    Creada(13), Etiquetas(14)
    ═══════════════════════════════════════════════════════════════════════ */
 
-function buildOsiCacheAndPivots(rowsOsi, latestSprint) {
+function buildOsiCacheAndPivots(rowsOsi, latestSprint, exclusionsSet) {
   // 1. Recopilar valores únicos por campo
   const sets = { tipo: new Set(), sprint: new Set(), asignado: new Set(), estado: new Set(), epica: new Set(), etiquetas: new Set(), sprintCreado: new Set() };
   const blanks = { tipo: false, sprint: false, asignado: false, estado: false, epica: false, etiquetas: false, sprintCreado: false };
@@ -196,9 +196,17 @@ function buildOsiCacheAndPivots(rowsOsi, latestSprint) {
   const sprintCreadoItems = [...sets.sprintCreado].sort((a, b) => extractNum(a) - extractNum(b));
 
   // Sprints anteriores incluidos en Deuda Técnica
+  // Aplica los mismos filtros que la tabla dinámica (solo Historias, sin No_Reportar y excluyendo exenciones)
   const deudaSprintsList = [...new Set(
     rowsOsi
-      .filter((r) => r.Sprint === latestSprint && r["Sprint Creado"] && r["Sprint Creado"] !== latestSprint)
+      .filter((r) => {
+        if (r.Sprint !== latestSprint) return false;
+        if (r.Tipo !== "Historia" && r.Tipo !== "Story") return false;
+        if (r.Etiquetas && r.Etiquetas.includes("No_Reportar")) return false;
+        if (exclusionsSet && exclusionsSet.has(r.Clave)) return false;
+        const sc = r["Sprint Creado"];
+        return sc && sc !== latestSprint;
+      })
       .map((r) => r["Sprint Creado"])
   )].sort((a, b) => extractNum(a) - extractNum(b));
   const deudaSprintsText = deudaSprintsList.length > 0 ? deudaSprintsList.join(", ") : "Ninguno";
@@ -834,17 +842,20 @@ export async function exportUnifiedExcel(selectedSprint) {
     /* ═══════════════════════════════════════════════════════════════
        1. OBTENER DATOS DE SUPABASE
        ═══════════════════════════════════════════════════════════════ */
-    const [equipoRes, personsRes, huReportadasRes] = await Promise.all([
+    const [equipoRes, personsRes, huReportadasRes, exclusionsRes] = await Promise.all([
       supabase.from("equipo_desarrollo").select("correo_pgim, correo_gcorp, nombre_clave, nombre"),
       supabase.from("jira_persons").select("email, display_name"),
       supabase.from("hu_reportadas").select("story_key"),
+      supabase.from("deuda_tecnica_exclusions").select("story_key"),
     ]);
 
     if (equipoRes.error) console.error("[exportExcel] Error equipo:", equipoRes.error);
     if (personsRes.error) console.error("[exportExcel] Error persons:", personsRes.error);
     if (huReportadasRes.error) console.error("[exportExcel] Error huReportadas:", huReportadasRes.error);
+    if (exclusionsRes?.error) console.error("[exportExcel] Error exclusions:", exclusionsRes.error);
 
     const reportedKeys = new Set((huReportadasRes.data || []).map((r) => r.story_key));
+    const exclusionsSet = new Set((exclusionsRes?.data || []).map((r) => r.story_key));
 
     let allTickets = [];
     const pageSize = 1000;
@@ -1018,7 +1029,7 @@ export async function exportUnifiedExcel(selectedSprint) {
        5. CONSTRUIR PIVOT CACHES + PIVOT TABLES
        ═══════════════════════════════════════════════════════════════ */
     // PF3 (Osi) — cache 1, pivot tables 1-3
-    const osiPivot = buildOsiCacheAndPivots(rowsOsi, sprintParaPF3);
+    const osiPivot = buildOsiCacheAndPivots(rowsOsi, sprintParaPF3, exclusionsSet);
     // QA — cache 2, pivot tables 4-5
     const qaPivot = buildQACacheAndPivots(rowsQA, sprintParaQA);
 
