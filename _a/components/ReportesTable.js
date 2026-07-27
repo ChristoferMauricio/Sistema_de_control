@@ -571,6 +571,7 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
     const [persons, setPersons] = useState([]);
     const [equipo, setEquipo] = useState([]);
     const [deudaExclusions, setDeudaExclusions] = useState(new Set());
+    const [reportedKeys, setReportedKeys] = useState(new Set());
     const deudaDropdownRef = useRef(null);
 
     // Reset Deuda Técnica when current sprint changes
@@ -595,10 +596,12 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
             supabase.from("jira_persons").select("email, display_name"),
             supabase.from("equipo_desarrollo").select("nombre, nombre_clave, correo_pgim, correo_gcorp"),
             supabase.from("deuda_tecnica_exclusions").select("story_key"),
-        ]).then(([personsRes, equipoRes, exclusionsRes]) => {
+            supabase.from("hu_reportadas").select("story_key"),
+        ]).then(([personsRes, equipoRes, exclusionsRes, huReportadasRes]) => {
             if (personsRes.data) setPersons(personsRes.data);
             if (equipoRes.data) setEquipo(equipoRes.data);
             if (exclusionsRes.data) setDeudaExclusions(new Set(exclusionsRes.data.map(e => e.story_key)));
+            if (huReportadasRes.data) setReportedKeys(new Set(huReportadasRes.data.map(r => r.story_key)));
         });
     }, []);
     const [traceModal, setTraceModal] = useState(null); // { assigneeName, stories }
@@ -684,28 +687,62 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
 
     // Opciones del filtro de Deuda Técnica dependiente
     const deudaTecnicaOptions = useMemo(() => {
-        let ticketsForOptions = historias;
-        if (selectedSprint) {
-            ticketsForOptions = ticketsForOptions.filter((t) => t.sprint === selectedSprint);
-        }
         const opts = new Set();
-        ticketsForOptions.forEach((t) => {
-            opts.add(getEffectiveCreatedSprint(t));
-        });
+        // Categoría A: historias en el sprint actual, creadas en sprint anterior
+        if (selectedSprint) {
+            historias
+                .filter((t) => t.sprint === selectedSprint)
+                .forEach((t) => opts.add(getEffectiveCreatedSprint(t)));
+        }
+        // Categoría B: historias en sprints anteriores, no movidas, no reportadas
+        if (selectedSprint) {
+            historias
+                .filter((t) => {
+                    if (t.sprint === selectedSprint) return false;
+                    if (!isStory(t.issue_type)) return false;
+                    if (Array.isArray(t.labels) && t.labels.includes("No_Reportar")) return false;
+                    return getEffectiveCreatedSprint(t) === t.sprint && !reportedKeys.has(t.jira_key);
+                })
+                .forEach((t) => opts.add(t.sprint));
+        }
+        // Quitar el sprint actual de las opciones (no es deuda)
+        opts.delete(selectedSprint);
         return sortSprints([...opts]);
-    }, [historias, selectedSprint, getEffectiveCreatedSprint]);
+    }, [historias, selectedSprint, getEffectiveCreatedSprint, reportedKeys]);
 
     // Filtrar por sprint + deuda técnica (multi) + etiqueta
     const filtered = useMemo(() => {
         let result = historias;
-        if (selectedSprint) result = result.filter((t) => t.sprint === selectedSprint);
+        if (selectedSprint) {
+            result = result.filter((t) => {
+                // Siempre incluir historias del sprint actual
+                if (t.sprint === selectedSprint) return true;
+                // Categoría B: incluir historias de sprints anteriores no reportadas
+                // solo cuando el filtro de deuda técnica tiene sprints seleccionados
+                if (deudaTecnicaFilters.length > 0
+                    && deudaTecnicaFilters.includes(t.sprint)
+                    && getEffectiveCreatedSprint(t) === t.sprint
+                    && !reportedKeys.has(t.jira_key)
+                    && isStory(t.issue_type)
+                    && (!Array.isArray(t.labels) || !t.labels.includes("No_Reportar"))) {
+                    return true;
+                }
+                return false;
+            });
+        }
         if (deudaTecnicaFilters.length > 0) {
-            result = result.filter((t) => deudaTecnicaFilters.includes(getEffectiveCreatedSprint(t)));
+            result = result.filter((t) => {
+                // Cat A: sprint actual, creada en sprint anterior seleccionado
+                if (t.sprint === selectedSprint && deudaTecnicaFilters.includes(getEffectiveCreatedSprint(t))) return true;
+                // Cat B: sprint anterior seleccionado, no movida, no reportada
+                if (t.sprint !== selectedSprint && deudaTecnicaFilters.includes(t.sprint)) return true;
+                return false;
+            });
         }
         if (labelFilter === "reportar") result = result.filter((t) => !Array.isArray(t.labels) || !t.labels.includes("No_Reportar"));
         if (labelFilter === "no_reportar") result = result.filter((t) => Array.isArray(t.labels) && t.labels.includes("No_Reportar"));
         return result;
-    }, [historias, selectedSprint, deudaTecnicaFilters, labelFilter, getEffectiveCreatedSprint]);
+    }, [historias, selectedSprint, deudaTecnicaFilters, labelFilter, getEffectiveCreatedSprint, reportedKeys]);
 
     // ── Subtareas de soporte e incidencias ────────────────────────────────────
     // Filtra subtareas que pertenecen a historias de la epica PF3-1799 (estabilizacion)
