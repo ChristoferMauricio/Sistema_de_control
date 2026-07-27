@@ -1027,13 +1027,12 @@ export async function exportUnifiedExcel(selectedSprint) {
         const tipo = t.issue_type || "";
         if (tipo !== "Historia" && tipo !== "Story") return "No";
         if (exclusionsSet.has(t.jira_key)) return "No";
-        if (Array.isArray(t.labels) && t.labels.includes("No_Reportar")) return "No";
         const sprint = t.sprint || "";
         const sc = t.created_sprint || sprint;
         // Cat A: en sprint actual, creada en sprint anterior
         if (sprint === sprintParaPF3 && sc !== sprintParaPF3) return "Sí";
-        // Cat B: en sprint anterior, nunca movida, no reportada
-        if (sprint !== sprintParaPF3 && sc === sprint && !reportedKeys.has(t.jira_key)) return "Sí";
+        // Cat B: en sprint anterior (independiente de si fue reportada o etiqueta No_Reportar)
+        if (sprint !== sprintParaPF3) return "Sí";
         return "No";
       })(),
     }));

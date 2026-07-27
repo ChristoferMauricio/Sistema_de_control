@@ -688,32 +688,28 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
     // Opciones del filtro de Deuda Técnica dependiente
     const deudaTecnicaOptions = useMemo(() => {
         const opts = new Set();
-        // Categoría A: historias en el sprint actual, creadas en sprint anterior
         if (selectedSprint) {
+            // Categoría A: historias en el sprint actual creadas en sprints anteriores
             historias
                 .filter((t) => t.sprint === selectedSprint)
                 .forEach((t) => {
                     const sc = getEffectiveCreatedSprint(t);
-                    if (sc) opts.add(sc);
+                    if (sc && sc !== selectedSprint) opts.add(sc);
                 });
-        }
-        // Categoría B: historias en sprints anteriores, no movidas, no reportadas
-        if (selectedSprint) {
+            // Categoría B: historias pertenecientes a sprints anteriores
             historias
                 .filter((t) => {
-                    if (!t || t.sprint === selectedSprint) return false;
+                    if (!t || !t.sprint || t.sprint === selectedSprint) return false;
                     if (!isStory(t.issue_type)) return false;
-                    if (Array.isArray(t.labels) && t.labels.includes("No_Reportar")) return false;
-                    return getEffectiveCreatedSprint(t) === t.sprint && !reportedKeys.has(t.jira_key);
+                    return true;
                 })
                 .forEach((t) => {
                     if (t.sprint) opts.add(t.sprint);
                 });
         }
-        // Quitar el sprint actual de las opciones (no es deuda)
         opts.delete(selectedSprint);
         return sortSprints([...opts].filter(Boolean));
-    }, [historias, selectedSprint, getEffectiveCreatedSprint, reportedKeys]);
+    }, [historias, selectedSprint, getEffectiveCreatedSprint]);
 
     // Filtrar por sprint + deuda técnica (multi) + etiqueta
     const filtered = useMemo(() => {
@@ -722,14 +718,11 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
             result = result.filter((t) => {
                 // Siempre incluir historias del sprint actual
                 if (t.sprint === selectedSprint) return true;
-                // Categoría B: incluir historias de sprints anteriores no reportadas
-                // solo cuando el filtro de deuda técnica tiene sprints seleccionados
+                // Categoría B: incluir historias de sprints anteriores
+                // solo cuando el filtro de deuda técnica incluye su sprint
                 if (deudaTecnicaFilters.length > 0
-                    && deudaTecnicaFilters.includes(t.sprint)
-                    && getEffectiveCreatedSprint(t) === t.sprint
-                    && !reportedKeys.has(t.jira_key)
-                    && isStory(t.issue_type)
-                    && (!Array.isArray(t.labels) || !t.labels.includes("No_Reportar"))) {
+                    && (deudaTecnicaFilters.includes(t.sprint) || deudaTecnicaFilters.includes(getEffectiveCreatedSprint(t)))
+                    && isStory(t.issue_type)) {
                     return true;
                 }
                 return false;
@@ -739,15 +732,15 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
             result = result.filter((t) => {
                 // Cat A: sprint actual, creada en sprint anterior seleccionado
                 if (t.sprint === selectedSprint && deudaTecnicaFilters.includes(getEffectiveCreatedSprint(t))) return true;
-                // Cat B: sprint anterior seleccionado, no movida, no reportada
-                if (t.sprint !== selectedSprint && deudaTecnicaFilters.includes(t.sprint)) return true;
+                // Cat B: sprint anterior seleccionado
+                if (t.sprint !== selectedSprint && (deudaTecnicaFilters.includes(t.sprint) || deudaTecnicaFilters.includes(getEffectiveCreatedSprint(t)))) return true;
                 return false;
             });
         }
         if (labelFilter === "reportar") result = result.filter((t) => !Array.isArray(t.labels) || !t.labels.includes("No_Reportar"));
         if (labelFilter === "no_reportar") result = result.filter((t) => Array.isArray(t.labels) && t.labels.includes("No_Reportar"));
         return result;
-    }, [historias, selectedSprint, deudaTecnicaFilters, labelFilter, getEffectiveCreatedSprint, reportedKeys]);
+    }, [historias, selectedSprint, deudaTecnicaFilters, labelFilter, getEffectiveCreatedSprint]);
 
     // ── Subtareas de soporte e incidencias ────────────────────────────────────
     // Filtra subtareas que pertenecen a historias de la epica PF3-1799 (estabilizacion)
