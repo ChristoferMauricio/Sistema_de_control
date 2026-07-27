@@ -687,26 +687,15 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
 
     // Opciones del filtro de Deuda Técnica dependiente
     const deudaTecnicaOptions = useMemo(() => {
-        const opts = new Set();
+        let ticketsForOptions = historias;
         if (selectedSprint) {
-            // Categoría A: historias en el sprint actual creadas en sprints anteriores
-            historias
-                .filter((t) => t.sprint === selectedSprint)
-                .forEach((t) => {
-                    const sc = getEffectiveCreatedSprint(t);
-                    if (sc && sc !== selectedSprint) opts.add(sc);
-                });
-            // Categoría B: historias pertenecientes a sprints anteriores
-            historias
-                .filter((t) => {
-                    if (!t || !t.sprint || t.sprint === selectedSprint) return false;
-                    if (!isStory(t.issue_type)) return false;
-                    return true;
-                })
-                .forEach((t) => {
-                    if (t.sprint) opts.add(t.sprint);
-                });
+            ticketsForOptions = ticketsForOptions.filter((t) => t.sprint === selectedSprint);
         }
+        const opts = new Set();
+        ticketsForOptions.forEach((t) => {
+            const sc = getEffectiveCreatedSprint(t);
+            if (sc) opts.add(sc);
+        });
         opts.delete(selectedSprint);
         return sortSprints([...opts].filter(Boolean));
     }, [historias, selectedSprint, getEffectiveCreatedSprint]);
@@ -714,28 +703,9 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
     // Filtrar por sprint + deuda técnica (multi) + etiqueta
     const filtered = useMemo(() => {
         let result = historias;
-        if (selectedSprint) {
-            result = result.filter((t) => {
-                // Siempre incluir historias del sprint actual
-                if (t.sprint === selectedSprint) return true;
-                // Categoría B: incluir historias de sprints anteriores
-                // solo cuando el filtro de deuda técnica incluye su sprint
-                if (deudaTecnicaFilters.length > 0
-                    && (deudaTecnicaFilters.includes(t.sprint) || deudaTecnicaFilters.includes(getEffectiveCreatedSprint(t)))
-                    && isStory(t.issue_type)) {
-                    return true;
-                }
-                return false;
-            });
-        }
+        if (selectedSprint) result = result.filter((t) => t.sprint === selectedSprint);
         if (deudaTecnicaFilters.length > 0) {
-            result = result.filter((t) => {
-                // Cat A: sprint actual, creada en sprint anterior seleccionado
-                if (t.sprint === selectedSprint && deudaTecnicaFilters.includes(getEffectiveCreatedSprint(t))) return true;
-                // Cat B: sprint anterior seleccionado
-                if (t.sprint !== selectedSprint && (deudaTecnicaFilters.includes(t.sprint) || deudaTecnicaFilters.includes(getEffectiveCreatedSprint(t)))) return true;
-                return false;
-            });
+            result = result.filter((t) => deudaTecnicaFilters.includes(getEffectiveCreatedSprint(t)));
         }
         if (labelFilter === "reportar") result = result.filter((t) => !Array.isArray(t.labels) || !t.labels.includes("No_Reportar"));
         if (labelFilter === "no_reportar") result = result.filter((t) => Array.isArray(t.labels) && t.labels.includes("No_Reportar"));
