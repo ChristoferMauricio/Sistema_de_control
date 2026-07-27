@@ -757,7 +757,7 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
         // We identify them by checking if the epic is PF3-1799 or if their summary has "(Iteraci[oó]n"
         const validParentKeys = new Set(
             tickets
-                .filter(t => !isSubtask(t.issue_type) && (t.parent_key === "PF3-1799" || t.summary.match(/\(Iteraci[oó]n/i)))
+                .filter(t => !isSubtask(t.issue_type) && (t.parent_key === "PF3-1799" || (t.summary && t.summary.match(/\(Iteraci[oó]n/i))))
                 .map(t => t.jira_key)
         );
 
