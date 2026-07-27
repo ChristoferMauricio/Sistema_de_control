@@ -195,6 +195,21 @@ function buildOsiCacheAndPivots(rowsOsi, latestSprint, exclusionsSet) {
   const etiquetasItems = [...sets.etiquetas].sort();
   const sprintCreadoItems = [...sets.sprintCreado].sort((a, b) => extractNum(a) - extractNum(b));
 
+  // Sprints anteriores incluidos en Deuda Técnica
+  const deudaSprintsList = [...new Set(
+    rowsOsi
+      .filter((r) => {
+        if (r.Sprint !== latestSprint) return false;
+        if (r.Tipo !== "Historia" && r.Tipo !== "Story") return false;
+        if (r.Etiquetas && r.Etiquetas.includes("No_Reportar")) return false;
+        if (exclusionsSet && exclusionsSet.has(r.Clave)) return false;
+        const sc = r["Sprint Creado"];
+        return sc && sc !== latestSprint;
+      })
+      .map((r) => r["Sprint Creado"])
+  )].sort((a, b) => extractNum(a) - extractNum(b));
+  const deudaSprintsText = deudaSprintsList.length > 0 ? deudaSprintsList.join(", ") : "Ninguno";
+
   // 2. SharedItems helper
   function makeSI(items, hasBlank, extra = "") {
     const count = items.length + (hasBlank ? 1 : 0);
