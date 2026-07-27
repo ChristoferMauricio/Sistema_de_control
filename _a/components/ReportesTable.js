@@ -692,22 +692,27 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
         if (selectedSprint) {
             historias
                 .filter((t) => t.sprint === selectedSprint)
-                .forEach((t) => opts.add(getEffectiveCreatedSprint(t)));
+                .forEach((t) => {
+                    const sc = getEffectiveCreatedSprint(t);
+                    if (sc) opts.add(sc);
+                });
         }
         // Categoría B: historias en sprints anteriores, no movidas, no reportadas
         if (selectedSprint) {
             historias
                 .filter((t) => {
-                    if (t.sprint === selectedSprint) return false;
+                    if (!t || t.sprint === selectedSprint) return false;
                     if (!isStory(t.issue_type)) return false;
                     if (Array.isArray(t.labels) && t.labels.includes("No_Reportar")) return false;
                     return getEffectiveCreatedSprint(t) === t.sprint && !reportedKeys.has(t.jira_key);
                 })
-                .forEach((t) => opts.add(t.sprint));
+                .forEach((t) => {
+                    if (t.sprint) opts.add(t.sprint);
+                });
         }
         // Quitar el sprint actual de las opciones (no es deuda)
         opts.delete(selectedSprint);
-        return sortSprints([...opts]);
+        return sortSprints([...opts].filter(Boolean));
     }, [historias, selectedSprint, getEffectiveCreatedSprint, reportedKeys]);
 
     // Filtrar por sprint + deuda técnica (multi) + etiqueta

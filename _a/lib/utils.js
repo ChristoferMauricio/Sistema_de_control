@@ -203,12 +203,16 @@ export function getInitials(name) {
  * @returns {string[]} Nuevo arreglo ordenado (no modifica el original)
  */
 export function sortSprints(sprints) {
-  return [...sprints].sort((a, b) => {
+  if (!Array.isArray(sprints)) return [];
+  const validSprints = sprints.filter((s) => typeof s === "string" && s.trim() !== "");
+  return validSprints.sort((a, b) => {
+    const strA = String(a || "");
+    const strB = String(b || "");
     // Extraer numeros de iteracion F3.XX y Tablero Sprint X mediante expresiones regulares
-    const iterA = a.match(/F3[,.](\d+)/i);
-    const iterB = b.match(/F3[,.](\d+)/i);
-    const tabA  = a.match(/Tablero\s+Sprint\s+(\d+)/i);
-    const tabB  = b.match(/Tablero\s+Sprint\s+(\d+)/i);
+    const iterA = strA.match(/F3[,.](\d+)/i);
+    const iterB = strB.match(/F3[,.](\d+)/i);
+    const tabA  = strA.match(/Tablero\s+Sprint\s+(\d+)/i);
+    const tabB  = strB.match(/Tablero\s+Sprint\s+(\d+)/i);
 
     // Si ambos son iteraciones F3, ordenar descendente (mayor numero primero)
     if (iterA && iterB) return parseInt(iterB[1]) - parseInt(iterA[1]);
@@ -221,7 +225,7 @@ export function sortSprints(sprints) {
     if (tabA)  return -1;
     if (tabB)  return  1;
     // Para el resto, ordenar alfabeticamente
-    return a.localeCompare(b);
+    return strA.localeCompare(strB);
   });
 }
 
