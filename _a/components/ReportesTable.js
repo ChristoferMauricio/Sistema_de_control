@@ -567,16 +567,18 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
     const [deudaTecnicaFilters, setDeudaTecnicaFilters] = useState([]);
     const [deudaDropdownOpen, setDeudaDropdownOpen] = useState(false);
     const [labelFilter, setLabelFilter] = useState("reportar"); // "todo" | "reportar" | "no_reportar"
+    const [reportadoFilter, setReportadoFilter] = useState("todos"); // "todos" | "si" | "no"
     const [hideCarolina, setHideCarolina] = useState(true);
     const [persons, setPersons] = useState([]);
     const [equipo, setEquipo] = useState([]);
     const [deudaExclusions, setDeudaExclusions] = useState(new Set());
-    const [reportedKeys, setReportedKeys] = useState(new Set());
+    const [reportedData, setReportedData] = useState([]); // [{story_key, sprint}]
     const deudaDropdownRef = useRef(null);
 
-    // Reset Deuda Técnica when current sprint changes
+    // Reset Deuda Técnica and Reportado when current sprint changes
     useEffect(() => {
         setDeudaTecnicaFilters([]);
+        setReportadoFilter("todos");
     }, [selectedSprint]);
 
     // Close dropdown when clicking outside
@@ -596,12 +598,12 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
             supabase.from("jira_persons").select("email, display_name"),
             supabase.from("equipo_desarrollo").select("nombre, nombre_clave, correo_pgim, correo_gcorp"),
             supabase.from("deuda_tecnica_exclusions").select("story_key"),
-            supabase.from("hu_reportadas").select("story_key"),
+            supabase.from("hu_reportadas").select("story_key, sprint"),
         ]).then(([personsRes, equipoRes, exclusionsRes, huReportadasRes]) => {
             if (personsRes.data) setPersons(personsRes.data);
             if (equipoRes.data) setEquipo(equipoRes.data);
             if (exclusionsRes.data) setDeudaExclusions(new Set(exclusionsRes.data.map(e => e.story_key)));
-            if (huReportadasRes.data) setReportedKeys(new Set(huReportadasRes.data.map(r => r.story_key)));
+            if (huReportadasRes.data) setReportedData(huReportadasRes.data);
         });
     }, []);
     const [traceModal, setTraceModal] = useState(null); // { assigneeName, stories }
@@ -700,7 +702,23 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
         return sortSprints([...opts].filter(Boolean));
     }, [historias, selectedSprint, getEffectiveCreatedSprint]);
 
-    // Filtrar por sprint + deuda técnica (multi) + etiqueta
+    // ── Mapa de story_keys reportadas por sprint (hu_reportadas) ──────────────
+    // Convierte el sprint de Jira ("Iteración F3.16") al formato de hu_reportadas ("Iteración 16")
+    const reportedKeysForSprint = useMemo(() => {
+        if (!selectedSprint) return new Set();
+        // Extraer número del sprint Jira: "Iteración F3.16" → 16, "Iteración F3.01" → 1
+        const numMatch = selectedSprint.match(/F3[.,](\d+)/i);
+        if (!numMatch) return new Set();
+        const sprintNum = parseInt(numMatch[1], 10);
+        const huSprintName = `Iteración ${sprintNum}`;
+        return new Set(
+            reportedData
+                .filter(r => r.sprint === huSprintName)
+                .map(r => r.story_key)
+        );
+    }, [selectedSprint, reportedData]);
+
+    // Filtrar por sprint + deuda técnica (multi) + etiqueta + reportado
     const filtered = useMemo(() => {
         let result = historias;
         if (selectedSprint) result = result.filter((t) => t.sprint === selectedSprint);
@@ -709,8 +727,14 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
         }
         if (labelFilter === "reportar") result = result.filter((t) => !Array.isArray(t.labels) || !t.labels.includes("No_Reportar"));
         if (labelFilter === "no_reportar") result = result.filter((t) => Array.isArray(t.labels) && t.labels.includes("No_Reportar"));
+        // Filtro REPORTADO: si hay sprint seleccionado, filtrar por si la historia fue reportada
+        if (selectedSprint && reportadoFilter === "si") {
+            result = result.filter((t) => reportedKeysForSprint.has(t.jira_key));
+        } else if (selectedSprint && reportadoFilter === "no") {
+            result = result.filter((t) => !reportedKeysForSprint.has(t.jira_key));
+        }
         return result;
-    }, [historias, selectedSprint, deudaTecnicaFilters, labelFilter, getEffectiveCreatedSprint]);
+    }, [historias, selectedSprint, deudaTecnicaFilters, labelFilter, getEffectiveCreatedSprint, reportadoFilter, reportedKeysForSprint]);
 
     // ── Subtareas de soporte e incidencias ────────────────────────────────────
     // Filtra subtareas que pertenecen a historias de la epica PF3-1799 (estabilizacion)
@@ -1150,6 +1174,27 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                                 <option value="todo">Todo</option>
                                 <option value="reportar">Reportar</option>
                                 <option value="no_reportar">No Reportar</option>
+                            </select>
+                        </div>
+
+                        {/* Reportado Filter */}
+                        <div className="flex items-center gap-2">
+                            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Reportado:</span>
+                            <select
+                                value={reportadoFilter}
+                                onChange={(e) => setReportadoFilter(e.target.value)}
+                                disabled={!selectedSprint}
+                                title={!selectedSprint ? "Selecciona un Sprint primero" : ""}
+                                className={`px-3 py-2 rounded-xl border text-xs font-medium focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[110px] shadow-sm transition-colors ${!selectedSprint
+                                    ? "bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed"
+                                    : reportadoFilter !== "todos"
+                                        ? "border-orange-300 bg-orange-50 text-orange-700 font-bold"
+                                        : "border-gray-200 bg-white text-gray-700"
+                                    }`}
+                            >
+                                <option value="todos">Todos</option>
+                                <option value="si">Sí</option>
+                                <option value="no">No</option>
                             </select>
                         </div>
 
