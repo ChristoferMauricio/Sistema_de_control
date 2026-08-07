@@ -563,7 +563,8 @@ function TicketListModal({ title, assigneeName, items, onClose }) {
  * @param {Array}  props.nombres  - Datos de la tabla "Nombres" para mapeo Programador -> Nombre
  */
 export default function ReportesTable({ tickets = [], nombres = [] }) {
-    const [selectedSprint, setSelectedSprint] = useState(() => getCurrentSprint(new Date())?.iteracion || "");
+    const [selectedSprints, setSelectedSprints] = useState(() => { const c = getCurrentSprint(new Date())?.iteracion; return c ? [c] : []; });
+    const [sprintDropdownOpen, setSprintDropdownOpen] = useState(false);
     const [deudaTecnicaFilters, setDeudaTecnicaFilters] = useState([]);
     const [deudaDropdownOpen, setDeudaDropdownOpen] = useState(false);
     const [labelFilter, setLabelFilter] = useState("reportar"); // "todo" | "reportar" | "no_reportar"
@@ -573,17 +574,21 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
     const [equipo, setEquipo] = useState([]);
     const [deudaExclusions, setDeudaExclusions] = useState(new Set());
     const [reportedData, setReportedData] = useState([]); // [{story_key, sprint}]
+    const sprintDropdownRef = useRef(null);
     const deudaDropdownRef = useRef(null);
 
     // Reset Deuda Técnica and Reportado when current sprint changes
     useEffect(() => {
         setDeudaTecnicaFilters([]);
         setReportadoFilter("todos");
-    }, [selectedSprint]);
+    }, [selectedSprints]);
 
-    // Close dropdown when clicking outside
+    // Close dropdowns when clicking outside
     useEffect(() => {
         function handleClickOutside(e) {
+            if (sprintDropdownRef.current && !sprintDropdownRef.current.contains(e.target)) {
+                setSprintDropdownOpen(false);
+            }
             if (deudaDropdownRef.current && !deudaDropdownRef.current.contains(e.target)) {
                 setDeudaDropdownOpen(false);
             }
@@ -610,24 +615,30 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
     const [subtasksModal, setSubtasksModal] = useState(null); // { assigneeName, subtasks }
     const [detailModal, setDetailModal] = useState(null); // { title, assigneeName, items }
 
-    // Sincronizar selectedSprint con parámetro URL ?sprint=
+    // Sincronizar selectedSprints con parámetro URL ?sprint=
     useEffect(() => {
         if (typeof window === "undefined") return;
         const params = new URLSearchParams(window.location.search);
         const sprintParam = params.get("sprint");
-        if (sprintParam !== null) setSelectedSprint(sprintParam);
+        if (sprintParam !== null) {
+            const parsed = sprintParam.split(",").map(s => s.trim()).filter(Boolean);
+            if (parsed.length > 0) setSelectedSprints(parsed);
+        }
     }, []);
 
     useEffect(() => {
         if (typeof window === "undefined") return;
         const params = new URLSearchParams(window.location.search);
-        if (selectedSprint) params.set("sprint", selectedSprint);
+        if (selectedSprints.length > 0) params.set("sprint", selectedSprints.join(","));
         else params.delete("sprint");
         const newUrl = params.toString()
             ? `${window.location.pathname}?${params.toString()}`
             : window.location.pathname;
         window.history.replaceState({}, "", newUrl);
-    }, [selectedSprint]);
+    }, [selectedSprints]);
+
+    const hasSprintFilter = selectedSprints.length > 0;
+    const selectedSprintSet = useMemo(() => new Set(selectedSprints), [selectedSprints]);
 
     // Helpers para tipos de issue
     const isStory = (type) => (type || "").toLowerCase().includes("histori") || (type || "").toLowerCase() === "story";
@@ -679,7 +690,7 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
     // Detectar si el sprint seleccionado pertenece al tablero PF3QA
     // (los sprints del tablero QA tienen formato "Tablero Sprint N")
     // para ocultar la columna de soporte e incidencias
-    const isPF3QA = /Tablero\s+Sprint/i.test(selectedSprint);
+    const isPF3QA = hasSprintFilter && selectedSprints.every(s => /Tablero\s+Sprint/i.test(s));
 
     // Resolver created_sprint efectivo: si la historia está excluida, usar su sprint actual
     const getEffectiveCreatedSprint = useCallback((t) => {
@@ -690,51 +701,52 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
     // Opciones del filtro de Deuda Técnica dependiente
     const deudaTecnicaOptions = useMemo(() => {
         let ticketsForOptions = historias;
-        if (selectedSprint) {
-            ticketsForOptions = ticketsForOptions.filter((t) => t.sprint === selectedSprint);
+        if (hasSprintFilter) {
+            ticketsForOptions = ticketsForOptions.filter((t) => selectedSprintSet.has(t.sprint));
         }
         const opts = new Set();
         ticketsForOptions.forEach((t) => {
             const sc = getEffectiveCreatedSprint(t);
             if (sc) opts.add(sc);
         });
-        opts.delete(selectedSprint);
+        selectedSprints.forEach(s => opts.delete(s));
         return sortSprints([...opts].filter(Boolean));
-    }, [historias, selectedSprint, getEffectiveCreatedSprint]);
+    }, [historias, selectedSprints, selectedSprintSet, hasSprintFilter, getEffectiveCreatedSprint]);
 
     // ── Mapa de story_keys reportadas por sprint (hu_reportadas) ──────────────
     // Convierte el sprint de Jira ("Iteración F3.16") al formato de hu_reportadas ("Iteración 16")
     const reportedKeysForSprint = useMemo(() => {
-        if (!selectedSprint) return new Set();
-        // Extraer número del sprint Jira: "Iteración F3.16" → 16, "Iteración F3.01" → 1
-        const numMatch = selectedSprint.match(/F3[.,](\d+)/i);
-        if (!numMatch) return new Set();
-        const sprintNum = parseInt(numMatch[1], 10);
-        const huSprintName = `Iteración ${sprintNum}`;
+        if (!hasSprintFilter) return new Set();
+        const huSprintNames = new Set();
+        selectedSprints.forEach(sp => {
+            const numMatch = sp.match(/F3[.,](\d+)/i);
+            if (numMatch) huSprintNames.add(`Iteración ${parseInt(numMatch[1], 10)}`);
+        });
+        if (huSprintNames.size === 0) return new Set();
         return new Set(
             reportedData
-                .filter(r => r.sprint === huSprintName)
+                .filter(r => huSprintNames.has(r.sprint))
                 .map(r => r.story_key)
         );
-    }, [selectedSprint, reportedData]);
+    }, [selectedSprints, hasSprintFilter, reportedData]);
 
     // Filtrar por sprint + deuda técnica (multi) + etiqueta + reportado
     const filtered = useMemo(() => {
         let result = historias;
-        if (selectedSprint) result = result.filter((t) => t.sprint === selectedSprint);
+        if (hasSprintFilter) result = result.filter((t) => selectedSprintSet.has(t.sprint));
         if (deudaTecnicaFilters.length > 0) {
             result = result.filter((t) => deudaTecnicaFilters.includes(getEffectiveCreatedSprint(t)));
         }
         if (labelFilter === "reportar") result = result.filter((t) => !Array.isArray(t.labels) || !t.labels.includes("No_Reportar"));
         if (labelFilter === "no_reportar") result = result.filter((t) => Array.isArray(t.labels) && t.labels.includes("No_Reportar"));
         // Filtro REPORTADO: si hay sprint seleccionado, filtrar por si la historia fue reportada
-        if (selectedSprint && reportadoFilter === "si") {
+        if (hasSprintFilter && reportadoFilter === "si") {
             result = result.filter((t) => reportedKeysForSprint.has(t.jira_key));
-        } else if (selectedSprint && reportadoFilter === "no") {
+        } else if (hasSprintFilter && reportadoFilter === "no") {
             result = result.filter((t) => !reportedKeysForSprint.has(t.jira_key));
         }
         return result;
-    }, [historias, selectedSprint, deudaTecnicaFilters, labelFilter, getEffectiveCreatedSprint, reportadoFilter, reportedKeysForSprint]);
+    }, [historias, hasSprintFilter, selectedSprintSet, deudaTecnicaFilters, labelFilter, getEffectiveCreatedSprint, reportadoFilter, reportedKeysForSprint]);
 
     // ── Subtareas de soporte e incidencias ────────────────────────────────────
     // Filtra subtareas que pertenecen a historias de la epica PF3-1799 (estabilizacion)
@@ -764,7 +776,7 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
             if (Array.isArray(t.labels) && t.labels.includes("No_Reportar")) return false;
 
             // Second, it must pass the sprint filter if one is selected
-            if (selectedSprint && !(t.sprint === selectedSprint || storyKeysBySprint.has(t.parent_key))) return false;
+            if (hasSprintFilter && !(selectedSprintSet.has(t.sprint) || storyKeysBySprint.has(t.parent_key))) return false;
 
             // Si el filtro de Deuda Técnica está activo, la subtarea debe pertenecer a una historia que coincida con el filtro
             if (deudaTecnicaFilters.length > 0 && !storyKeysBySprint.has(t.parent_key)) return false;
@@ -775,7 +787,7 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
 
             return true;
         });
-    }, [tickets, selectedSprint, filtered, labelFilter, deudaTecnicaFilters]);
+    }, [tickets, hasSprintFilter, selectedSprintSet, filtered, labelFilter, deudaTecnicaFilters]);
 
     // Crear mapa de Programador → Nombre (case-insensitive)
     // nameMap: jiraDisplayName.lower → alias personalizado (tabla Nombres)
@@ -1032,7 +1044,7 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
      * Exporta a Excel unificado con tablas dinámicas (Osi + Datos QA).
      * Delega al módulo compartido exportExcel.js
      */
-    const exportToExcel = () => exportUnifiedExcel(selectedSprint);
+    const exportToExcel = () => exportUnifiedExcel(selectedSprints.length === 1 ? selectedSprints[0] : selectedSprints.join(", "));
 
     return (
         <>
@@ -1060,27 +1072,73 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
 
                     {/* Filters Bar */}
                     <div className="flex flex-wrap items-center gap-x-6 gap-y-3 pt-3 border-t border-gray-100">
-                        {/* Sprint Filter */}
-                        <div className="flex items-center gap-2">
+                        {/* Sprint Filter — Multi-select */}
+                        <div className="flex items-center gap-2" ref={sprintDropdownRef}>
                             <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Sprint:</span>
-                            <div className="flex items-center gap-1.5">
-                                <select
-                                    value={selectedSprint}
-                                    onChange={(e) => setSelectedSprint(e.target.value)}
-                                    className="px-3 py-2 rounded-xl border border-gray-200 text-xs font-medium text-gray-700 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[180px]"
+                            <div className="relative">
+                                <button
+                                    type="button"
+                                    onClick={() => setSprintDropdownOpen((o) => !o)}
+                                    className={`flex items-center justify-between gap-2 px-3 py-2 rounded-xl border text-xs font-medium focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[200px] shadow-sm transition-colors ${hasSprintFilter
+                                        ? "border-orange-300 bg-orange-50 text-orange-700 font-bold"
+                                        : "border-gray-200 bg-white text-gray-700 hover:border-gray-300"
+                                        }`}
                                 >
-                                    <option value="">Todos los sprints</option>
-                                    {sprints.map((s) => (
-                                        <option key={s} value={s}>{s}</option>
-                                    ))}
-                                </select>
-                                {selectedSprint && (
-                                    <button
-                                        onClick={() => setSelectedSprint("")}
-                                        className="text-xs text-orange-500 hover:text-orange-600 font-bold whitespace-nowrap"
-                                    >
-                                        Limpiar
-                                    </button>
+                                    <span className="truncate">
+                                        {selectedSprints.length === 0
+                                            ? "Todos los sprints"
+                                            : selectedSprints.length === 1
+                                                ? selectedSprints[0]
+                                                : `${selectedSprints.length} sprints seleccionados`}
+                                    </span>
+                                    <svg className={`w-3.5 h-3.5 shrink-0 transition-transform ${sprintDropdownOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                                    </svg>
+                                </button>
+
+                                {sprintDropdownOpen && (
+                                    <div className="absolute z-50 mt-1 w-full min-w-[220px] bg-white border border-gray-200 rounded-xl shadow-lg py-1 max-h-60 overflow-y-auto animate-fade-in">
+                                        {/* Select All / Clear */}
+                                        <div className="flex items-center justify-between px-3 py-1.5 border-b border-gray-100">
+                                            <button
+                                                type="button"
+                                                onClick={() => setSelectedSprints(sprints.length === selectedSprints.length ? [] : [...sprints])}
+                                                className="text-[11px] font-semibold text-orange-500 hover:text-orange-600"
+                                            >
+                                                {sprints.length === selectedSprints.length ? "Deseleccionar todo" : "Seleccionar todo"}
+                                            </button>
+                                            {selectedSprints.length > 0 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setSelectedSprints([])}
+                                                    className="text-[11px] font-semibold text-gray-400 hover:text-gray-600"
+                                                >
+                                                    Limpiar
+                                                </button>
+                                            )}
+                                        </div>
+                                        {sprints.map((s) => {
+                                            const checked = selectedSprints.includes(s);
+                                            return (
+                                                <label
+                                                    key={s}
+                                                    className={`flex items-center gap-2.5 px-3 py-1.5 cursor-pointer hover:bg-orange-50/60 transition-colors ${checked ? "bg-orange-50/40" : ""}`}
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={checked}
+                                                        onChange={() => {
+                                                            setSelectedSprints((prev) =>
+                                                                checked ? prev.filter((x) => x !== s) : [...prev, s]
+                                                            );
+                                                        }}
+                                                        className="w-3.5 h-3.5 rounded border-gray-300 text-orange-500 focus:ring-orange-500/40 accent-orange-500"
+                                                    />
+                                                    <span className={`text-xs ${checked ? "font-semibold text-orange-700" : "text-gray-600"}`}>{s}</span>
+                                                </label>
+                                            );
+                                        })}
+                                    </div>
                                 )}
                             </div>
                         </div>
@@ -1091,10 +1149,10 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                             <div className="relative">
                                 <button
                                     type="button"
-                                    onClick={() => selectedSprint && setDeudaDropdownOpen((o) => !o)}
-                                    disabled={!selectedSprint}
-                                    title={!selectedSprint ? "Selecciona un Sprint primero" : ""}
-                                    className={`flex items-center justify-between gap-2 px-3 py-2 rounded-xl border text-xs font-medium focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[200px] shadow-sm transition-colors ${!selectedSprint
+                                    onClick={() => hasSprintFilter && setDeudaDropdownOpen((o) => !o)}
+                                    disabled={!hasSprintFilter}
+                                    title={!hasSprintFilter ? "Selecciona un Sprint primero" : ""}
+                                    className={`flex items-center justify-between gap-2 px-3 py-2 rounded-xl border text-xs font-medium focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[200px] shadow-sm transition-colors ${!hasSprintFilter
                                         ? "bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed"
                                         : deudaTecnicaFilters.length > 0
                                             ? "border-orange-300 bg-orange-50 text-orange-700 font-bold"
@@ -1183,9 +1241,9 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                             <select
                                 value={reportadoFilter}
                                 onChange={(e) => setReportadoFilter(e.target.value)}
-                                disabled={!selectedSprint}
-                                title={!selectedSprint ? "Selecciona un Sprint primero" : ""}
-                                className={`px-3 py-2 rounded-xl border text-xs font-medium focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[110px] shadow-sm transition-colors ${!selectedSprint
+                                disabled={!hasSprintFilter}
+                                title={!hasSprintFilter ? "Selecciona un Sprint primero" : ""}
+                                className={`px-3 py-2 rounded-xl border text-xs font-medium focus:outline-none focus:ring-2 focus:ring-orange-500/40 min-w-[110px] shadow-sm transition-colors ${!hasSprintFilter
                                     ? "bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed"
                                     : reportadoFilter !== "todos"
                                         ? "border-orange-300 bg-orange-50 text-orange-700 font-bold"
@@ -1246,7 +1304,7 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                             {pivotData.length === 0 ? (
                                 <tr>
                                     <td colSpan={STATUS_COLUMNS.length + 2} className="px-4 py-8 text-center text-gray-400">
-                                        No hay historias {selectedSprint ? `en ${selectedSprint}` : ""}
+                                        No hay historias {hasSprintFilter ? `en ${selectedSprints.join(", ")}` : ""}
                                     </td>
                                 </tr>
                             ) : (
@@ -1368,7 +1426,7 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                     </h3>
                     <p className="text-xs text-gray-400 mt-0.5">
                         {totalsSP.total} SP totales · {pivotDataSP.length} integrante{pivotDataSP.length !== 1 ? "s" : ""}
-                        {selectedSprint ? ` · ${selectedSprint}` : ""}
+                        {hasSprintFilter ? ` · ${selectedSprints.join(", ")}` : ""}
                     </p>
                 </div>
 
@@ -1394,7 +1452,7 @@ export default function ReportesTable({ tickets = [], nombres = [] }) {
                             {pivotDataSP.length === 0 ? (
                                 <tr>
                                     <td colSpan={STATUS_COLUMNS.length + 2} className="px-4 py-8 text-center text-gray-400">
-                                        No hay historias {selectedSprint ? `en ${selectedSprint}` : ""}
+                                        No hay historias {hasSprintFilter ? `en ${selectedSprints.join(", ")}` : ""}
                                     </td>
                                 </tr>
                             ) : (
