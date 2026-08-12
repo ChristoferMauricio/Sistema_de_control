@@ -104,7 +104,7 @@ class SharedStrings {
    GENERADOR DE HOJAS
    ═══════════════════════════════════════════════════════════════════════ */
 
-function buildSheetXml(headers, rows, colWidths, sst, headerStyle = "6") {
+function buildSheetXml(headers, rows, colWidths, sst, headerStyle = "6", hiddenCols = new Set(), customHeaderStyles = {}) {
   const lastCol = colLetter(headers.length - 1);
   const lastRow = rows.length + 1;
 
@@ -121,7 +121,8 @@ function buildSheetXml(headers, rows, colWidths, sst, headerStyle = "6") {
   if (colWidths.length > 0) {
     xml += "<cols>";
     colWidths.forEach((w, i) => {
-      xml += `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`;
+      const h = hiddenCols.has(i) ? ' hidden="1"' : '';
+      xml += `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"${h}/>`;
     });
     xml += "</cols>";
   }
@@ -129,7 +130,8 @@ function buildSheetXml(headers, rows, colWidths, sst, headerStyle = "6") {
   xml += "<sheetData>";
   xml += '<row r="1" ht="22" customHeight="1">';
   headers.forEach((h, c) => {
-    xml += `<c r="${colLetter(c)}1" s="${headerStyle}" t="s"><v>${sst.getIndex(h)}</v></c>`;
+    const style = customHeaderStyles[h] || headerStyle;
+    xml += `<c r="${colLetter(c)}1" s="${style}" t="s"><v>${sst.getIndex(h)}</v></c>`;
   });
   xml += "</row>";
 
@@ -240,22 +242,22 @@ function buildOsiCacheAndPivots(rowsOsi, latestSprint, exclusionsSet) {
   defXml += '<cacheSource type="worksheet"><worksheetSource ref="A1:Q1048576" sheet="Osi"/></cacheSource>';
   defXml += '<cacheFields count="17">';
   defXml += `<cacheField name="Tipo" numFmtId="0">${si.tipo.xml}</cacheField>`;                    // 0
-  defXml += '<cacheField name="Clave" numFmtId="0"><sharedItems containsBlank="1"/></cacheField>';  // 1
-  defXml += '<cacheField name="Resumen" numFmtId="0"><sharedItems containsBlank="1" longText="1"/></cacheField>'; // 2
-  defXml += '<cacheField name="Subtareas" numFmtId="0"><sharedItems containsBlank="1"/></cacheField>'; // 3
-  defXml += '<cacheField name="Principal" numFmtId="0"><sharedItems containsBlank="1"/></cacheField>'; // 4
-  defXml += `<cacheField name="Épica" numFmtId="0">${si.epica.xml}</cacheField>`;                  // 5
-  defXml += '<cacheField name="Codigo HU" numFmtId="0"><sharedItems containsBlank="1"/></cacheField>'; // 6
-  defXml += '<cacheField name="Historia" numFmtId="0"><sharedItems containsBlank="1"/></cacheField>'; // 7
-  defXml += `<cacheField name="Sprint" numFmtId="0">${si.sprint.xml}</cacheField>`;                // 8
-  defXml += `<cacheField name="Persona asignada" numFmtId="0">${si.asignado.xml}</cacheField>`;    // 9
-  defXml += '<cacheField name="Story Points" numFmtId="0"><sharedItems containsBlank="1" containsMixedTypes="1" containsNumber="1" containsInteger="1" minValue="1" maxValue="20"/></cacheField>'; // 10
-  defXml += `<cacheField name="Estado" numFmtId="0">${si.estado.xml}</cacheField>`;                // 11
-  defXml += '<cacheField name="Informador" numFmtId="0"><sharedItems containsBlank="1"/></cacheField>'; // 12
-  defXml += '<cacheField name="Creada" numFmtId="0"><sharedItems containsBlank="1"/></cacheField>'; // 13
-  defXml += `<cacheField name="Etiquetas" numFmtId="0">${si.etiquetas.xml}</cacheField>`;                // 14
-  defXml += `<cacheField name="Sprint Creado" numFmtId="0">${si.sprintCreado.xml}</cacheField>`; // 15
-  defXml += '<cacheField name="HU Reportada" numFmtId="0"><sharedItems containsBlank="1"/></cacheField>'; // 16
+  defXml += '<cacheField name="HU Reportada" numFmtId="0"><sharedItems containsBlank="1"/></cacheField>'; // 1
+  defXml += '<cacheField name="Clave" numFmtId="0"><sharedItems containsBlank="1"/></cacheField>';  // 2
+  defXml += '<cacheField name="Resumen" numFmtId="0"><sharedItems containsBlank="1" longText="1"/></cacheField>'; // 3
+  defXml += '<cacheField name="Subtareas" numFmtId="0"><sharedItems containsBlank="1"/></cacheField>'; // 4
+  defXml += '<cacheField name="Principal" numFmtId="0"><sharedItems containsBlank="1"/></cacheField>'; // 5
+  defXml += `<cacheField name="Épica" numFmtId="0">${si.epica.xml}</cacheField>`;                  // 6
+  defXml += '<cacheField name="Codigo HU" numFmtId="0"><sharedItems containsBlank="1"/></cacheField>'; // 7
+  defXml += '<cacheField name="Historia" numFmtId="0"><sharedItems containsBlank="1"/></cacheField>'; // 8
+  defXml += `<cacheField name="Sprint" numFmtId="0">${si.sprint.xml}</cacheField>`;                // 9
+  defXml += `<cacheField name="Persona asignada" numFmtId="0">${si.asignado.xml}</cacheField>`;    // 10
+  defXml += '<cacheField name="Story Points" numFmtId="0"><sharedItems containsBlank="1" containsMixedTypes="1" containsNumber="1" containsInteger="1" minValue="1" maxValue="20"/></cacheField>'; // 11
+  defXml += `<cacheField name="Estado" numFmtId="0">${si.estado.xml}</cacheField>`;                // 12
+  defXml += '<cacheField name="Informador" numFmtId="0"><sharedItems containsBlank="1"/></cacheField>'; // 13
+  defXml += '<cacheField name="Creada" numFmtId="0"><sharedItems containsBlank="1"/></cacheField>'; // 14
+  defXml += `<cacheField name="Etiquetas" numFmtId="0">${si.etiquetas.xml}</cacheField>`;                // 15
+  defXml += `<cacheField name="Sprint Creado" numFmtId="0">${si.sprintCreado.xml}</cacheField>`; // 16
   defXml += '</cacheFields></pivotCacheDefinition>';
 
   // 4. Pivot cache records
@@ -275,23 +277,23 @@ function buildOsiCacheAndPivots(rowsOsi, latestSprint, exclusionsSet) {
     const sp = r["Story Points"];
     recXml += "<r>";
     recXml += `<x v="${getIdx(si.tipo, r.Tipo, !r.Tipo)}"/>`;         // 0 Tipo
-    recXml += `<s v="${escXml(r.Clave)}"/>`;                           // 1 Clave
-    recXml += `<s v="${escXml(r.Resumen)}"/>`;                         // 2 Resumen
-    recXml += `<s v="${escXml(r.Subtareas)}"/>`;                       // 3 Subtareas
-    recXml += `<s v="${escXml(r.Principal)}"/>`;                       // 4 Principal
-    recXml += `<x v="${getIdx(si.epica, ep, !ep)}"/>`;                 // 5 Épica
-    recXml += `<s v="${escXml(r["Codigo HU"])}"/>`;                    // 6 Codigo HU
-    recXml += `<s v="${escXml(r.Historia)}"/>`;                        // 7 Historia
-    recXml += `<x v="${getIdx(si.sprint, r.Sprint, !r.Sprint)}"/>`;    // 8 Sprint
-    recXml += `<x v="${getIdx(si.asignado, a, !a || a === "—")}"/>`;   // 9 Asignado
-    if (sp === "" || sp == null) recXml += "<m/>";                     // 10 SP
+    recXml += `<s v="${escXml(r["HU Reportada"])}"/>`;                // 1 HU Reportada
+    recXml += `<s v="${escXml(r.Clave)}"/>`;                          // 2 Clave
+    recXml += `<s v="${escXml(r.Resumen)}"/>`;                        // 3 Resumen
+    recXml += `<s v="${escXml(r.Subtareas)}"/>`;                      // 4 Subtareas
+    recXml += `<s v="${escXml(r.Principal)}"/>`;                      // 5 Principal
+    recXml += `<x v="${getIdx(si.epica, ep, !ep)}"/>`;                 // 6 Épica
+    recXml += `<s v="${escXml(r["Codigo HU"])}"/>`;                    // 7 Codigo HU
+    recXml += `<s v="${escXml(r.Historia)}"/>`;                        // 8 Historia
+    recXml += `<x v="${getIdx(si.sprint, r.Sprint, !r.Sprint)}"/>`;    // 9 Sprint
+    recXml += `<x v="${getIdx(si.asignado, a, !a || a === "—")}"/>`;   // 10 Asignado
+    if (sp === "" || sp == null) recXml += "<m/>";                     // 11 SP
     else recXml += `<n v="${sp}"/>`;
-    recXml += `<x v="${getIdx(si.estado, r.Estado, !r.Estado)}"/>`;    // 11 Estado
-    recXml += `<s v="${escXml(r.Informador)}"/>`;                      // 12 Informador
-    recXml += `<s v="${escXml(r.Creada)}"/>`;                          // 13 Creada
-    recXml += `<x v="${getIdx(si.etiquetas, r.Etiquetas, !r.Etiquetas)}"/>`;   // 14 Etiquetas
-    recXml += `<x v="${getIdx(si.sprintCreado, r["Sprint Creado"], !r["Sprint Creado"])}"/>`; // 15 Sprint Creado
-    recXml += `<s v="${escXml(r["HU Reportada"])}"/>`;                 // 16 HU Reportada
+    recXml += `<x v="${getIdx(si.estado, r.Estado, !r.Estado)}"/>`;    // 12 Estado
+    recXml += `<s v="${escXml(r.Informador)}"/>`;                      // 13 Informador
+    recXml += `<s v="${escXml(r.Creada)}"/>`;                          // 14 Creada
+    recXml += `<x v="${getIdx(si.etiquetas, r.Etiquetas, !r.Etiquetas)}"/>`;   // 15 Etiquetas
+    recXml += `<x v="${getIdx(si.sprintCreado, r["Sprint Creado"], !r["Sprint Creado"])}"/>`; // 16 Sprint Creado
     recXml += "</r>";
   });
   recXml += "</pivotCacheRecords>";
@@ -365,37 +367,37 @@ function buildOsiCacheAndPivots(rowsOsi, latestSprint, exclusionsSet) {
   function pf(role, items) { return `<pivotField${role} showAll="0">${items}</pivotField>`; }
   const pfSimple = '<pivotField showAll="0"/>';
 
-  // Page fields: Tipo(0), Sprint(8), Etiquetas(14), Sprint Creado(15)
-  const pageFields4 = '<pageFields count="4"><pageField fld="0" hier="-1"/><pageField fld="8" hier="-1"/><pageField fld="14" hier="-1"/><pageField fld="15" hier="-1"/></pageFields>';
-  const dataFields1 = '<dataFields count="1"><dataField name="Cuenta de Clave" fld="1" subtotal="count" baseField="0" baseItem="0"/></dataFields>';
-  const dataFields2 = '<dataFields count="1"><dataField name="Suma de Story Points" fld="10" baseField="9" baseItem="0"/></dataFields>';
+  // Page fields: Tipo(0), Sprint(9), Etiquetas(15)
+  const pageFields4 = '<pageFields count="3"><pageField fld="0" hier="-1"/><pageField fld="9" hier="-1"/><pageField fld="15" hier="-1"/></pageFields>';
+  const dataFields1 = '<dataFields count="1"><dataField name="Cuenta de Clave" fld="2" subtotal="count" baseField="0" baseItem="0"/></dataFields>';
+  const dataFields2 = '<dataFields count="1"><dataField name="Suma de Story Points" fld="11" baseField="10" baseItem="0"/></dataFields>';
 
   // --- PT1: TablaDinámica2 — Sprint Actual (HU count) ---
   let pt1 = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
   pt1 += `<pivotTableDefinition xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" name="TablaDinámica2" cacheId="0"${ptAttrs}>`;
   pt1 += '<location ref="A8:F18" firstHeaderRow="1" firstDataRow="2" firstDataCol="1" rowPageCount="4" colPageCount="2"/>';
   pt1 += '<pivotFields count="17">';
-  pt1 += pf(' axis="axisPage" multipleItemSelectionAllowed="1"', tipoFieldItems);  // 0
-  pt1 += '<pivotField dataField="1" showAll="0"/>';                                 // 1
-  pt1 += pfSimple;  // 2
-  pt1 += pfSimple;  // 3
-  pt1 += pfSimple;  // 4
-  pt1 += pfSimple;  // 5
-  pt1 += pfSimple;  // 6
-  pt1 += pfSimple;  // 7
-  pt1 += pf(' axis="axisPage" multipleItemSelectionAllowed="1"', sprintFieldItems); // 8
-  pt1 += pf(' axis="axisRow"', asignadoFieldItems);                                 // 9
-  pt1 += pfSimple;  // 10
-  pt1 += pf(' axis="axisCol"', estadoFieldItems);                                   // 11
-  pt1 += pfSimple;  // 12
-  pt1 += pfSimple;  // 13
-  pt1 += pf(' axis="axisPage" multipleItemSelectionAllowed="1"', etiquetasFieldItems); // 14
-  pt1 += pf(' axis="axisPage" multipleItemSelectionAllowed="1"', sprintCreadoFieldItemsActual); // 15
-  pt1 += pfSimple;  // 16 HU Reportada
+  pt1 += pf(' axis="axisPage" multipleItemSelectionAllowed="1"', tipoFieldItems);  // 0 Tipo
+  pt1 += pfSimple;  // 1 HU Reportada
+  pt1 += '<pivotField dataField="1" showAll="0"/>';                                 // 2 Clave
+  pt1 += pfSimple;  // 3 Resumen
+  pt1 += pfSimple;  // 4 Subtareas
+  pt1 += pfSimple;  // 5 Principal
+  pt1 += pfSimple;  // 6 Épica
+  pt1 += pfSimple;  // 7 Codigo HU
+  pt1 += pfSimple;  // 8 Historia
+  pt1 += pf(' axis="axisPage" multipleItemSelectionAllowed="1"', sprintFieldItems); // 9 Sprint
+  pt1 += pf(' axis="axisRow"', asignadoFieldItems);                                 // 10 Asignado
+  pt1 += pfSimple;  // 11 Story Points
+  pt1 += pf(' axis="axisCol"', estadoFieldItems);                                   // 12 Estado
+  pt1 += pfSimple;  // 13 Informador
+  pt1 += pfSimple;  // 14 Creada
+  pt1 += pf(' axis="axisPage" multipleItemSelectionAllowed="1"', etiquetasFieldItems); // 15 Etiquetas
+  pt1 += pfSimple;  // 16 Sprint Creado
   pt1 += '</pivotFields>';
-  pt1 += '<rowFields count="1"><field x="9"/></rowFields>';
+  pt1 += '<rowFields count="1"><field x="10"/></rowFields>';
   pt1 += rowItemsAsignado;
-  pt1 += '<colFields count="1"><field x="11"/></colFields>';
+  pt1 += '<colFields count="1"><field x="12"/></colFields>';
   pt1 += colItemsEstado;
   pt1 += pageFields4;
   pt1 += dataFields1;
@@ -407,27 +409,27 @@ function buildOsiCacheAndPivots(rowsOsi, latestSprint, exclusionsSet) {
   pt2 += `<pivotTableDefinition xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" name="TablaDinámica3" cacheId="0"${ptAttrs}>`;
   pt2 += '<location ref="I8:N18" firstHeaderRow="1" firstDataRow="2" firstDataCol="1" rowPageCount="4" colPageCount="2"/>';
   pt2 += '<pivotFields count="17">';
-  pt2 += pf(' axis="axisPage" multipleItemSelectionAllowed="1"', tipoFieldItems);
-  pt2 += pfSimple;  // 1
-  pt2 += pfSimple;  // 2
-  pt2 += pfSimple;  // 3
-  pt2 += pfSimple;  // 4
-  pt2 += pfSimple;  // 5
-  pt2 += pfSimple;  // 6
-  pt2 += pfSimple;  // 7
-  pt2 += pf(' axis="axisPage" multipleItemSelectionAllowed="1"', sprintFieldItems);
-  pt2 += pf(' axis="axisRow"', asignadoFieldItems);
-  pt2 += '<pivotField dataField="1" showAll="0"/>';  // 10 SP
-  pt2 += pf(' axis="axisCol"', estadoFieldItems);
-  pt2 += pfSimple;  // 12
-  pt2 += pfSimple;  // 13
-  pt2 += pf(' axis="axisPage" multipleItemSelectionAllowed="1"', etiquetasFieldItems); // 14
-  pt2 += pf(' axis="axisPage" multipleItemSelectionAllowed="1"', sprintCreadoFieldItemsActual); // 15
-  pt2 += pfSimple;  // 16 HU Reportada
+  pt2 += pf(' axis="axisPage" multipleItemSelectionAllowed="1"', tipoFieldItems);  // 0 Tipo
+  pt2 += pfSimple;  // 1 HU Reportada
+  pt2 += pfSimple;  // 2 Clave
+  pt2 += pfSimple;  // 3 Resumen
+  pt2 += pfSimple;  // 4 Subtareas
+  pt2 += pfSimple;  // 5 Principal
+  pt2 += pfSimple;  // 6 Épica
+  pt2 += pfSimple;  // 7 Codigo HU
+  pt2 += pfSimple;  // 8 Historia
+  pt2 += pf(' axis="axisPage" multipleItemSelectionAllowed="1"', sprintFieldItems); // 9 Sprint
+  pt2 += pf(' axis="axisRow"', asignadoFieldItems);                                 // 10 Asignado
+  pt2 += '<pivotField dataField="1" showAll="0"/>';                                 // 11 Story Points
+  pt2 += pf(' axis="axisCol"', estadoFieldItems);                                   // 12 Estado
+  pt2 += pfSimple;  // 13 Informador
+  pt2 += pfSimple;  // 14 Creada
+  pt2 += pf(' axis="axisPage" multipleItemSelectionAllowed="1"', etiquetasFieldItems); // 15 Etiquetas
+  pt2 += pfSimple;  // 16 Sprint Creado
   pt2 += '</pivotFields>';
-  pt2 += '<rowFields count="1"><field x="9"/></rowFields>';
+  pt2 += '<rowFields count="1"><field x="10"/></rowFields>';
   pt2 += rowItemsAsignado;
-  pt2 += '<colFields count="1"><field x="11"/></colFields>';
+  pt2 += '<colFields count="1"><field x="12"/></colFields>';
   pt2 += colItemsEstado;
   pt2 += pageFields4;
   pt2 += dataFields2;
@@ -499,32 +501,32 @@ function buildOsiCacheAndPivots(rowsOsi, latestSprint, exclusionsSet) {
   pt7 += '</pivotTableDefinition>';
 
   // --- PT3: TablaEpica — Reporte por Épica (HU count + SP sum) ---
-  const pageFields3 = '<pageFields count="3"><pageField fld="0" hier="-1"/><pageField fld="8" hier="-1"/><pageField fld="14" hier="-1"/></pageFields>';
-  const dataFields3 = '<dataFields count="2"><dataField name="HU" fld="11" subtotal="count"/><dataField name="Puntos" fld="10" subtotal="sum"/></dataFields>';
+  const pageFields3 = '<pageFields count="3"><pageField fld="0" hier="-1"/><pageField fld="9" hier="-1"/><pageField fld="15" hier="-1"/></pageFields>';
+  const dataFields3 = '<dataFields count="2"><dataField name="HU" fld="12" subtotal="count"/><dataField name="Puntos" fld="11" subtotal="sum"/></dataFields>';
 
   let pt3 = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
   pt3 += `<pivotTableDefinition xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" name="TablaEpica" cacheId="0"${ptAttrs}>`;
   pt3 += '<location ref="A4:C50" firstHeaderRow="1" firstDataRow="2" firstDataCol="1" rowPageCount="2" colPageCount="2"/>';
   pt3 += '<pivotFields count="17">';
-  pt3 += pf(' axis="axisPage" multipleItemSelectionAllowed="1"', tipoFieldItems);
-  pt3 += pfSimple;  // 1
-  pt3 += pfSimple;  // 2
-  pt3 += pfSimple;  // 3
-  pt3 += pfSimple;  // 4
-  pt3 += pf(' axis="axisRow"', epicaFieldItems);  // 5
-  pt3 += pfSimple;  // 6
-  pt3 += pfSimple;  // 7
-  pt3 += pf(' axis="axisPage" multipleItemSelectionAllowed="1"', sprintFieldItems);
-  pt3 += pfSimple;  // 9
-  pt3 += '<pivotField dataField="1" showAll="0"/>';  // 10 SP
-  pt3 += '<pivotField dataField="1" showAll="0"/>';  // 11 Estado (count)
-  pt3 += pfSimple;  // 12
-  pt3 += pfSimple;  // 13
-  pt3 += pf(' axis="axisPage" multipleItemSelectionAllowed="1"', etiquetasFieldItems); // 14
-  pt3 += pfSimple;  // 15 Sprint Creado
-  pt3 += pfSimple;  // 16 HU Reportada
+  pt3 += pf(' axis="axisPage" multipleItemSelectionAllowed="1"', tipoFieldItems);  // 0 Tipo
+  pt3 += pfSimple;  // 1 HU Reportada
+  pt3 += pfSimple;  // 2 Clave
+  pt3 += pfSimple;  // 3 Resumen
+  pt3 += pfSimple;  // 4 Subtareas
+  pt3 += pfSimple;  // 5 Principal
+  pt3 += pf(' axis="axisRow"', epicaFieldItems);                                  // 6 Épica
+  pt3 += pfSimple;  // 7 Codigo HU
+  pt3 += pfSimple;  // 8 Historia
+  pt3 += pf(' axis="axisPage" multipleItemSelectionAllowed="1"', sprintFieldItems); // 9 Sprint
+  pt3 += pfSimple;  // 10 Asignado
+  pt3 += '<pivotField dataField="1" showAll="0"/>';                                 // 11 SP
+  pt3 += '<pivotField dataField="1" showAll="0"/>';                                 // 12 Estado (count)
+  pt3 += pfSimple;  // 13 Informador
+  pt3 += pfSimple;  // 14 Creada
+  pt3 += pf(' axis="axisPage" multipleItemSelectionAllowed="1"', etiquetasFieldItems); // 15 Etiquetas
+  pt3 += pfSimple;  // 16 Sprint Creado
   pt3 += '</pivotFields>';
-  pt3 += '<rowFields count="1"><field x="5"/></rowFields>';
+  pt3 += '<rowFields count="1"><field x="6"/></rowFields>';
   pt3 += rowItemsEpica;
   pt3 += '<colFields count="1"><field x="-2"/></colFields>';
   pt3 += '<colItems count="2"><i/><i><x v="1"/></i></colItems>';
@@ -814,7 +816,8 @@ async function customizeTemplate(zip) {
   // xfId=7: Banner Titulo Sprint Actual (fontId=4, fillId=3 - azul, alineado izq, centrado vert)
   // xfId=8: Banner Titulo Deuda Técnica (fontId=4, fillId=4 - naranja, alineado izq, centrado vert)
   // xfId=9: Subtitulo Deuda Técnica (fontId=5, fillId=0, alineado izq, centrado vert)
-  sty = sty.replace('<cellXfs count="6"', '<cellXfs count="10"');
+  // xfId=10: Encabezado HU Reportada (fontId=3, fillId=4 - naranja + blanco + centrado + borde)
+  sty = sty.replace('<cellXfs count="6"', '<cellXfs count="11"');
   sty = sty.replace("</cellXfs>",
     '<xf numFmtId="0" fontId="3" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1">' +
     '<alignment horizontal="center" vertical="center" wrapText="1"/>' +
@@ -827,6 +830,9 @@ async function customizeTemplate(zip) {
     '</xf>' +
     '<xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1">' +
     '<alignment horizontal="left" vertical="center"/>' +
+    '</xf>' +
+    '<xf numFmtId="0" fontId="3" fillId="4" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1">' +
+    '<alignment horizontal="center" vertical="center" wrapText="1"/>' +
     '</xf></cellXfs>'
   );
 
@@ -980,33 +986,47 @@ export async function exportUnifiedExcel(selectedSprint) {
 
     console.log(`[exportExcel] Sprint PF3: "${sprintParaPF3}", Sprint QA: "${sprintParaQA}"`);
 
-    // ─── Hoja "Osi" (sheet2) — todos los tickets ────────────────────
+    // ─── Hoja "Osi" (sheet2) — tickets filtrados ───────────────────
+    const isStory = (type) => (type || "").toLowerCase().includes("histori") || (type || "").toLowerCase() === "story";
+    const selectedSprintList = sprintParaPF3 ? sprintParaPF3.split(",").map((s) => s.trim()) : [];
+
     const headersOsi = [
-      "Tipo", "Clave", "Resumen", "Subtareas", "Principal",
+      "Tipo", "HU Reportada", "Clave", "Resumen", "Subtareas", "Principal",
       "Épica", "Codigo HU", "Historia", "Sprint", "Persona asignada", "Story Points",
-      "Estado", "Informador", "Creada", "Etiquetas", "Sprint Creado", "HU Reportada",
+      "Estado", "Informador", "Creada", "Etiquetas", "Sprint Creado",
     ];
-    const rowsOsi = allTickets.map((t) => ({
-      Tipo: t.issue_type || "",
-      Clave: t.jira_key || "",
-      Resumen: t.summary || "",
-      Subtareas: (subtaskMap[t.jira_key] || []).join(", "),
-      Principal: t.parent_key || "",
-      "Épica": resolveEpic(t)?.summary || "",
-      "Codigo HU": resolveParentStory(t)?.jira_key || "",
-      Historia: resolveParentStory(t)?.summary || "",
-      Sprint: t.sprint || "",
-      "Persona asignada": resolveName(t.assignee_email),
-      "Story Points": t.story_points != null && t.story_points !== "" ? Number(t.story_points) : "",
-      Estado: normalizeStatus(t.status),
-      Informador: resolveName(t.reporter_email),
-      Creada: t.created_at ? formatDate(t.created_at) : "",
-      Etiquetas: Array.isArray(t.labels) ? t.labels.join(", ") : "",
-      "Sprint Creado": t.created_sprint || t.sprint || "",
-      "HU Reportada": reportedKeys.has(t.jira_key) ? "Sí" : "No",
-    }));
+    const rowsOsi = allTickets
+      .filter((t) => {
+        // 1. Tipo: solo Historias
+        if (!isStory(t.issue_type)) return false;
+        // 2. Etiquetas: desmarcar únicamente No_Reportar
+        if (Array.isArray(t.labels) && t.labels.includes("No_Reportar")) return false;
+        // 3. Sprint: únicamente el sprint actual (o sprints seleccionados)
+        if (selectedSprintList.length > 0 && !selectedSprintList.includes(t.sprint)) return false;
+        return true;
+      })
+      .map((t) => ({
+        Tipo: t.issue_type || "",
+        "HU Reportada": reportedKeys.has(t.jira_key) ? "Sí" : "No",
+        Clave: t.jira_key || "",
+        Resumen: t.summary || "",
+        Subtareas: (subtaskMap[t.jira_key] || []).join(", "),
+        Principal: t.parent_key || "",
+        "Épica": resolveEpic(t)?.summary || "",
+        "Codigo HU": resolveParentStory(t)?.jira_key || "",
+        Historia: resolveParentStory(t)?.summary || "",
+        Sprint: t.sprint || "",
+        "Persona asignada": resolveName(t.assignee_email),
+        "Story Points": t.story_points != null && t.story_points !== "" ? Number(t.story_points) : "",
+        Estado: normalizeStatus(t.status),
+        Informador: resolveName(t.reporter_email),
+        Creada: t.created_at ? formatDate(t.created_at) : "",
+        Etiquetas: Array.isArray(t.labels) ? t.labels.join(", ") : "",
+        "Sprint Creado": t.created_sprint || t.sprint || "",
+      }));
     const osiXml = buildSheetXml(headersOsi, rowsOsi,
-      [16, 13, 52, 20, 13, 32, 13, 40, 22, 24, 13, 20, 24, 18, 20, 22, 15], sst);
+      [16, 15, 13, 52, 20, 13, 32, 13, 40, 22, 24, 13, 20, 24, 18, 20, 22], sst, "6",
+      new Set([4, 7, 8]), { "HU Reportada": "10" }); // Ocultar: Subtareas(4), Codigo HU(7), Historia(8); HU Reportada estilo 10 (naranja)
     console.log(`[exportExcel] ✅ Hoja Osi: ${rowsOsi.length} filas`);
 
     // ─── Hoja "Datos QA" (sheet4) — TODOS los tickets PF3QA ────────
