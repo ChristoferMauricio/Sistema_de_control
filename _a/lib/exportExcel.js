@@ -104,7 +104,7 @@ class SharedStrings {
    GENERADOR DE HOJAS
    ═══════════════════════════════════════════════════════════════════════ */
 
-function buildSheetXml(headers, rows, colWidths, sst, headerStyle = "6", hiddenCols = new Set(), customHeaderStyles = {}) {
+function buildSheetXml(headers, rows, colWidths, sst, headerStyle = "6", hiddenCols = new Set(), customHeaderStyles = {}, autoFilterXml = "") {
   const lastCol = colLetter(headers.length - 1);
   const lastRow = rows.length + 1;
 
@@ -137,7 +137,8 @@ function buildSheetXml(headers, rows, colWidths, sst, headerStyle = "6", hiddenC
 
   rows.forEach((row, ri) => {
     const r = ri + 2;
-    xml += `<row r="${r}">`;
+    const hAttr = row._hidden ? ' hidden="1"' : '';
+    xml += `<row r="${r}"${hAttr}>`;
     headers.forEach((h, c) => {
       const val = row[h];
       if (val === "" || val == null) return;
@@ -152,7 +153,11 @@ function buildSheetXml(headers, rows, colWidths, sst, headerStyle = "6", hiddenC
   });
 
   xml += "</sheetData>";
-  xml += `<autoFilter ref="A1:${lastCol}${lastRow}"/>`;
+  if (autoFilterXml) {
+    xml += `<autoFilter ref="A1:${lastCol}${lastRow}">${autoFilterXml}</autoFilter>`;
+  } else {
+    xml += `<autoFilter ref="A1:${lastCol}${lastRow}"/>`;
+  }
   xml += "</worksheet>";
   return xml;
 }
@@ -909,7 +914,7 @@ export async function exportUnifiedExcel(selectedSprint) {
 
     console.log(`[exportExcel] Sprint PF3: "${sprintParaPF3}", Sprint QA: "${sprintParaQA}"`);
 
-    // ─── Hoja "Osi" (sheet2) — tickets filtrados ───────────────────
+    // ─── Hoja "Osi" (sheet2) — TODOS los tickets (con filtro pre-aplicado) ─────
     const isStory = (type) => (type || "").toLowerCase().includes("histori") || (type || "").toLowerCase() === "story";
     const selectedSprintList = sprintParaPF3 ? sprintParaPF3.split(",").map((s) => s.trim()) : [];
 
@@ -918,17 +923,18 @@ export async function exportUnifiedExcel(selectedSprint) {
       "Épica", "Codigo HU", "Historia", "Sprint", "Persona asignada", "Story Points",
       "Estado", "Informador", "Creada", "Etiquetas", "Sprint Creado",
     ];
-    const rowsOsi = allTickets
-      .filter((t) => {
-        // 1. Tipo: solo Historias
-        if (!isStory(t.issue_type)) return false;
-        // 2. Etiquetas: desmarcar únicamente No_Reportar
-        if (Array.isArray(t.labels) && t.labels.includes("No_Reportar")) return false;
-        // 3. Sprint: únicamente el sprint actual (o sprints seleccionados)
-        if (selectedSprintList.length > 0 && !selectedSprintList.includes(t.sprint)) return false;
-        return true;
-      })
-      .map((t) => ({
+
+    const rowsOsi = allTickets.map((t) => {
+      // Determinar si la fila debe ocultarse por defecto en el AutoFilter de Excel:
+      // 1. Tipo: ocultar si no es Historia
+      // 2. Etiquetas: ocultar si contiene "No_Reportar"
+      // 3. Sprint: ocultar si no pertenece al sprint seleccionado
+      const isHidden = !isStory(t.issue_type) ||
+        (Array.isArray(t.labels) && t.labels.includes("No_Reportar")) ||
+        (selectedSprintList.length > 0 && !selectedSprintList.includes(t.sprint));
+
+      return {
+        _hidden: isHidden,
         Tipo: t.issue_type || "",
         "HU Reportada": reportedKeys.has(t.jira_key) ? "Sí" : "No",
         Clave: t.jira_key || "",
@@ -946,11 +952,31 @@ export async function exportUnifiedExcel(selectedSprint) {
         Creada: t.created_at ? formatDate(t.created_at) : "",
         Etiquetas: Array.isArray(t.labels) ? t.labels.join(", ") : "",
         "Sprint Creado": t.created_sprint || t.sprint || "",
-      }));
-    const osiXml = buildSheetXml(headersOsi, rowsOsi,
-      [16, 15, 13, 52, 20, 13, 32, 13, 40, 22, 24, 13, 20, 24, 18, 20, 22], sst, "6",
-      new Set([4, 7, 8]), { "HU Reportada": "10" }); // Ocultar: Subtareas(4), Codigo HU(7), Historia(8); HU Reportada estilo 10 (naranja)
-    console.log(`[exportExcel] ✅ Hoja Osi: ${rowsOsi.length} filas`);
+      };
+    });
+
+    // Construir XML de AutoFilter pre-seleccionado para Excel
+    const storyTypesInCache = [...new Set(allTickets.map((t) => t.issue_type).filter(isStory))];
+    const tipoFiltersXml = storyTypesInCache.length > 0
+      ? `<filterColumn colId="0"><filters>${storyTypesInCache.map((st) => `<filter val="${escXml(st)}"/>`).join("")}</filters></filterColumn>`
+      : "";
+    const sprintFiltersXml = selectedSprintList.length > 0
+      ? `<filterColumn colId="9"><filters>${selectedSprintList.map((s) => `<filter val="${escXml(s)}"/>`).join("")}</filters></filterColumn>`
+      : "";
+    const etiquetasFiltersXml = `<filterColumn colId="15"><customFilters><customFilter operator="notEqual" val="*No_Reportar*"/></customFilters></filterColumn>`;
+    const osiAutoFilterXml = tipoFiltersXml + sprintFiltersXml + etiquetasFiltersXml;
+
+    const osiXml = buildSheetXml(
+      headersOsi,
+      rowsOsi,
+      [16, 15, 13, 52, 20, 13, 32, 13, 40, 22, 24, 13, 20, 24, 18, 20, 22],
+      sst,
+      "6",
+      new Set([4, 7, 8]), // Ocultar columnas: Subtareas(4), Codigo HU(7), Historia(8)
+      { "HU Reportada": "10" }, // Estilo naranja para HU Reportada
+      osiAutoFilterXml
+    );
+    console.log(`[exportExcel] ✅ Hoja Osi: ${rowsOsi.length} filas totales (${rowsOsi.filter((r) => !r._hidden).length} visibles)`);
 
     // ─── Hoja "Datos QA" (sheet4) — TODOS los tickets PF3QA ────────
     const headersQA = ["Tipo", "Clave", "Resumen", "Sprint", "Persona asignada", "Estado", "Informador", "Etiquetas"];
