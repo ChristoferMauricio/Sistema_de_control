@@ -387,11 +387,16 @@ export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
     const rawRows = incidencias.map((inc) => {
       const reporter = parseReporter(inc.description);
       const confluence = parseConfluenceKey(inc.description);
+      // Quitar la etiqueta del resumen: el texto antes del separador "|" ya
+      // se muestra en la columna dedicada "Etiqueta", así que se elimina del resumen.
+      const pipeIdx = inc.resumen ? inc.resumen.indexOf("|") : -1;
+      const resumenLimpio = pipeIdx !== -1 ? inc.resumen.substring(pipeIdx + 1).trim() : inc.resumen;
+
       return [
         inc.clave,
         confluence || "-",
         inc.etiqueta || "-",
-        inc.resumen,
+        resumenLimpio,
         reporter || "-",
         inc.iteracion,
         inc.asignado,
@@ -434,7 +439,7 @@ export default function IncidenciasTable({ incidencias, role, gsmData = [] }) {
 
     ws["!cols"] = [
       { wch: 12 }, { wch: 14 }, { wch: 22 }, { wch: 50 }, { wch: 22 }, { wch: 14 },
-      { wch: 22 }, { wch: 18 }, { wch: 26 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 },
+      { wch: 22 }, { wch: 18 }, { wch: 26 }, { wch: 14, hidden: true }, { wch: 14 }, { wch: 14 }, { wch: 14 },
     ];
 
     /* ─── Hoja 2: Resumen (pre-populate para PivotTable + chart) ─── */
