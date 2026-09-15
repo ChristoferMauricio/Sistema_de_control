@@ -979,7 +979,10 @@ export async function exportUnifiedExcel(selectedSprint) {
     console.log(`[exportExcel] ✅ Hoja Osi: ${rowsOsi.length} filas totales (${rowsOsi.filter((r) => !r._hidden).length} visibles)`);
 
     // ─── Hoja "Datos QA" (sheet4) — TODOS los tickets PF3QA ────────
-    const headersQA = ["Tipo", "Clave", "Resumen", "Sprint", "Persona asignada", "Estado", "Informador", "Etiquetas"];
+    const headersQA = [
+      "Tipo", "Clave", "Resumen", "Sprint", "Persona asignada", "Estado", "Informador",
+      "Etiquetas", "Fecha Creación", "Fecha de Modificación", "Story Points", "Principal", "Épica",
+    ];
 
     const rowsQA = pf3qaTickets.map((t) => ({
       Tipo: t.issue_type || "",
@@ -990,9 +993,14 @@ export async function exportUnifiedExcel(selectedSprint) {
       Estado: normalizeStatus(t.status),
       Informador: resolveName(t.reporter_email),
       Etiquetas: Array.isArray(t.labels) ? t.labels.join(", ") : "",
+      "Fecha Creación": t.created_at ? formatDate(t.created_at) : "",
+      "Fecha de Modificación": t.updated_at ? formatDate(t.updated_at) : "",
+      "Story Points": t.story_points != null && t.story_points !== "" ? Number(t.story_points) : "",
+      Principal: t.parent_key || "",
+      "Épica": resolveEpic(t)?.summary || "",
     }));
     const qaXml = buildSheetXml(headersQA, rowsQA,
-      [16, 13, 52, 22, 24, 20, 24, 20], sst);
+      [16, 13, 52, 22, 24, 20, 24, 20, 20, 20, 13, 16, 32], sst);
     console.log(`[exportExcel] ✅ Hoja QA: ${rowsQA.length} filas (todos los PF3QA)`);
 
     /* ═══════════════════════════════════════════════════════════════
