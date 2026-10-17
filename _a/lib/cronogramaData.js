@@ -27,7 +27,8 @@
 
 /**
  * Cronograma completo del proyecto PGIM Fase 3.
- * Contiene la etapa pre-operativa y las 18 iteraciones operativas (F3.01 a F3.18).
+ * Contiene la etapa pre-operativa y las 23 iteraciones operativas (F3.01 a F3.23).
+ * Fuente: "Cronograma de Sprints.xlsx".
  * Cada iteracion tiene una duracion de 30 dias calendario, con 5 dias adicionales
  * de plazo para presentacion de entregables.
  *
@@ -63,6 +64,11 @@ export const cronogramaData = [
   { no: 16, etapa: "Etapa Operativa", iteracion: "Iteración F3.16", duracion: 30, duracionAcumulada: 495, fechaInicio: "2026-06-26", fechaFin: "2026-07-25", plazoPresentacion: 5, fechaMaxima: "2026-07-30" },
   { no: 17, etapa: "Etapa Operativa", iteracion: "Iteración F3.17", duracion: 30, duracionAcumulada: 525, fechaInicio: "2026-07-26", fechaFin: "2026-08-24", plazoPresentacion: 5, fechaMaxima: "2026-08-29" },
   { no: 18, etapa: "Etapa Operativa", iteracion: "Iteración F3.18", duracion: 30, duracionAcumulada: 555, fechaInicio: "2026-08-25", fechaFin: "2026-09-23", plazoPresentacion: 5, fechaMaxima: "2026-09-28" },
+  { no: 19, etapa: "Etapa Operativa", iteracion: "Iteración F3.19", duracion: 30, duracionAcumulada: 585, fechaInicio: "2026-09-29", fechaFin: "2026-10-28", plazoPresentacion: 5, fechaMaxima: "2026-11-02" },
+  { no: 20, etapa: "Etapa Operativa", iteracion: "Iteración F3.20", duracion: 30, duracionAcumulada: 615, fechaInicio: "2026-10-29", fechaFin: "2026-11-27", plazoPresentacion: 5, fechaMaxima: "2026-12-02" },
+  { no: 21, etapa: "Etapa Operativa", iteracion: "Iteración F3.21", duracion: 30, duracionAcumulada: 645, fechaInicio: "2026-11-28", fechaFin: "2026-12-27", plazoPresentacion: 5, fechaMaxima: "2027-01-01" },
+  { no: 22, etapa: "Etapa Operativa", iteracion: "Iteración F3.22", duracion: 30, duracionAcumulada: 675, fechaInicio: "2026-12-28", fechaFin: "2027-01-26", plazoPresentacion: 5, fechaMaxima: "2027-01-31" },
+  { no: 23, etapa: "Etapa Operativa", iteracion: "Iteración F3.23", duracion: 30, duracionAcumulada: 705, fechaInicio: "2027-01-27", fechaFin: "2027-02-25", plazoPresentacion: 5, fechaMaxima: "2027-03-02" },
 ];
 
 // ─── Funciones del Cronograma ───────────────────────────────────────────────
