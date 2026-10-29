@@ -779,17 +779,39 @@ export async function exportUnifiedExcel(selectedSprint) {
     /* ═══════════════════════════════════════════════════════════════
        1. OBTENER DATOS DE SUPABASE
        ═══════════════════════════════════════════════════════════════ */
-    const [equipoRes, personsRes, huReportadasRes, exclusionsRes] = await Promise.all([
+    // hu_reportadas se pagina: supera fácilmente el límite por defecto de 1000 filas
+    async function fetchAllHuReportadas() {
+      let rows = [];
+      let offset = 0;
+      const size = 1000;
+      while (true) {
+        const { data, error } = await supabase
+          .from("hu_reportadas")
+          .select("story_key")
+          .order("id", { ascending: true })
+          .range(offset, offset + size - 1);
+        if (error) return { data: rows, error };
+        if (!data || data.length === 0) break;
+        rows = rows.concat(data);
+        if (data.length < size) break;
+        offset += size;
+      }
+      return { data: rows, error: null };
+    }
+
+    const [equipoRes, personsRes, huReportadasRes, exclusionsRes, nombresRes] = await Promise.all([
       supabase.from("equipo_desarrollo").select("correo_pgim, correo_gcorp, nombre_clave, nombre"),
       supabase.from("jira_persons").select("email, display_name"),
-      supabase.from("hu_reportadas").select("story_key"),
+      fetchAllHuReportadas(),
       supabase.from("deuda_tecnica_exclusions").select("story_key"),
+      supabase.from("Nombres").select("Nombre, Programador"),
     ]);
 
     if (equipoRes.error) console.error("[exportExcel] Error equipo:", equipoRes.error);
     if (personsRes.error) console.error("[exportExcel] Error persons:", personsRes.error);
     if (huReportadasRes.error) console.error("[exportExcel] Error huReportadas:", huReportadasRes.error);
     if (exclusionsRes?.error) console.error("[exportExcel] Error exclusions:", exclusionsRes.error);
+    if (nombresRes?.error) console.error("[exportExcel] Error nombres:", nombresRes.error);
 
     const reportedKeys = new Set((huReportadasRes.data || []).map((r) => r.story_key));
     const exclusionsSet = new Set((exclusionsRes?.data || []).map((r) => r.story_key));
@@ -846,13 +868,19 @@ export async function exportUnifiedExcel(selectedSprint) {
       if (p.email && p.display_name) personsMap[p.email.toLowerCase()] = p.display_name;
     });
 
+    // Alias de la tabla "Nombres" (Programador Jira → Nombre), igual que en el dashboard
+    const nombresMap = {};
+    (nombresRes?.data || []).forEach((n) => {
+      if (n.Programador && n.Nombre) nombresMap[n.Programador.toLowerCase()] = n.Nombre;
+    });
+
     function resolveName(email) {
       if (!email || email.trim() === "") return "—";
       const key = email.toLowerCase();
       const byEmail = equipoEmailMap[key];
       if (byEmail) return NAME_OVERRIDES[byEmail.toLowerCase()] || byEmail;
       const displayName = personsMap[key] || email;
-      const resolved = equipoKeyMap[displayName.toLowerCase()] || displayName;
+      const resolved = equipoKeyMap[displayName.toLowerCase()] || nombresMap[displayName.toLowerCase()] || displayName;
       return NAME_OVERRIDES[resolved.toLowerCase()] || resolved;
     }
 
