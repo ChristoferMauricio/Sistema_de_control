@@ -102,15 +102,18 @@ export default function DetailReviewTable({ tickets = [] }) {
   // Datos auxiliares para resolución de nombres
   const [persons, setPersons] = useState([]);
   const [equipo, setEquipo] = useState([]);
+  const [nombres, setNombres] = useState([]);
 
   // ── Cargar datos auxiliares para resolución de nombres ──────────────────
   useEffect(() => {
     Promise.all([
       supabase.from("jira_persons").select("email, display_name"),
       supabase.from("equipo_desarrollo").select("nombre, nombre_clave, correo_pgim, correo_gcorp"),
-    ]).then(([personsRes, equipoRes]) => {
+      supabase.from("Nombres").select("Nombre, Programador"),
+    ]).then(([personsRes, equipoRes, nombresRes]) => {
       if (personsRes.data) setPersons(personsRes.data);
       if (equipoRes.data) setEquipo(equipoRes.data);
+      if (nombresRes?.data) setNombres(nombresRes.data);
     });
   }, []);
 
@@ -153,18 +156,32 @@ export default function DetailReviewTable({ tickets = [] }) {
 
   const personsMap = useMemo(() => {
     const map = {};
-    persons.forEach((p) => { if (p.email) map[p.email] = p.display_name; });
+    persons.forEach((p) => {
+      if (p.email && p.display_name) map[p.email.toLowerCase()] = p.display_name;
+    });
     return map;
   }, [persons]);
 
+  const nombresMap = useMemo(() => {
+    const map = {};
+    nombres.forEach((n) => {
+      if (n.Programador && n.Nombre) map[n.Programador.toLowerCase()] = n.Nombre;
+    });
+    return map;
+  }, [nombres]);
+
   const resolveName = useCallback((email) => {
     if (!email || email.trim() === "") return "Sin asignar";
-    const byEmail = equipoEmailMap[email.toLowerCase()];
+    const key = email.toLowerCase();
+    const byEmail = equipoEmailMap[key];
     if (byEmail) return NAME_OVERRIDES[byEmail.toLowerCase()] || byEmail;
-    const displayName = personsMap[email] || email;
-    const resolved = equipoKeyMap[displayName.toLowerCase()] || displayName;
+    const displayName = personsMap[key] || email;
+    const resolved =
+      equipoKeyMap[displayName.toLowerCase()] ||
+      nombresMap[displayName.toLowerCase()] ||
+      displayName;
     return NAME_OVERRIDES[resolved.toLowerCase()] || resolved;
-  }, [equipoEmailMap, equipoKeyMap, personsMap]);
+  }, [equipoEmailMap, equipoKeyMap, personsMap, nombresMap]);
 
   // ── Filtrar solo Historias ─────────────────────────────────────────────
   const historias = useMemo(() => {
@@ -186,6 +203,7 @@ export default function DetailReviewTable({ tickets = [] }) {
       ...t,
       category: classifyDescription(t.description),
       assigneeName: resolveName(t.assignee_email),
+      reporterName: t.reporter_email ? resolveName(t.reporter_email) : "—",
       preview: getPlainPreview(t.description, 100),
       normalizedStatus: normalizeStatus(t.status),
     }));
